@@ -1,0 +1,22 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - xue_hua_media_compression (0.0.1):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - xue_hua_media_compression (from `Flutter/ephemeral/.symlinks/plugins/xue_hua_media_compression/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  xue_hua_media_compression:
+    :path: Flutter/ephemeral/.symlinks/plugins/xue_hua_media_compression/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  xue_hua_media_compression: 7431fc41bd72cc4b0fd22e374c46d91f4ee61866
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.16.2

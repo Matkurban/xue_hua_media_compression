@@ -1,0 +1,99 @@
+[package]
+name = "xue_hua_media_compression"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+# =============================================================================
+# 通用依赖（所有平台共用）
+# - flutter_rust_bridge: FRB 运行时
+# - image / oxipng / ravif: 纯 Rust 图片编解码与压缩
+# - mp4: 纯 Rust 封装器，把各端硬编吐出的 H.264/H.265 裸流打包成标准 MP4
+# - thiserror / anyhow: 错误处理
+# =============================================================================
+[dependencies]
+flutter_rust_bridge = "=2.12.0"
+image = { version = "0.25.10", default-features = false, features = [
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+] }
+oxipng = { version = "10.1.1", default-features = false, features = ["zopfli"] }
+ravif = "0.13.0"
+rgb = "0.8.53"
+mp4 = "0.14.0"
+thiserror = "2.0.18"
+anyhow = "1.0.103"
+bytes = "1.12.0"
+zenwebp = "0.4.4"
+# HEIC/HEIF 通过 libheif-rs（封装 C++ libheif）。需要系统安装 libheif + pkg-config，
+# 因此默认关闭，移动端构建时用 `--features heic` 打开（见 [features]）。
+libheif-rs = { version = "2.7.0", optional = true }
+
+[features]
+default = []
+# 打开后启用 HEIC/HEIF 编解码（要求目标平台存在 libheif 系统库）。
+heic = ["dep:libheif-rs"]
+
+# =============================================================================
+# Windows: Media Foundation (WMF) 硬件编码
+# =============================================================================
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_Media_MediaFoundation",
+    "Win32_Media_KernelStreaming",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+] }
+windows-core = "0.62.2"
+
+# =============================================================================
+# Apple (iOS / macOS): VideoToolbox 硬件编码
+# =============================================================================
+[target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
+# 苹果原生 VideoToolbox 的 sys 绑定（裸 FFI）。也可只在 build.rs 里
+# link framework=VideoToolbox 后自行声明 extern "C"。
+video-toolbox-sys = "0.2"
+core-foundation = "0.10.1"
+core-foundation-sys = "0.8"
+core-media-sys = "0.1.0"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-av-foundation = { version = "0.3", features = ["AVAsset", "AVAssetReader", "AVAssetReaderOutput", "AVAssetTrack", "AVMediaFormat"] }
+objc2-core-video = "0.3"
+objc2-core-media = "0.3"
+
+# =============================================================================
+# Android: AMediaCodec (libmediandk.so) 硬件编码
+# =============================================================================
+[target.'cfg(target_os = "android")'.dependencies]
+# mediacodec 克拉直接封装 NDK 的 AMediaCodec 接口。
+mediacodec = "0.1"
+ndk = "0.9"
+ndk-sys = "0.6"
+ndk-context = "0.1.1"
+jni = "0.22.4"
+
+# =============================================================================
+# Linux: VA-API 硬件编码
+# =============================================================================
+[target.'cfg(target_os = "linux")'.dependencies]
+# crates.io 上没有 `vaapi`/`libva` 这两个名字；VA-API 的可用封装是
+# cros-libva（安全封装）或 libva-sys（裸 FFI）。这里用 cros-libva。
+cros-libva = "0.0.13"
+# 软件 H.264/H.265 解码（非 FFmpeg），配合 VA-API 硬编。
+openh264 = "0.9"
+
+[build-dependencies]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+[profile.dev]
+opt-level = 2
