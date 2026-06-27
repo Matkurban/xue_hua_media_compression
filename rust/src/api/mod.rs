@@ -9,6 +9,7 @@
 
 pub mod traits;
 
+pub mod file_input;
 pub mod image;
 pub mod media;
 pub mod platform;

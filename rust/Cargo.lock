@@ -1307,7 +1307,6 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "706bf8a5e8c8ddb99128c3291d31bd21f4bcde17f0f4c20ec678d85c74faa149"
 dependencies = [
- "jobserver",
  "log 0.4.33",
 ]
 
@@ -1535,7 +1534,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
  "bitflags",
+ "block2",
  "dispatch2",
+ "libc",
  "objc2",
 ]
 
@@ -1924,7 +1925,6 @@ dependencies = [
  "av1-grain",
  "bitstream-io",
  "built",
- "cc",
  "cfg-if 1.0.0",
  "interpolate_name",
  "itertools 0.14.0",
@@ -1932,7 +1932,6 @@ dependencies = [
  "libfuzzer-sys",
  "log 0.4.33",
  "maybe-rayon",
- "nasm-rs",
  "new_debug_unreachable",
  "noop_proc_macro",
  "num-derive",
@@ -2709,6 +2708,7 @@ dependencies = [
  "ndk-sys",
  "objc2",
  "objc2-av-foundation",
+ "objc2-core-foundation",
  "objc2-core-media",
  "objc2-core-video",
  "objc2-foundation",

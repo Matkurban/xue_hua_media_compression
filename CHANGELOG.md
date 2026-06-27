@@ -13,7 +13,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2025-06-27
+## [Unreleased]
+
+---
+
+## [1.1.0] - 2026-06-28
+
+### Changed / 变更
+
+- **Direct path input / 路径直传** — File picker paths (`xFile.path`) are passed directly to Rust; no Dart-side cache copy or `readAsBytes`. Rust normalizes `file://` prefixes and reads files by path.  
+  文件选择器路径（`xFile.path`）直接传给 Rust，不再在 Dart 侧复制到缓存或 `readAsBytes`；Rust 规范化 `file://` 并按路径读文件。
+
+- **Android `content://` / Android content URI** — Opened in Rust via `ContentResolver` + fd for `AMediaExtractor` (streaming, no full-file load in Dart).  
+  Android `content://` 由 Rust 通过 `ContentResolver` 取 fd 供 `AMediaExtractor` 流式读取。
+
+- **Linux video streaming / Linux 视频流式处理** — VA-API pipeline decodes and encodes one frame at a time with a fixed surface pool; no longer buffers all NV12 frames in memory (same class of OOM fix as Apple VideoToolbox).  
+  Linux VA-API 管线改为逐帧解码+编码并使用固定 surface 池，不再将全部 NV12 帧载入内存（与 Apple VideoToolbox 同类 OOM 修复）。
+
+- **Apple (macOS/iOS) video streaming / Apple 视频流式处理** — VideoToolbox pipeline streams decode+encode per frame instead of loading all CVPixelBuffers.  
+  VideoToolbox 改为逐帧流式解码+编码，不再一次性加载全部 CVPixelBuffer。
+
+- **Output path parent dirs / 输出目录** — Rust creates parent directories before writing image/video output (`prepare_output_path`).  
+  Rust 写入图片/视频输出前自动创建父目录（`prepare_output_path`）。
+
+- **Example temp dir / 示例临时目录** — Example uses `Directory.systemTemp` instead of `path_provider` (avoids macOS native dependency conflicts).  
+  示例改用 `Directory.systemTemp`，不再依赖 `path_provider`（避免 macOS 原生依赖冲突）。
+
+### Removed / 移除
+
+- **`ensureLocalFileInput` / `ensureLocalVideoInput`** — Removed from the public API; use direct paths instead.  
+  已从公开 API 移除；请直接传入 picker 路径。
+
+---
+
+## [1.0.0] - 2026-06-27
 
 First public release.  
 首次公开发布。
@@ -42,4 +75,5 @@ First public release.
 - **Multi-platform FFI plugin / 多平台 FFI 插件** — Android, iOS, macOS, Windows, Linux via Cargokit + flutter_rust_bridge 2.12.  
   通过 Cargokit + flutter_rust_bridge 2.12 支持 Android、iOS、macOS、Windows、Linux。
 
-[1.0.0]: https://github.com/your-org/xue_hua_media_compression/releases/tag/v1.0.0
+[1.1.0]: https://github.com/Matkurban/xue_hua_media_compression/releases/tag/v1.1.0
+[1.0.0]: https://github.com/Matkurban/xue_hua_media_compression/releases/tag/v1.0.0

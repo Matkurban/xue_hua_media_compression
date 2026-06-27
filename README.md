@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**Version:** 1.0.0 · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
+**Version:** 1.1.0 · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
 A cross-platform Flutter FFI plugin for **image and video compression**, powered by Rust and [flutter_rust_bridge](https://codelabs.flutter.dev/codelabs/flutter-ffigen). Image compression runs entirely in Rust on all platforms; video compression uses each platform's native **hardware encoder** and muxes the result into standard MP4.
 
@@ -79,7 +79,7 @@ Add the dependency to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^1.0.0
+  xue_hua_media_compression: ^1.1.0
 ```
 
 For local development (monorepo / path dependency):
@@ -168,7 +168,9 @@ Add to `android/app/src/main/AndroidManifest.xml` as needed:
 
 Also request runtime permissions in Dart (e.g. with [`permission_handler`](https://pub.dev/packages/permission_handler)) before opening the gallery or file picker.
 
-**Video paths on Android:** Paths from `file_selector` or the photo picker are often `content://` URIs that NDK `AMediaExtractor` cannot open directly. Use the bundled helper `ensureLocalVideoInput` to copy the stream to a local cache file first (see [Video compression](#video-compression)).
+**File picker paths:** Pass `xFile.path` from `file_selector` directly to `compressFile` / `video.compress`. Rust reads the file by path (video uses native streaming APIs; Android `content://` URIs are opened via JNI fd — no Dart-side copy or `readAsBytes`).
+
+**macOS sandbox:** Enable `com.apple.security.files.user-selected.read-write` (or read-only) in your entitlements so Rust can read user-picked files during the picker session.
 
 ### iOS / macOS
 
@@ -261,7 +263,28 @@ In-memory compression.
 
 #### `compressFile`
 
-File-to-file compression. Returns output file size in bytes.
+File-to-file compression. Returns output file size in bytes. Rust reads `inputPath` directly (normalizes `file://` prefixes). Pass the path from your file picker as-is.
+
+#### Image compression with file picker
+
+```dart
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
+import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
+
+final xFile = await openFile(/* ... */);
+if (xFile == null) return;
+
+// `Directory.systemTemp` avoids extra native deps in the example; apps may use path_provider instead.
+final tmpDir = Directory.systemTemp;
+await XueHuaMediaCompression.image.compressFile(
+  inputPath: xFile.path,
+  outputPath: '${tmpDir.path}/out.jpg',
+  format: ImageFormat.jpeg,
+  quality: 80,
+);
+```
 
 #### `compressWith`
 
@@ -294,30 +317,28 @@ Returns `VideoResult`:
 
 #### Video compression
 
-On Android, when using a file picker:
+With a file picker, pass `xFile.path` directly:
 
 ```dart
-import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
-final tmpDir = await getTemporaryDirectory();
-final localPath = await ensureLocalVideoInput(
-  inputPath: xFile.path,
-  cacheDirectory: tmpDir.path,
-  openStream: () async => xFile.openRead().cast<List<int>>(),
-  fileName: xFile.name,
-  expectedBytes: await xFile.length(),
-);
+final xFile = await openFile(/* ... */);
+if (xFile == null) return;
 
+// `Directory.systemTemp` avoids extra native deps in the example; apps may use path_provider instead.
+final tmpDir = Directory.systemTemp;
 final result = await XueHuaMediaCompression.video.compress(
-  inputPath: localPath,
+  inputPath: xFile.path,
   outputPath: '${tmpDir.path}/out.mp4',
   codec: VideoCodec.h264,
   bitrate: 2_000_000,
 );
 ```
 
-`ensureLocalVideoInput` validates the copied file (non-empty, size match, MP4/MOV container magic).
+On Android, `content://` URIs are opened in Rust via `ContentResolver` (streaming fd, no full-file copy in Dart).
 
 ---
 
@@ -361,7 +382,7 @@ Features demonstrated:
 - Image format selection (JPEG / PNG / WebP / AVIF)
 - Quality slider and before/after preview
 - Video codec and bitrate selection
-- `ensureLocalVideoInput` for Android file picker paths
+- Direct `xFile.path` → `compressFile` / `video.compress` (no Dart-side cache copy)
 - Live display of `videoBackendName()`
 
 ---
@@ -373,7 +394,7 @@ xue_hua_media_compression/
 ├── lib/                    # Dart public API & FRB generated bindings
 │   └── src/
 │       ├── media_compression.dart   # Facade (XueHuaMediaCompression)
-│       ├── video_input.dart         # ensureLocalVideoInput helper
+│       ├── file_input.rs            # Path normalization (Rust)
 │       └── rust/                    # flutter_rust_bridge generated code
 ├── rust/                   # Rust implementation (image + platform video)
 │   └── src/api/

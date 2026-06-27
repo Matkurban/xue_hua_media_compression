@@ -121,14 +121,16 @@ extern "C" {
 
 fn validate_input_path(input_path: &str) -> Result<(), MediaError> {
     if input_path.starts_with("content://") {
-        return Err(MediaError::Decode(
-            "无法打开视频文件: content:// URI 不能直接访问（请先将视频复制到应用缓存目录）".into(),
-        ));
-    }
-    if input_path.starts_with("file://") {
-        return Err(MediaError::Decode(
-            "无法打开视频文件: file:// 前缀路径不受支持，请使用绝对路径".into(),
-        ));
+        #[cfg(target_os = "android")]
+        {
+            return Ok(());
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            return Err(MediaError::Decode(
+                "无法打开视频文件: content:// URI 仅 Android 支持".into(),
+            ));
+        }
     }
     if !Path::new(input_path).exists() {
         return Err(MediaError::Decode(format!(
@@ -161,6 +163,10 @@ fn try_set_data_source_fd(extractor: RawPtr, input_path: &str) -> Result<(), Str
     let file = File::open(input_path).map_err(|e| format!("File::open: {e}"))?;
     let len = file.metadata().map_err(|e| format!("metadata: {e}"))?.len() as i64;
     let fd = file.as_raw_fd();
+    try_set_data_source_fd_raw(extractor, fd, len)
+}
+
+fn try_set_data_source_fd_raw(extractor: RawPtr, fd: i32, len: i64) -> Result<(), String> {
     unsafe {
         if AMediaExtractor_setDataSourceFd(extractor, fd, 0, len) != AMEDIA_OK {
             return Err("AMediaExtractor_setDataSourceFd 失败".into());
@@ -169,7 +175,30 @@ fn try_set_data_source_fd(extractor: RawPtr, input_path: &str) -> Result<(), Str
     Ok(())
 }
 
+fn open_extractor_from_content_uri(uri: &str) -> Result<RawPtr, MediaError> {
+    let (fd, len) = super::android_file::open_content_uri_fd(uri)?;
+    unsafe {
+        let extractor = AMediaExtractor_new();
+        if extractor.is_null() {
+            return Err(MediaError::HardwareUnavailable(
+                "AMediaExtractor_new 失败".into(),
+            ));
+        }
+        if let Err(e) = try_set_data_source_fd_raw(extractor, fd, len) {
+            AMediaExtractor_delete(extractor);
+            return Err(MediaError::Decode(format!(
+                "无法打开 content URI ({uri}): {e}"
+            )));
+        }
+        Ok(extractor)
+    }
+}
+
 fn open_extractor_data_source(input_path: &str) -> Result<RawPtr, MediaError> {
+    if input_path.starts_with("content://") {
+        return open_extractor_from_content_uri(input_path);
+    }
+
     validate_input_path(input_path)?;
     let diagnostics = file_open_diagnostics(input_path);
     unsafe {
@@ -190,7 +219,7 @@ fn open_extractor_data_source(input_path: &str) -> Result<RawPtr, MediaError> {
                 Err(MediaError::Decode(format!(
                     "无法打开视频文件 ({input_path}): \
                      路径方式与 fd 方式均失败 ({fd_err})。{diagnostics} \
-                     请确认文件为完整 MP4/MOV 且已复制到应用可访问目录"
+                     请确认文件为完整 MP4/MOV 且路径可读"
                 )))
             }
         }

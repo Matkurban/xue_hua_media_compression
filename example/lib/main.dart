@@ -1,10 +1,7 @@
 import 'dart:io';
 
-import 'dart:typed_data';
-
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
 Future<void> main() async {
@@ -112,8 +109,10 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
 
   bool _busy = false;
   String? _name;
-  Uint8List? _original;
-  Uint8List? _compressed;
+  String? _originalPath;
+  String? _compressedPath;
+  int? _originalSize;
+  int? _compressedSize;
   Duration? _elapsed;
   String? _error;
 
@@ -122,7 +121,6 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
       _busy = true;
       _error = null;
     });
-    String? tempInPath;
     String? tempOutPath;
     try {
       const typeGroup = XTypeGroup(
@@ -144,41 +142,34 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
         return;
       }
 
-      final tmpDir = await getTemporaryDirectory();
+      final inputPath = file.path;
+      final originalSize = await file.length();
+      final tmpDir = Directory.systemTemp;
       final ts = DateTime.now().millisecondsSinceEpoch;
-      tempInPath = '${tmpDir.path}/xh_img_in_$ts';
       tempOutPath = '${tmpDir.path}/xh_img_out_$ts${_outputExtension(_format)}';
-      await file.saveTo(tempInPath);
-      final original = await File(tempInPath).readAsBytes();
 
       final sw = Stopwatch()..start();
       await XueHuaMediaCompression.image.compressFile(
-        inputPath: tempInPath,
+        inputPath: inputPath,
         outputPath: tempOutPath,
         format: _format,
         quality: _quality.round(),
       );
       sw.stop();
 
-      final compressed = await File(tempOutPath).readAsBytes();
+      final compressedSize = await File(tempOutPath).length();
 
       setState(() {
         _name = file.name;
-        _original = original;
-        _compressed = compressed;
+        _originalPath = inputPath;
+        _compressedPath = tempOutPath;
+        _originalSize = originalSize;
+        _compressedSize = compressedSize;
         _elapsed = sw.elapsed;
       });
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
-      for (final path in [tempInPath, tempOutPath]) {
-        if (path != null) {
-          try {
-            final f = File(path);
-            if (await f.exists()) await f.delete();
-          } catch (_) {}
-        }
-      }
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -262,23 +253,32 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
             const SizedBox(height: 12),
             _ErrorBox(message: _error!),
           ],
-          if (_original != null && _compressed != null) ...[
+          if (_originalPath != null &&
+              _compressedPath != null &&
+              _originalSize != null &&
+              _compressedSize != null) ...[
             const SizedBox(height: 12),
             _SizeResult(
               name: _name ?? '',
-              originalSize: _original!.length,
-              compressedSize: _compressed!.length,
+              originalSize: _originalSize!,
+              compressedSize: _compressedSize!,
               elapsed: _elapsed,
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: _ImagePreview(label: '原图', bytes: _original!),
+                  child: _ImagePreview(
+                    label: '原图',
+                    path: _originalPath!,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _ImagePreview(label: '压缩后', bytes: _compressed!),
+                  child: _ImagePreview(
+                    label: '压缩后',
+                    path: _compressedPath!,
+                  ),
                 ),
               ],
             ),
@@ -324,7 +324,8 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
       _compressedSize = null;
       _elapsed = null;
     });
-    String? tempInputPath;
+    String? tempOutputPath;
+    var succeeded = false;
     try {
       const typeGroup = XTypeGroup(
         label: 'videos',
@@ -337,23 +338,8 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
       }
 
       final originalSize = await file.length();
-      final tmpDir = await getTemporaryDirectory();
-      tempInputPath = await ensureLocalVideoInput(
-        inputPath: file.path,
-        cacheDirectory: tmpDir.path,
-        openStream: () async => file.openRead().cast<List<int>>(),
-        fileName: file.name,
-        expectedBytes: originalSize,
-      );
-      assert(() {
-        // ignore: avoid_print
-        print(
-          '视频已复制到缓存: $tempInputPath, '
-          '大小=${File(tempInputPath!).lengthSync()} 字节',
-        );
-        return true;
-      }());
-      final outPath =
+      final tmpDir = Directory.systemTemp;
+      tempOutputPath =
           '${tmpDir.path}/xh_compressed_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
       setState(() {
@@ -363,8 +349,8 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
 
       final sw = Stopwatch()..start();
       final result = await XueHuaMediaCompression.video.compress(
-        inputPath: tempInputPath,
-        outputPath: outPath,
+        inputPath: file.path,
+        outputPath: tempOutputPath,
         codec: _codec,
         bitrate: (_bitrateMbps * 1000000).round(),
       );
@@ -375,12 +361,13 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
         _resultBackend = result.backend;
         _elapsed = sw.elapsed;
       });
+      succeeded = true;
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
-      if (tempInputPath != null) {
+      if (!succeeded && tempOutputPath != null) {
         try {
-          final f = File(tempInputPath);
+          final f = File(tempOutputPath);
           if (await f.exists()) {
             await f.delete();
           }
@@ -605,10 +592,10 @@ class _KeyValueRow extends StatelessWidget {
 }
 
 class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.label, required this.bytes});
+  const _ImagePreview({required this.label, required this.path});
 
   final String label;
-  final Uint8List bytes;
+  final String path;
 
   @override
   Widget build(BuildContext context) {
@@ -618,8 +605,8 @@ class _ImagePreview extends StatelessWidget {
         const SizedBox(height: 4),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            bytes,
+          child: Image.file(
+            File(path),
             height: 120,
             fit: BoxFit.cover,
             gaplessPlayback: true,

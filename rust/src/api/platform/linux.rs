@@ -27,6 +27,9 @@ use crate::api::video_common::{
     avcc_to_annex_b, extract_param_sets_for_codec, read_mp4_video_metadata, scale_dims, scale_nv12,
 };
 
+/// VA-API 编码 surface 池大小（逐帧轮转，不随视频长度增长）。
+const VAAPI_SURFACE_POOL: usize = 4;
+
 #[flutter_rust_bridge::frb(opaque)]
 pub(crate) struct LinuxVideoCompressor;
 
@@ -56,13 +59,56 @@ fn encode_with_vaapi(
     let fps = opts.fps.unwrap_or(src_fps).max(1);
     let frame_duration = 90_000 / fps;
 
-    let nv12_frames = decode_mp4_to_nv12(input_path, out_w, out_h)?;
+    let file_size = std::fs::metadata(input_path)?.len();
+    let file = File::open(input_path)?;
+    let mut reader = BufReader::new(file);
+    let mut mp4 = Mp4Reader::read_header(&mut reader, file_size)
+        .map_err(|e| MediaError::Decode(e.to_string()))?;
+
+    let input_codec = detect_input_codec_from_reader(&mp4)?;
+    let (track_id, track_src_w, track_src_h) = mp4
+        .tracks()
+        .iter()
+        .find(|(_, t)| t.track_type().ok() == Some(TrackType::Video))
+        .map(|(id, t)| (*id, t.width() as u32, t.height() as u32))
+        .ok_or_else(|| MediaError::Decode("无视频轨".into()))?;
+
+    let sample_count = mp4
+        .sample_count(track_id)
+        .map_err(|e| MediaError::Decode(e.to_string()))?;
+
     let (frames, vps, sps, pps) = match opts.codec {
         VideoCodec::H264 => {
-            encode_nv12_vaapi_h264(&nv12_frames, out_w, out_h, fps, opts, frame_duration)?
+            let mut encoder =
+                VaapiH264Encoder::open(out_w, out_h, fps, opts, frame_duration)?;
+            stream_decode_and_encode(
+                &mut mp4,
+                track_id,
+                sample_count,
+                input_codec,
+                out_w,
+                out_h,
+                track_src_w,
+                track_src_h,
+                &mut encoder,
+            )?;
+            encoder.finish()
         }
         VideoCodec::H265 => {
-            encode_nv12_vaapi_hevc(&nv12_frames, out_w, out_h, fps, opts, frame_duration)?
+            let mut encoder =
+                VaapiHevcEncoder::open(out_w, out_h, fps, opts, frame_duration)?;
+            stream_decode_and_encode(
+                &mut mp4,
+                track_id,
+                sample_count,
+                input_codec,
+                out_w,
+                out_h,
+                track_src_w,
+                track_src_h,
+                &mut encoder,
+            )?;
+            encoder.finish()
         }
     };
 
@@ -94,25 +140,78 @@ fn encode_with_vaapi(
     })
 }
 
+trait VaapiNv12Encoder {
+    fn encode_frame(&mut self, nv12: &[u8], frame_index: usize) -> Result<(), MediaError>;
+    fn frame_count(&self) -> usize;
+}
+
+fn stream_decode_and_encode<E: VaapiNv12Encoder>(
+    mp4: &mut Mp4Reader<BufReader<File>>,
+    track_id: u32,
+    sample_count: u32,
+    input_codec: InputCodec,
+    out_w: u32,
+    out_h: u32,
+    src_w: u32,
+    src_h: u32,
+    encoder: &mut E,
+) -> Result<(), MediaError> {
+    match input_codec {
+        InputCodec::H264 => {
+            let mut decoder = Decoder::new().map_err(|e| MediaError::Decode(e.to_string()))?;
+            for sample_id in 1..=sample_count {
+                let sample = mp4
+                    .read_sample(track_id, sample_id)
+                    .map_err(|e| MediaError::Decode(e.to_string()))?;
+                let Some(sample) = sample else { break };
+                let annex_b = avcc_to_annex_b(&sample.bytes);
+                if let Some(yuv) = decoder
+                    .decode(&annex_b)
+                    .map_err(|e| MediaError::Decode(e.to_string()))?
+                {
+                    let (w, h) = yuv.dimensions();
+                    let nv12 = i420_to_nv12(&yuv);
+                    let scaled = if out_w != w as u32 || out_h != h as u32 {
+                        scale_nv12(&nv12, w as u32, h as u32, out_w, out_h)
+                    } else {
+                        nv12
+                    };
+                    encoder.encode_frame(&scaled, encoder.frame_count())?;
+                }
+            }
+        }
+        InputCodec::H265 => {
+            let mut decoder = HevcVldDecoder::open(src_w, src_h)?;
+            for sample_id in 1..=sample_count {
+                let sample = mp4
+                    .read_sample(track_id, sample_id)
+                    .map_err(|e| MediaError::Decode(e.to_string()))?;
+                let Some(sample) = sample else { break };
+                let annex_b = avcc_to_annex_b(&sample.bytes);
+                let nv12 = decoder.decode_sample(&annex_b)?;
+                let scaled = if out_w != src_w || out_h != src_h {
+                    scale_nv12(&nv12, src_w, src_h, out_w, out_h)
+                } else {
+                    nv12
+                };
+                encoder.encode_frame(&scaled, encoder.frame_count())?;
+            }
+        }
+    }
+
+    if encoder.frame_count() == 0 {
+        return Err(MediaError::Decode("未能解码任何视频帧".into()));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InputCodec {
     H264,
     H265,
 }
 
-fn decode_mp4_to_nv12(path: &str, out_w: u32, out_h: u32) -> Result<Vec<Vec<u8>>, MediaError> {
-    match detect_input_codec(path)? {
-        InputCodec::H264 => decode_mp4_h264_openh264(path, out_w, out_h),
-        InputCodec::H265 => decode_mp4_hevc_vaapi(path, out_w, out_h),
-    }
-}
-
-fn detect_input_codec(path: &str) -> Result<InputCodec, MediaError> {
-    let file_size = std::fs::metadata(path)?.len();
-    let file = File::open(path)?;
-    let mut reader = BufReader::new(file);
-    let mp4 = Mp4Reader::read_header(&mut reader, file_size)
-        .map_err(|e| MediaError::Decode(e.to_string()))?;
+fn detect_input_codec_from_reader(mp4: &Mp4Reader<impl std::io::Read + std::io::Seek>) -> Result<InputCodec, MediaError> {
     let track = mp4
         .tracks()
         .values()
@@ -127,58 +226,6 @@ fn detect_input_codec(path: &str) -> Result<InputCodec, MediaError> {
     } else {
         Ok(InputCodec::H264)
     }
-}
-
-fn decode_mp4_h264_openh264(
-    path: &str,
-    out_w: u32,
-    out_h: u32,
-) -> Result<Vec<Vec<u8>>, MediaError> {
-    let file_size = std::fs::metadata(path)?.len();
-    let file = File::open(path)?;
-    let mut reader = BufReader::new(file);
-    let mut mp4 = Mp4Reader::read_header(&mut reader, file_size)
-        .map_err(|e| MediaError::Decode(e.to_string()))?;
-
-    let track_id = mp4
-        .tracks()
-        .iter()
-        .find(|(_, t)| t.track_type().ok() == Some(TrackType::Video))
-        .map(|(id, _)| *id)
-        .ok_or_else(|| MediaError::Decode("无视频轨".into()))?;
-
-    let sample_count = mp4
-        .sample_count(track_id)
-        .map_err(|e| MediaError::Decode(e.to_string()))?;
-
-    let mut decoder = Decoder::new().map_err(|e| MediaError::Decode(e.to_string()))?;
-    let mut out = Vec::new();
-
-    for sample_id in 1..=sample_count {
-        let sample = mp4
-            .read_sample(track_id, sample_id)
-            .map_err(|e| MediaError::Decode(e.to_string()))?;
-        let Some(sample) = sample else { break };
-        let annex_b = avcc_to_annex_b(&sample.bytes);
-        if let Some(yuv) = decoder
-            .decode(&annex_b)
-            .map_err(|e| MediaError::Decode(e.to_string()))?
-        {
-            let (w, h) = yuv.dimensions();
-            let nv12 = i420_to_nv12(&yuv);
-            let scaled = if out_w != w as u32 || out_h != h as u32 {
-                scale_nv12(&nv12, w as u32, h as u32, out_w, out_h)
-            } else {
-                nv12
-            };
-            out.push(scaled);
-        }
-    }
-
-    if out.is_empty() {
-        return Err(MediaError::Decode("OpenH264 未能解码任何帧".into()));
-    }
-    Ok(out)
 }
 
 /// OpenH264 输出 I420 平面，VA-API 需要 NV12（UV 交错）。
@@ -204,87 +251,124 @@ fn i420_to_nv12(yuv: &impl YUVSource) -> Vec<u8> {
     nv12
 }
 
-fn encode_nv12_vaapi_h264(
-    frames: &[Vec<u8>],
+struct VaapiH264Encoder {
+    context: std::rc::Rc<Context>,
+    surfaces: Vec<cros_libva::surface::Surface>,
+    image_fmt: bindings::VAImageFormat,
     width: u32,
     height: u32,
-    fps: u32,
-    opts: &VideoOptions,
+    mb_w: u16,
+    mb_h: u16,
     frame_duration: u32,
-) -> Result<(Vec<EncodedFrame>, Vec<u8>, Vec<u8>, Vec<u8>), MediaError> {
-    let display = Display::open()
-        .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
+    keyframe_interval: usize,
+    seq_pending: Option<cros_libva::buffer::Buffer>,
+    encoded_frames: Vec<EncodedFrame>,
+    vps: Vec<u8>,
+    sps: Vec<u8>,
+    pps: Vec<u8>,
+}
 
-    let format = bindings::VA_RT_FORMAT_YUV420;
-    let entrypoint = bindings::VAEntrypoint::VAEntrypointEncSliceLP;
-    let profile = bindings::VAProfile::VAProfileH264ConstrainedBaseline;
+impl VaapiH264Encoder {
+    fn open(
+        width: u32,
+        height: u32,
+        fps: u32,
+        opts: &VideoOptions,
+        frame_duration: u32,
+    ) -> Result<Self, MediaError> {
+        let display = Display::open()
+            .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
 
-    let mut attrs = vec![bindings::VAConfigAttrib {
-        type_: bindings::VAConfigAttribType::VAConfigAttribRTFormat,
-        value: 0,
-    }];
-    display
-        .get_config_attributes(profile, entrypoint, &mut attrs)
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+        let format = bindings::VA_RT_FORMAT_YUV420;
+        let entrypoint = bindings::VAEntrypoint::VAEntrypointEncSliceLP;
+        let profile = bindings::VAProfile::VAProfileH264ConstrainedBaseline;
 
-    let config = display
-        .create_config(attrs, profile, entrypoint)
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+        let mut attrs = vec![bindings::VAConfigAttrib {
+            type_: bindings::VAConfigAttribType::VAConfigAttribRTFormat,
+            value: 0,
+        }];
+        display
+            .get_config_attributes(profile, entrypoint, &mut attrs)
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
 
-    let mut surfaces = display
-        .create_surfaces(
-            format,
-            None,
+        let config = display
+            .create_config(attrs, profile, entrypoint)
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+
+        let surfaces = display
+            .create_surfaces(
+                format,
+                None,
+                width,
+                height,
+                Some(UsageHint::USAGE_HINT_ENCODER),
+                vec![(); VAAPI_SURFACE_POOL],
+            )
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+
+        let context = display
+            .create_context(&config, width, height, Some(&surfaces), true)
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+
+        let image_fmts = display
+            .query_image_formats()
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+        let image_fmt = image_fmts
+            .into_iter()
+            .find(|f| f.fourcc == bindings::VA_FOURCC_NV12)
+            .ok_or_else(|| MediaError::HardwareUnavailable("无 NV12 VA 图像格式".into()))?;
+
+        let mb_w = (width / 16).max(1) as u16;
+        let mb_h = (height / 16).max(1) as u16;
+        let seq_buf = create_seq_buffer(&context, mb_w, mb_h, fps, opts)?;
+
+        Ok(Self {
+            context,
+            surfaces,
+            image_fmt,
             width,
             height,
-            Some(UsageHint::USAGE_HINT_ENCODER),
-            vec![(); frames.len().max(1)],
-        )
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+            mb_w,
+            mb_h,
+            frame_duration,
+            keyframe_interval: opts.keyframe_interval.unwrap_or(60).max(1) as usize,
+            seq_pending: Some(seq_buf),
+            encoded_frames: Vec::new(),
+            vps: Vec::new(),
+            sps: Vec::new(),
+            pps: Vec::new(),
+        })
+    }
 
-    let context = display
-        .create_context(&config, width, height, Some(&surfaces), true)
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+    fn finish(self) -> (Vec<EncodedFrame>, Vec<u8>, Vec<u8>, Vec<u8>) {
+        (self.encoded_frames, self.vps, self.sps, self.pps)
+    }
+}
 
-    let image_fmts = display
-        .query_image_formats()
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
-    let image_fmt = image_fmts
-        .into_iter()
-        .find(|f| f.fourcc == bindings::VA_FOURCC_NV12)
-        .ok_or_else(|| MediaError::HardwareUnavailable("无 NV12 VA 图像格式".into()))?;
+impl VaapiNv12Encoder for VaapiH264Encoder {
+    fn frame_count(&self) -> usize {
+        self.encoded_frames.len()
+    }
 
-    let mut encoded_frames = Vec::new();
-    let mut vps = Vec::new();
-    let mut sps = Vec::new();
-    let mut pps = Vec::new();
-
-    let mb_w = (width / 16).max(1) as u16;
-    let mb_h = (height / 16).max(1) as u16;
-
-    let seq_buf = create_seq_buffer(&context, mb_w, mb_h, fps, opts)?;
-    let mut seq_pending = Some(seq_buf);
-
-    for (i, nv12) in frames.iter().enumerate() {
-        let surface = surfaces
-            .get(i)
-            .or_else(|| surfaces.first())
-            .ok_or_else(|| MediaError::HardwareUnavailable("VA surface 不足".into()))?;
+    fn encode_frame(&mut self, nv12: &[u8], frame_index: usize) -> Result<(), MediaError> {
+        let surface_idx = frame_index % self.surfaces.len();
+        let surface = self.surfaces[surface_idx].clone();
         let surface_id = surface.id();
 
-        upload_nv12_to_surface(surface, &image_fmt, width, height, nv12)?;
+        upload_nv12_to_surface(&surface, &self.image_fmt, self.width, self.height, nv12)?;
 
-        let coded_buffer = context
+        let coded_buffer = self
+            .context
             .create_enc_coded(nv12.len())
             .map_err(|e| MediaError::Encode(e.to_string()))?;
 
-        let pic_buf = create_pic_buffer(&context, surface_id, coded_buffer.id())?;
-        let slice_buf = create_slice_buffer(&context, mb_w, mb_h)?;
+        let pic_buf = create_pic_buffer(&self.context, surface_id, coded_buffer.id())?;
+        let slice_buf = create_slice_buffer(&self.context, self.mb_w, self.mb_h)?;
 
-        let mut picture = Picture::new(0, std::rc::Rc::clone(&context), surface.clone());
+        let mut picture = Picture::new(0, std::rc::Rc::clone(&self.context), surface);
         picture.add_buffer(pic_buf);
-        if i == 0 {
-            if let Some(seq) = seq_pending.take() {
+        if frame_index == 0 {
+            if let Some(seq) = self.seq_pending.take() {
                 picture.add_buffer(seq);
             }
         }
@@ -309,21 +393,188 @@ fn encode_nv12_vaapi_h264(
         for segment in mapped.segments() {
             nal.extend_from_slice(segment.buf);
         }
-        if sps.is_empty() {
+        if self.sps.is_empty() {
             let (v, s, p) = extract_param_sets_for_codec(VideoCodec::H264, &nal);
-            vps = v.unwrap_or_default();
-            sps = s;
-            pps = p;
+            self.vps = v.unwrap_or_default();
+            self.sps = s;
+            self.pps = p;
         }
-        let is_key = i == 0 || i % opts.keyframe_interval.unwrap_or(60) as usize == 0;
-        encoded_frames.push(EncodedFrame {
+        let is_key = frame_index == 0 || frame_index % self.keyframe_interval == 0;
+        self.encoded_frames.push(EncodedFrame {
             data: nal,
             is_keyframe: is_key,
-            duration: frame_duration,
+            duration: self.frame_duration,
         });
+        Ok(())
+    }
+}
+
+struct VaapiHevcEncoder {
+    context: std::rc::Rc<Context>,
+    surfaces: Vec<cros_libva::surface::Surface>,
+    image_fmt: bindings::VAImageFormat,
+    width: u32,
+    height: u32,
+    ctu_count: u32,
+    frame_duration: u32,
+    gop: u32,
+    seq_pending: Option<cros_libva::buffer::Buffer>,
+    ref_frames: [PictureHEVC; 15],
+    encoded_frames: Vec<EncodedFrame>,
+    vps: Vec<u8>,
+    sps: Vec<u8>,
+    pps: Vec<u8>,
+}
+
+impl VaapiHevcEncoder {
+    fn open(
+        width: u32,
+        height: u32,
+        fps: u32,
+        opts: &VideoOptions,
+        frame_duration: u32,
+    ) -> Result<Self, MediaError> {
+        let display = Display::open()
+            .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
+
+        let format = bindings::VA_RT_FORMAT_YUV420;
+        let entrypoint = bindings::VAEntrypoint::VAEntrypointEncSliceLP;
+        let profile = bindings::VAProfile::VAProfileHEVCMain;
+
+        let mut attrs = vec![bindings::VAConfigAttrib {
+            type_: bindings::VAConfigAttribType::VAConfigAttribRTFormat,
+            value: 0,
+        }];
+        display
+            .get_config_attributes(profile, entrypoint, &mut attrs)
+            .map_err(|e| MediaError::HardwareUnavailable(format!("HEVC 编码不支持: {e}")))?;
+
+        let config = display
+            .create_config(attrs, profile, entrypoint)
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+
+        let surfaces = display
+            .create_surfaces(
+                format,
+                None,
+                width,
+                height,
+                Some(UsageHint::USAGE_HINT_ENCODER),
+                vec![(); VAAPI_SURFACE_POOL],
+            )
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+
+        let context = display
+            .create_context(&config, width, height, Some(&surfaces), true)
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+
+        let image_fmts = display
+            .query_image_formats()
+            .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
+        let image_fmt = image_fmts
+            .into_iter()
+            .find(|f| f.fourcc == bindings::VA_FOURCC_NV12)
+            .ok_or_else(|| MediaError::HardwareUnavailable("无 NV12 VA 图像格式".into()))?;
+
+        let ctu_w = ((width + 15) / 16).max(1);
+        let ctu_h = ((height + 15) / 16).max(1);
+        let gop = opts.keyframe_interval.unwrap_or(60).max(1);
+        let seq_buf = create_hevc_seq_buffer(&context, width, height, fps, opts, gop)?;
+
+        Ok(Self {
+            context,
+            surfaces,
+            image_fmt,
+            width,
+            height,
+            ctu_count: ctu_w * ctu_h,
+            frame_duration,
+            gop,
+            seq_pending: Some(seq_buf),
+            ref_frames: invalid_hevc_ref_array(),
+            encoded_frames: Vec::new(),
+            vps: Vec::new(),
+            sps: Vec::new(),
+            pps: Vec::new(),
+        })
     }
 
-    Ok((encoded_frames, vps, sps, pps))
+    fn finish(self) -> (Vec<EncodedFrame>, Vec<u8>, Vec<u8>, Vec<u8>) {
+        (self.encoded_frames, self.vps, self.sps, self.pps)
+    }
+}
+
+impl VaapiNv12Encoder for VaapiHevcEncoder {
+    fn frame_count(&self) -> usize {
+        self.encoded_frames.len()
+    }
+
+    fn encode_frame(&mut self, nv12: &[u8], frame_index: usize) -> Result<(), MediaError> {
+        let surface_idx = frame_index % self.surfaces.len();
+        let surface = self.surfaces[surface_idx].clone();
+        let surface_id = surface.id();
+        upload_nv12_to_surface(&surface, &self.image_fmt, self.width, self.height, nv12)?;
+
+        let coded_buffer = self
+            .context
+            .create_enc_coded(nv12.len().max(4096))
+            .map_err(|e| MediaError::Encode(e.to_string()))?;
+
+        let is_idr = frame_index == 0 || frame_index as u32 % self.gop == 0;
+        let pic_buf = create_hevc_pic_buffer(
+            &self.context,
+            surface_id,
+            coded_buffer.id(),
+            &self.ref_frames,
+            is_idr,
+        )?;
+        let slice_buf = create_hevc_enc_slice_buffer(&self.context, self.ctu_count, is_idr)?;
+
+        let mut picture = Picture::new(
+            frame_index as u64,
+            std::rc::Rc::clone(&self.context),
+            surface,
+        );
+        picture.add_buffer(pic_buf);
+        if frame_index == 0 {
+            if let Some(seq) = self.seq_pending.take() {
+                picture.add_buffer(seq);
+            }
+        }
+        picture.add_buffer(slice_buf);
+
+        let picture = picture
+            .begin()
+            .map_err(|e| MediaError::Encode(e.to_string()))?;
+        let picture = picture
+            .render()
+            .map_err(|e| MediaError::Encode(e.to_string()))?;
+        let picture = picture
+            .end()
+            .map_err(|e| MediaError::Encode(e.to_string()))?;
+        picture
+            .sync()
+            .map_err(|(e, _)| MediaError::Encode(e.to_string()))?;
+
+        let mapped =
+            MappedCodedBuffer::new(&coded_buffer).map_err(|e| MediaError::Encode(e.to_string()))?;
+        let mut nal = Vec::new();
+        for segment in mapped.segments() {
+            nal.extend_from_slice(segment.buf);
+        }
+        if self.sps.is_empty() {
+            let (v, s, p) = extract_param_sets_for_codec(VideoCodec::H265, &nal);
+            self.vps = v.unwrap_or_default();
+            self.sps = s;
+            self.pps = p;
+        }
+        self.encoded_frames.push(EncodedFrame {
+            data: nal,
+            is_keyframe: is_idr,
+            duration: self.frame_duration,
+        });
+        Ok(())
+    }
 }
 
 fn upload_nv12_to_surface(
@@ -493,172 +744,6 @@ fn create_slice_buffer(
     context
         .create_buffer(slice)
         .map_err(|e| MediaError::Encode(e.to_string()))
-}
-
-fn encode_nv12_vaapi_hevc(
-    frames: &[Vec<u8>],
-    width: u32,
-    height: u32,
-    fps: u32,
-    opts: &VideoOptions,
-    frame_duration: u32,
-) -> Result<(Vec<EncodedFrame>, Vec<u8>, Vec<u8>, Vec<u8>), MediaError> {
-    let display = Display::open()
-        .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
-
-    let format = bindings::VA_RT_FORMAT_YUV420;
-    let entrypoint = bindings::VAEntrypoint::VAEntrypointEncSliceLP;
-    let profile = bindings::VAProfile::VAProfileHEVCMain;
-
-    let mut attrs = vec![bindings::VAConfigAttrib {
-        type_: bindings::VAConfigAttribType::VAConfigAttribRTFormat,
-        value: 0,
-    }];
-    display
-        .get_config_attributes(profile, entrypoint, &mut attrs)
-        .map_err(|e| MediaError::HardwareUnavailable(format!("HEVC 编码不支持: {e}")))?;
-
-    let config = display
-        .create_config(attrs, profile, entrypoint)
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
-
-    let mut surfaces = display
-        .create_surfaces(
-            format,
-            None,
-            width,
-            height,
-            Some(UsageHint::USAGE_HINT_ENCODER),
-            vec![(); frames.len().max(1)],
-        )
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
-
-    let context = display
-        .create_context(&config, width, height, Some(&surfaces), true)
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
-
-    let image_fmts = display
-        .query_image_formats()
-        .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
-    let image_fmt = image_fmts
-        .into_iter()
-        .find(|f| f.fourcc == bindings::VA_FOURCC_NV12)
-        .ok_or_else(|| MediaError::HardwareUnavailable("无 NV12 VA 图像格式".into()))?;
-
-    let ctu_w = ((width + 15) / 16).max(1);
-    let ctu_h = ((height + 15) / 16).max(1);
-    let gop = opts.keyframe_interval.unwrap_or(60).max(1);
-
-    let seq_buf = create_hevc_seq_buffer(&context, width, height, fps, opts, gop)?;
-    let mut seq_pending = Some(seq_buf);
-
-    let mut encoded_frames = Vec::new();
-    let mut vps = Vec::new();
-    let mut sps = Vec::new();
-    let mut pps = Vec::new();
-    let ref_frames = invalid_hevc_ref_array();
-
-    for (i, nv12) in frames.iter().enumerate() {
-        let surface = surfaces
-            .get(i)
-            .or_else(|| surfaces.first())
-            .ok_or_else(|| MediaError::HardwareUnavailable("VA surface 不足".into()))?;
-        let surface_id = surface.id();
-        upload_nv12_to_surface(surface, &image_fmt, width, height, nv12)?;
-
-        let coded_buffer = context
-            .create_enc_coded(nv12.len().max(4096))
-            .map_err(|e| MediaError::Encode(e.to_string()))?;
-
-        let is_idr = i == 0 || i % gop as usize == 0;
-        let pic_buf =
-            create_hevc_pic_buffer(&context, surface_id, coded_buffer.id(), &ref_frames, is_idr)?;
-        let slice_buf = create_hevc_enc_slice_buffer(&context, ctu_w * ctu_h, is_idr)?;
-
-        let mut picture = Picture::new(i as u64, std::rc::Rc::clone(&context), surface.clone());
-        picture.add_buffer(pic_buf);
-        if i == 0 {
-            if let Some(seq) = seq_pending.take() {
-                picture.add_buffer(seq);
-            }
-        }
-        picture.add_buffer(slice_buf);
-
-        let picture = picture
-            .begin()
-            .map_err(|e| MediaError::Encode(e.to_string()))?;
-        let picture = picture
-            .render()
-            .map_err(|e| MediaError::Encode(e.to_string()))?;
-        let picture = picture
-            .end()
-            .map_err(|e| MediaError::Encode(e.to_string()))?;
-        picture
-            .sync()
-            .map_err(|(e, _)| MediaError::Encode(e.to_string()))?;
-
-        let mapped =
-            MappedCodedBuffer::new(&coded_buffer).map_err(|e| MediaError::Encode(e.to_string()))?;
-        let mut nal = Vec::new();
-        for segment in mapped.segments() {
-            nal.extend_from_slice(segment.buf);
-        }
-        if sps.is_empty() {
-            let (v, s, p) = extract_param_sets_for_codec(VideoCodec::H265, &nal);
-            vps = v.unwrap_or_default();
-            sps = s;
-            pps = p;
-        }
-        encoded_frames.push(EncodedFrame {
-            data: nal,
-            is_keyframe: is_idr,
-            duration: frame_duration,
-        });
-    }
-
-    Ok((encoded_frames, vps, sps, pps))
-}
-
-fn decode_mp4_hevc_vaapi(path: &str, out_w: u32, out_h: u32) -> Result<Vec<Vec<u8>>, MediaError> {
-    let file_size = std::fs::metadata(path)?.len();
-    let file = File::open(path)?;
-    let mut reader = BufReader::new(file);
-    let mut mp4 = Mp4Reader::read_header(&mut reader, file_size)
-        .map_err(|e| MediaError::Decode(e.to_string()))?;
-
-    let (track_id, src_w, src_h) = mp4
-        .tracks()
-        .iter()
-        .find(|(_, t)| t.track_type().ok() == Some(TrackType::Video))
-        .map(|(id, t)| (*id, t.width() as u32, t.height() as u32))
-        .ok_or_else(|| MediaError::Decode("无视频轨".into()))?;
-
-    let sample_count = mp4
-        .sample_count(track_id)
-        .map_err(|e| MediaError::Decode(e.to_string()))?;
-
-    let mut decoder = HevcVldDecoder::open(src_w, src_h)?;
-    let mut out = Vec::new();
-
-    for sample_id in 1..=sample_count {
-        let sample = mp4
-            .read_sample(track_id, sample_id)
-            .map_err(|e| MediaError::Decode(e.to_string()))?;
-        let Some(sample) = sample else { break };
-        let annex_b = avcc_to_annex_b(&sample.bytes);
-        let nv12 = decoder.decode_sample(&annex_b)?;
-        let scaled = if out_w != src_w || out_h != src_h {
-            scale_nv12(&nv12, src_w, src_h, out_w, out_h)
-        } else {
-            nv12
-        };
-        out.push(scaled);
-    }
-
-    if out.is_empty() {
-        return Err(MediaError::Decode("VA-API HEVC 解码未产出任何帧".into()));
-    }
-    Ok(out)
 }
 
 struct HevcVldDecoder {

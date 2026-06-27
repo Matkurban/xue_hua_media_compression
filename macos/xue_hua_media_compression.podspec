@@ -23,8 +23,9 @@ A new Flutter FFI plugin project.
   s.dependency 'FlutterMacOS'
 
   s.platform = :osx, '10.11'
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.swift_version = '5.0'
+
+  s.frameworks = 'VideoToolbox', 'AVFoundation', 'CoreMedia', 'CoreVideo', 'CoreFoundation'
 
   s.script_phase = {
     :name => 'Build Rust library',
@@ -38,8 +39,6 @@ A new Flutter FFI plugin project.
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # Flutter.framework does not contain a i386 slice.
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-force_load ${PODS_CONFIGURATION_BUILD_DIR}/xue_hua_media_compression/libxue_hua_media_compression.a',
+    'OTHER_LDFLAGS' => '$(inherited) -force_load "${PODS_CONFIGURATION_BUILD_DIR}/xue_hua_media_compression/libxue_hua_media_compression.a"',
   }
 end

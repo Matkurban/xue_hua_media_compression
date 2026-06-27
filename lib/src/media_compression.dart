@@ -19,8 +19,6 @@ library;
 
 import 'dart:typed_data';
 
-export 'video_input.dart' show ensureLocalVideoInput;
-
 import 'rust/api/media.dart' as rust;
 import 'rust/api/traits.dart';
 import 'rust/frb_generated.dart';

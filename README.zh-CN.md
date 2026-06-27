@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**版本：** 1.0.0 · [English](README.md) · [更新日志](CHANGELOG.md)
+**版本：** 1.1.0 · [English](README.md) · [更新日志](CHANGELOG.md)
 
 跨平台 Flutter FFI 插件，提供**图片与视频压缩**能力。核心逻辑由 Rust 实现，通过 [flutter_rust_bridge](https://codelabs.flutter.dev/codelabs/flutter-ffigen) 与 Dart 互通。图片压缩在全平台统一走纯 Rust 管线；视频压缩调用各平台原生**硬件编码器**，并封装为标准 MP4。
 
@@ -79,7 +79,7 @@
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^1.0.0
+  xue_hua_media_compression: ^1.1.0
 ```
 
 本地开发（路径依赖）：
@@ -168,7 +168,9 @@ flutter_rust_bridge_codegen generate
 
 在 Dart 中还需请求运行时权限（例如使用 [`permission_handler`](https://pub.dev/packages/permission_handler)），再打开相册或文件选择器。
 
-**Android 视频路径：** `file_selector` 或系统相册返回的路径常为 `content://` URI，NDK 的 `AMediaExtractor` 无法直接打开。请先用内置辅助函数 `ensureLocalVideoInput` 将流复制到本地缓存（见 [视频压缩](#视频压缩-1)）。
+**文件选择器路径：** 将 `file_selector` 返回的 `xFile.path` 直接传给 `compressFile` / `video.compress`。Rust 按路径读文件（视频走原生流式 API；Android `content://` 通过 JNI 取 fd 打开，无需在 Dart 侧复制或 `readAsBytes`）。
+
+**macOS 沙盒：** 在 entitlements 中启用 `com.apple.security.files.user-selected.read-write`（或 read-only），以便 Rust 在 picker 会话期间读取用户选中的文件。
 
 ### iOS / macOS
 
@@ -261,7 +263,28 @@ final backend = await XueHuaMediaCompression.videoBackendName();
 
 #### `compressFile`
 
-文件到文件压缩，返回输出文件字节数。
+文件到文件压缩，返回输出文件字节数。Rust 直接读取 `inputPath`（会自动规范化 `file://` 前缀）。将文件选择器返回的路径原样传入即可。
+
+#### 文件选择器下的图片压缩
+
+```dart
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
+import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
+
+final xFile = await openFile(/* ... */);
+if (xFile == null) return;
+
+// 示例使用 `Directory.systemTemp` 以减少原生依赖；业务 App 也可使用 path_provider。
+final tmpDir = Directory.systemTemp;
+await XueHuaMediaCompression.image.compressFile(
+  inputPath: xFile.path,
+  outputPath: '${tmpDir.path}/out.jpg',
+  format: ImageFormat.jpeg,
+  quality: 80,
+);
+```
 
 #### `compressWith`
 
@@ -294,30 +317,28 @@ final backend = await XueHuaMediaCompression.videoBackendName();
 
 #### 视频压缩
 
-Android 上使用文件选择器时：
+使用文件选择器时，直接传入 `xFile.path`：
 
 ```dart
-import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
-final tmpDir = await getTemporaryDirectory();
-final localPath = await ensureLocalVideoInput(
-  inputPath: xFile.path,
-  cacheDirectory: tmpDir.path,
-  openStream: () async => xFile.openRead().cast<List<int>>(),
-  fileName: xFile.name,
-  expectedBytes: await xFile.length(),
-);
+final xFile = await openFile(/* ... */);
+if (xFile == null) return;
 
+// 示例使用 `Directory.systemTemp` 以减少原生依赖；业务 App 也可使用 path_provider。
+final tmpDir = Directory.systemTemp;
 final result = await XueHuaMediaCompression.video.compress(
-  inputPath: localPath,
+  inputPath: xFile.path,
   outputPath: '${tmpDir.path}/out.mp4',
   codec: VideoCodec.h264,
   bitrate: 2_000_000,
 );
 ```
 
-`ensureLocalVideoInput` 会校验复制后的文件（非空、大小一致、MP4/MOV 容器魔数）。
+Android 上 `content://` URI 由 Rust 通过 `ContentResolver` 打开（流式 fd，不在 Dart 侧整文件复制）。
 
 ---
 
@@ -361,7 +382,7 @@ flutter run
 - 图片格式选择（JPEG / PNG / WebP / AVIF）
 - 质量滑块与压缩前后预览
 - 视频编码格式与码率选择
-- Android 文件选择器路径的 `ensureLocalVideoInput` 用法
+- 文件选择器路径直接传给 Rust（无 Dart 侧缓存复制）
 - 实时展示 `videoBackendName()`
 
 ---
@@ -373,7 +394,7 @@ xue_hua_media_compression/
 ├── lib/                    # Dart 公开 API 与 FRB 生成绑定
 │   └── src/
 │       ├── media_compression.dart   # 门面类 XueHuaMediaCompression
-│       ├── video_input.dart         # ensureLocalVideoInput 辅助函数
+│       ├── file_input.rs            # 路径规范化（Rust）
 │       └── rust/                    # flutter_rust_bridge 生成代码
 ├── rust/                   # Rust 实现（图片 + 各平台视频）
 │   └── src/api/

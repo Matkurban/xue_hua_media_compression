@@ -6,6 +6,7 @@ use std::io::{BufWriter, Seek, Write};
 
 use mp4::{AvcConfig, HevcConfig, MediaConfig, Mp4Config, Mp4Writer, TrackConfig, TrackType};
 
+use crate::api::file_input::prepare_output_path;
 use crate::api::traits::{MediaError, VideoCodec};
 use crate::api::video_common::{annex_b_to_avcc, patch_hvcc_in_mp4, strip_annex_b_start_code};
 
@@ -45,7 +46,8 @@ pub(crate) fn mux_to_mp4(
         VideoCodec::H265 => ("isom", vec!["isom", "iso2", "hvc1", "mp41"]),
     };
 
-    let file = File::create(output_path)?;
+    let output_path = prepare_output_path(output_path)?;
+    let file = File::create(&output_path)?;
     let writer = BufWriter::new(file);
 
     let config = Mp4Config {
@@ -108,10 +110,10 @@ pub(crate) fn mux_to_mp4(
 
     if params.codec == VideoCodec::H265 {
         let vps = params.vps.unwrap_or(params.sps);
-        patch_hvcc_in_mp4(output_path, vps, params.sps, params.pps)?;
+        patch_hvcc_in_mp4(&output_path, vps, params.sps, params.pps)?;
     }
 
-    let meta = std::fs::metadata(output_path)?;
+    let meta = std::fs::metadata(&output_path)?;
     Ok(meta.len())
 }
 

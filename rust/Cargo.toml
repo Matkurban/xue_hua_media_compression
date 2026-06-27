@@ -23,7 +23,7 @@ image = { version = "0.25.10", default-features = false, features = [
     "webp",
 ] }
 oxipng = { version = "10.1.1", default-features = false, features = ["zopfli"] }
-ravif = "0.13.0"
+ravif = { version = "0.13.0", default-features = false, features = ["threading"] }
 rgb = "0.8.53"
 mp4 = "0.14.0"
 thiserror = "2.0.18"
@@ -66,6 +66,7 @@ core-media-sys = "0.1.0"
 objc2 = "0.6"
 objc2-foundation = "0.3"
 objc2-av-foundation = { version = "0.3", features = ["AVAsset", "AVAssetReader", "AVAssetReaderOutput", "AVAssetTrack", "AVMediaFormat"] }
+objc2-core-foundation = "0.3"
 objc2-core-video = "0.3"
 objc2-core-media = "0.3"
 

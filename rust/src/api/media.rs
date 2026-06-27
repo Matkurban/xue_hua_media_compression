@@ -9,6 +9,7 @@
 //! - 视频：根据编译目标用 `cfg` 绑定到对应平台的硬件编码器
 //!   [`crate::api::platform::PlatformVideoCompressor`]。
 
+use crate::api::file_input::{normalize_input_path, prepare_output_path};
 use crate::api::image::GenericImageCompressor;
 use crate::api::platform::PlatformVideoCompressor;
 use crate::api::traits::{
@@ -48,9 +49,18 @@ pub fn rust_compress_image_file(
     output_path: String,
     opts: ImageOptions,
 ) -> Result<u64, MediaError> {
-    let bytes = std::fs::read(&input_path)?;
+    let input_path = normalize_input_path(&input_path)?;
+    let bytes = std::fs::read(&input_path).map_err(|e| {
+        MediaError::Io(format!(
+            "无法读取输入图片 ({input_path}): {e}。\
+             请确认路径可读（macOS 沙盒需通过文件选择器选取并配置 user-selected entitlement）"
+        ))
+    })?;
     let out = GenericImageCompressor::compress(&bytes, &opts)?;
-    std::fs::write(&output_path, &out)?;
+    let output_path = prepare_output_path(&output_path)?;
+    std::fs::write(&output_path, &out).map_err(|e| {
+        MediaError::Io(format!("无法写入输出图片 ({output_path}): {e}"))
+    })?;
     Ok(out.len() as u64)
 }
 
@@ -64,6 +74,8 @@ pub fn rust_compress_video(
     output_path: String,
     opts: VideoOptions,
 ) -> Result<VideoResult, MediaError> {
+    let input_path = normalize_input_path(&input_path)?;
+    let output_path = prepare_output_path(&output_path)?;
     PlatformVideoCompressor::compress(&input_path, &output_path, &opts)
 }
 

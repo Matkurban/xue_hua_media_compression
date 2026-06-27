@@ -35,6 +35,8 @@ pub mod android;
 #[cfg(target_os = "android")]
 mod android_context;
 #[cfg(target_os = "android")]
+mod android_file;
+#[cfg(target_os = "android")]
 pub(crate) use android::AndroidVideoCompressor as PlatformVideoCompressor;
 
 // ---------------------------------------------------------------------------
