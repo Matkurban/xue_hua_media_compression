@@ -76,7 +76,8 @@ extern "C" {
     fn AMediaExtractor_getTrackCount(extractor: RawPtr) -> usize;
     fn AMediaExtractor_getTrackFormat(extractor: RawPtr, index: usize) -> RawPtr;
     fn AMediaExtractor_selectTrack(extractor: RawPtr, index: usize) -> isize;
-    fn AMediaExtractor_readSampleData(extractor: RawPtr, buffer: *mut u8, capacity: usize) -> isize;
+    fn AMediaExtractor_readSampleData(extractor: RawPtr, buffer: *mut u8, capacity: usize)
+        -> isize;
     fn AMediaExtractor_getSampleTime(extractor: RawPtr) -> i64;
     fn AMediaExtractor_advance(extractor: RawPtr) -> bool;
 
@@ -109,7 +110,11 @@ extern "C" {
         time_us: u64,
         flags: u32,
     ) -> isize;
-    fn AMediaCodec_dequeueOutputBuffer(codec: RawPtr, info: *mut BufferInfo, timeout_us: i64) -> isize;
+    fn AMediaCodec_dequeueOutputBuffer(
+        codec: RawPtr,
+        info: *mut BufferInfo,
+        timeout_us: i64,
+    ) -> isize;
     fn AMediaCodec_getOutputBuffer(codec: RawPtr, index: usize, out_size: *mut usize) -> *mut u8;
     fn AMediaCodec_releaseOutputBuffer(codec: RawPtr, index: usize, render: bool) -> isize;
 }
@@ -117,8 +122,7 @@ extern "C" {
 fn validate_input_path(input_path: &str) -> Result<(), MediaError> {
     if input_path.starts_with("content://") {
         return Err(MediaError::Decode(
-            "无法打开视频文件: content:// URI 不能直接访问（请先将视频复制到应用缓存目录）"
-                .into(),
+            "无法打开视频文件: content:// URI 不能直接访问（请先将视频复制到应用缓存目录）".into(),
         ));
     }
     if input_path.starts_with("file://") {
@@ -155,10 +159,7 @@ fn file_open_diagnostics(input_path: &str) -> String {
 
 fn try_set_data_source_fd(extractor: RawPtr, input_path: &str) -> Result<(), String> {
     let file = File::open(input_path).map_err(|e| format!("File::open: {e}"))?;
-    let len = file
-        .metadata()
-        .map_err(|e| format!("metadata: {e}"))?
-        .len() as i64;
+    let len = file.metadata().map_err(|e| format!("metadata: {e}"))?.len() as i64;
     let fd = file.as_raw_fd();
     unsafe {
         if AMediaExtractor_setDataSourceFd(extractor, fd, 0, len) != AMEDIA_OK {
@@ -174,7 +175,9 @@ fn open_extractor_data_source(input_path: &str) -> Result<RawPtr, MediaError> {
     unsafe {
         let extractor = AMediaExtractor_new();
         if extractor.is_null() {
-            return Err(MediaError::HardwareUnavailable("AMediaExtractor_new 失败".into()));
+            return Err(MediaError::HardwareUnavailable(
+                "AMediaExtractor_new 失败".into(),
+            ));
         }
         let path = CString::new(input_path).map_err(|e| MediaError::Io(e.to_string()))?;
         if AMediaExtractor_setDataSource(extractor, path.as_ptr()) == AMEDIA_OK {
@@ -529,29 +532,41 @@ fn read_source_dimensions(input_path: &str) -> Result<(u32, u32, u32), MediaErro
                      NDK 打开失败 ({ndk_err})。{diagnostics}"
                 ))
             })?;
-        let count = AMediaExtractor_getTrackCount(extractor);
-        for i in 0..count {
-            let fmt = AMediaExtractor_getTrackFormat(extractor, i);
-            let mut mime_ptr: *mut c_char = null_mut();
-            if AMediaFormat_getString(fmt, CString::new("mime").unwrap().as_ptr(), &mut mime_ptr) {
-                let mime = c_ptr_to_string(mime_ptr);
-                if mime.starts_with("video/") {
-                    let mut w = 0i32;
-                    let mut h = 0i32;
-                    let mut fps = 30i32;
-                    AMediaFormat_getInt32(fmt, CString::new("width").unwrap().as_ptr(), &mut w);
-                    AMediaFormat_getInt32(fmt, CString::new("height").unwrap().as_ptr(), &mut h);
-                    AMediaFormat_getInt32(fmt, CString::new("frame-rate").unwrap().as_ptr(), &mut fps);
-                    AMediaFormat_delete(fmt);
-                    AMediaExtractor_delete(extractor);
-                    return Ok((w as u32, h as u32, fps.max(1) as u32));
+            let count = AMediaExtractor_getTrackCount(extractor);
+            for i in 0..count {
+                let fmt = AMediaExtractor_getTrackFormat(extractor, i);
+                let mut mime_ptr: *mut c_char = null_mut();
+                if AMediaFormat_getString(
+                    fmt,
+                    CString::new("mime").unwrap().as_ptr(),
+                    &mut mime_ptr,
+                ) {
+                    let mime = c_ptr_to_string(mime_ptr);
+                    if mime.starts_with("video/") {
+                        let mut w = 0i32;
+                        let mut h = 0i32;
+                        let mut fps = 30i32;
+                        AMediaFormat_getInt32(fmt, CString::new("width").unwrap().as_ptr(), &mut w);
+                        AMediaFormat_getInt32(
+                            fmt,
+                            CString::new("height").unwrap().as_ptr(),
+                            &mut h,
+                        );
+                        AMediaFormat_getInt32(
+                            fmt,
+                            CString::new("frame-rate").unwrap().as_ptr(),
+                            &mut fps,
+                        );
+                        AMediaFormat_delete(fmt);
+                        AMediaExtractor_delete(extractor);
+                        return Ok((w as u32, h as u32, fps.max(1) as u32));
+                    }
                 }
+                AMediaFormat_delete(fmt);
             }
-            AMediaFormat_delete(fmt);
-        }
-        AMediaExtractor_delete(extractor);
-        Err(MediaError::Decode("无视频轨".into()))
-        }
+            AMediaExtractor_delete(extractor);
+            Err(MediaError::Decode("无视频轨".into()))
+        },
     }
 }
 

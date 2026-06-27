@@ -50,10 +50,7 @@ Future<String> ensureLocalVideoInput({
 }
 
 /// 校验复制后的视频文件：非空、大小匹配、MP4/MOV 容器魔数。
-Future<void> _validateVideoFile(
-  File file, {
-  int? expectedBytes,
-}) async {
+Future<void> _validateVideoFile(File file, {int? expectedBytes}) async {
   final length = await file.length();
   if (length == 0) {
     throw StateError('视频复制后文件为空 (${file.path})');
@@ -69,9 +66,7 @@ Future<void> _validateVideoFile(
   try {
     final read = await raf.readInto(header);
     if (read < 8) {
-      throw StateError(
-        '视频文件过短或已损坏（仅 $read 字节可读，${file.path}）',
-      );
+      throw StateError('视频文件过短或已损坏（仅 $read 字节可读，${file.path}）');
     }
   } finally {
     await raf.close();

@@ -15,7 +15,9 @@ use std::sync::OnceLock;
 static CTX: OnceLock<Global<JObject<'static>>> = OnceLock::new();
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_flutter_1rust_1bridge_xue_1hua_1media_1compression_XueHuaMediaCompressionPlugin_initAndroid<'caller>(
+pub extern "system" fn Java_com_flutter_1rust_1bridge_xue_1hua_1media_1compression_XueHuaMediaCompressionPlugin_initAndroid<
+    'caller,
+>(
     mut unowned_env: EnvUnowned<'caller>,
     _class: JClass<'caller>,
     ctx: JObject<'caller>,

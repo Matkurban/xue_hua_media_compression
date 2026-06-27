@@ -20,10 +20,7 @@ pub(crate) struct GenericImageCompressor;
 impl ImageCompressor for GenericImageCompressor {
     fn compress(input: &[u8], opts: &ImageOptions) -> Result<Vec<u8>, MediaError> {
         // 快路径：PNG 输入 → PNG 输出且无缩放，直接 oxipng 优化，避免 decode/re-encode。
-        if opts.format == ImageFormat::Png
-            && opts.max_dimension.is_none()
-            && is_png(input)
-        {
+        if opts.format == ImageFormat::Png && opts.max_dimension.is_none() && is_png(input) {
             return optimize_png_bytes(input, opts);
         }
 
@@ -295,12 +292,7 @@ mod tests {
 
     fn make_jpeg_bytes() -> Vec<u8> {
         let img = image::RgbaImage::from_fn(64, 64, |x, y| {
-            image::Rgba([
-                (x * 4) as u8,
-                (y * 4) as u8,
-                128,
-                255,
-            ])
+            image::Rgba([(x * 4) as u8, (y * 4) as u8, 128, 255])
         });
         let mut out = Vec::new();
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 85)
@@ -316,12 +308,7 @@ mod tests {
 
     fn make_png_bytes() -> Vec<u8> {
         let img = image::RgbaImage::from_fn(64, 64, |x, y| {
-            image::Rgba([
-                (x * 4) as u8,
-                (y * 4) as u8,
-                128,
-                255,
-            ])
+            image::Rgba([(x * 4) as u8, (y * 4) as u8, 128, 255])
         });
         let mut out = Vec::new();
         DynamicImage::ImageRgba8(img)
@@ -369,9 +356,7 @@ mod tests {
     }
 
     fn is_webp(bytes: &[u8]) -> bool {
-        bytes.len() >= 12
-            && &bytes[0..4] == b"RIFF"
-            && &bytes[8..12] == b"WEBP"
+        bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP"
     }
 
     #[test]

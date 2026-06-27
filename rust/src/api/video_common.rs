@@ -250,8 +250,7 @@ pub(crate) fn patch_hvcc_in_mp4(
         .position(|w| w == needle)
         .ok_or_else(|| MediaError::Mux("MP4 中未找到 hvcC box".into()))?;
     let box_start = pos - 4;
-    let old_size =
-        u32::from_be_bytes(data[box_start..box_start + 4].try_into().unwrap()) as usize;
+    let old_size = u32::from_be_bytes(data[box_start..box_start + 4].try_into().unwrap()) as usize;
     let delta = new_box.len() as i64 - old_size as i64;
     if delta != 0 {
         update_containing_box_sizes(&mut data, box_start, delta);
@@ -304,13 +303,7 @@ fn update_containing_box_sizes(data: &mut [u8], target_pos: usize, delta: i64) {
 }
 
 /// NV12 双线性缩放（CPU）。
-pub(crate) fn scale_nv12(
-    src: &[u8],
-    src_w: u32,
-    src_h: u32,
-    dst_w: u32,
-    dst_h: u32,
-) -> Vec<u8> {
+pub(crate) fn scale_nv12(src: &[u8], src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) -> Vec<u8> {
     if src_w == dst_w && src_h == dst_h {
         return src.to_vec();
     }
@@ -358,8 +351,8 @@ pub(crate) fn read_mp4_video_metadata(path: &str) -> Result<(u32, u32, u32), Med
     let file_size = std::fs::metadata(path)?.len();
     let file = File::open(path)?;
     let reader = BufReader::new(file);
-    let mp4 = Mp4Reader::read_header(reader, file_size)
-        .map_err(|e| MediaError::Decode(e.to_string()))?;
+    let mp4 =
+        Mp4Reader::read_header(reader, file_size).map_err(|e| MediaError::Decode(e.to_string()))?;
 
     for track_id in mp4.tracks().keys() {
         let track = mp4.tracks().get(track_id).unwrap();
@@ -405,7 +398,9 @@ mod tests {
 
     #[test]
     fn extract_hevc() {
-        let annex = [0u8, 0, 0, 1, 0x40, 0x01, 0, 0, 0, 0, 1, 0x42, 0x01, 0, 0, 0, 1, 0x44, 0x01];
+        let annex = [
+            0u8, 0, 0, 1, 0x40, 0x01, 0, 0, 0, 0, 1, 0x42, 0x01, 0, 0, 0, 1, 0x44, 0x01,
+        ];
         let ps = extract_hevc_param_sets(&annex);
         assert!(!ps.vps.is_empty());
         assert!(!ps.sps.is_empty());

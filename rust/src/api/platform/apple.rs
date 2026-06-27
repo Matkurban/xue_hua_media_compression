@@ -13,13 +13,11 @@ use core_foundation_sys::dictionary::CFDictionaryRef;
 use core_foundation_sys::string::CFStringRef;
 use core_media_sys::CMTime;
 use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
 use objc2::{msg_send, AnyThread};
-use objc2_av_foundation::{
-    AVAssetReader, AVAssetReaderTrackOutput, AVMediaTypeVideo, AVURLAsset,
-};
+use objc2_av_foundation::{AVAssetReader, AVAssetReaderTrackOutput, AVMediaTypeVideo, AVURLAsset};
 use objc2_core_media::CMSampleBuffer;
 use objc2_foundation::{NSDictionary, NSNumber, NSString, NSURL};
-use objc2::runtime::AnyObject;
 use video_toolbox_sys::codecs::video::{H264, HEVC};
 use video_toolbox_sys::compression::{
     kVTCompressionPropertyKey_AverageBitRate, kVTCompressionPropertyKey_MaxKeyFrameInterval,
@@ -124,12 +122,12 @@ fn encode_with_video_toolbox(
         let profile_key =
             CFString::wrap_under_get_rule(kVTCompressionPropertyKey_ProfileLevel as CFStringRef);
         let profile_value = match opts.codec {
-            VideoCodec::H264 => CFString::wrap_under_get_rule(
-                kVTProfileLevel_H264_High_AutoLevel as CFStringRef,
-            ),
-            VideoCodec::H265 => CFString::wrap_under_get_rule(
-                kVTProfileLevel_HEVC_Main_AutoLevel as CFStringRef,
-            ),
+            VideoCodec::H264 => {
+                CFString::wrap_under_get_rule(kVTProfileLevel_H264_High_AutoLevel as CFStringRef)
+            }
+            VideoCodec::H265 => {
+                CFString::wrap_under_get_rule(kVTProfileLevel_HEVC_Main_AutoLevel as CFStringRef)
+            }
         };
         VTSessionSetProperty(
             session,
@@ -207,12 +205,15 @@ fn encode_with_video_toolbox(
             CFRelease(*pb as CFTypeRef);
         }
 
-        VTCompressionSessionCompleteFrames(session, CMTime {
-            value: i64::MAX / 2,
-            timescale: 1,
-            flags: 1,
-            epoch: 0,
-        });
+        VTCompressionSessionCompleteFrames(
+            session,
+            CMTime {
+                value: i64::MAX / 2,
+                timescale: 1,
+                flags: 1,
+                epoch: 0,
+            },
+        );
         VTCompressionSessionInvalidate(session);
         CFRelease(session as CFTypeRef);
     }
@@ -270,14 +271,7 @@ extern "C" fn compression_output_callback(
         if block.is_null() {
             return;
         }
-        if CMBlockBufferGetDataPointer(
-            block,
-            0,
-            ptr::null_mut(),
-            &mut total,
-            &mut data_ptr,
-        ) != 0
-        {
+        if CMBlockBufferGetDataPointer(block, 0, ptr::null_mut(), &mut total, &mut data_ptr) != 0 {
             return;
         }
         let avcc = std::slice::from_raw_parts(data_ptr as *const u8, total).to_vec();
@@ -351,7 +345,12 @@ unsafe fn extract_format_param_sets(sample: *mut c_void, sink: &mut EncodeSink) 
             let mut ptr: *const u8 = ptr::null();
             let mut len = 0usize;
             if CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                fmt, 0, &mut ptr, &mut len, ptr::null_mut(), ptr::null_mut(),
+                fmt,
+                0,
+                &mut ptr,
+                &mut len,
+                ptr::null_mut(),
+                ptr::null_mut(),
             ) == 0
                 && !ptr.is_null()
             {
@@ -360,7 +359,12 @@ unsafe fn extract_format_param_sets(sample: *mut c_void, sink: &mut EncodeSink) 
                 sink.sps = sps;
             }
             if CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                fmt, 1, &mut ptr, &mut len, ptr::null_mut(), ptr::null_mut(),
+                fmt,
+                1,
+                &mut ptr,
+                &mut len,
+                ptr::null_mut(),
+                ptr::null_mut(),
             ) == 0
                 && !ptr.is_null()
             {
@@ -374,7 +378,12 @@ unsafe fn extract_format_param_sets(sample: *mut c_void, sink: &mut EncodeSink) 
             let mut len = 0usize;
             for (idx, target) in [(0, &mut sink.vps), (1, &mut sink.sps), (2, &mut sink.pps)] {
                 if CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
-                    fmt, idx, &mut ptr, &mut len, ptr::null_mut(), ptr::null_mut(),
+                    fmt,
+                    idx,
+                    &mut ptr,
+                    &mut len,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
                 ) == 0
                     && !ptr.is_null()
                 {
@@ -389,9 +398,8 @@ unsafe fn extract_format_param_sets(sample: *mut c_void, sink: &mut EncodeSink) 
 }
 
 fn read_source_dimensions(input_path: &str) -> Result<(u32, u32, u32), MediaError> {
-    crate::api::video_common::read_mp4_video_metadata(input_path).or_else(|_| {
-        read_source_dimensions_avfoundation(input_path)
-    })
+    crate::api::video_common::read_mp4_video_metadata(input_path)
+        .or_else(|_| read_source_dimensions_avfoundation(input_path))
 }
 
 fn read_source_dimensions_avfoundation(input_path: &str) -> Result<(u32, u32, u32), MediaError> {
@@ -423,9 +431,8 @@ fn decode_source_frames(
     let url = unsafe { NSURL::fileURLWithPath(&path) };
     let asset = unsafe { AVURLAsset::initWithURL_options(AVURLAsset::alloc(), &url, None) };
     let reader = unsafe {
-        AVAssetReader::assetReaderWithAsset_error(&asset).map_err(|e| {
-            MediaError::Decode(format!("AVAssetReader 创建失败: {e:?}"))
-        })?
+        AVAssetReader::assetReaderWithAsset_error(&asset)
+            .map_err(|e| MediaError::Decode(format!("AVAssetReader 创建失败: {e:?}")))?
     };
     let tracks = unsafe { asset.tracksWithMediaType(media_type) };
     if tracks.count() == 0 {

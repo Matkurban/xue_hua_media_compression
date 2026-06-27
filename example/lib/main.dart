@@ -20,10 +20,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'XueHua Media Compression',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
       home: const HomePage(),
     );
   }
@@ -130,7 +127,16 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
     try {
       const typeGroup = XTypeGroup(
         label: 'images',
-        extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'avif'],
+        extensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'gif',
+          'heic',
+          'heif',
+          'avif',
+        ],
       );
       final file = await openFile(acceptedTypeGroups: [typeGroup]);
       if (file == null) {
@@ -203,10 +209,10 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
               DropdownButton<ImageFormat>(
                 value: _format,
                 items: _formats.entries
-                    .map((e) => DropdownMenuItem(
-                          value: e.value,
-                          child: Text(e.key),
-                        ))
+                    .map(
+                      (e) =>
+                          DropdownMenuItem(value: e.value, child: Text(e.key)),
+                    )
                     .toList(),
                 onChanged: _busy
                     ? null
@@ -218,8 +224,8 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
             Text(
               'PNG 为无损格式，从 JPEG 转换后体积通常会增大；PNG→PNG 可无损优化体积。',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             )
           else
             Row(
@@ -237,10 +243,7 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
                         : (v) => setState(() => _quality = v),
                   ),
                 ),
-                SizedBox(
-                  width: 36,
-                  child: Text(_quality.round().toString()),
-                ),
+                SizedBox(width: 36, child: Text(_quality.round().toString())),
               ],
             ),
           const SizedBox(height: 8),
@@ -271,17 +274,11 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
             Row(
               children: [
                 Expanded(
-                  child: _ImagePreview(
-                    label: '原图',
-                    bytes: _original!,
-                  ),
+                  child: _ImagePreview(label: '原图', bytes: _original!),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _ImagePreview(
-                    label: '压缩后',
-                    bytes: _compressed!,
-                  ),
+                  child: _ImagePreview(label: '压缩后', bytes: _compressed!),
                 ),
               ],
             ),
@@ -408,10 +405,10 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
               DropdownButton<VideoCodec>(
                 value: _codec,
                 items: _codecs.entries
-                    .map((e) => DropdownMenuItem(
-                          value: e.value,
-                          child: Text(e.key),
-                        ))
+                    .map(
+                      (e) =>
+                          DropdownMenuItem(value: e.value, child: Text(e.key)),
+                    )
                     .toList(),
                 onChanged: _busy
                     ? null
@@ -455,10 +452,7 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
           if (_originalSize != null) ...[
             const SizedBox(height: 12),
             _KeyValueRow(label: '文件', value: _name ?? ''),
-            _KeyValueRow(
-              label: '原始大小',
-              value: formatBytes(_originalSize!),
-            ),
+            _KeyValueRow(label: '原始大小', value: formatBytes(_originalSize!)),
           ],
           if (_compressedSize != null) ...[
             _SizeResult(
@@ -508,10 +502,7 @@ class _SectionCard extends StatelessWidget {
               children: [
                 Icon(icon, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const Divider(height: 24),
@@ -566,12 +557,8 @@ class _SizeResult extends StatelessWidget {
             valueColor: color,
           ),
           if (elapsed != null)
-            _KeyValueRow(
-              label: '耗时',
-              value: '${elapsed!.inMilliseconds} ms',
-            ),
-          if (backend != null)
-            _KeyValueRow(label: '编码后端', value: backend!),
+            _KeyValueRow(label: '耗时', value: '${elapsed!.inMilliseconds} ms'),
+          if (backend != null) _KeyValueRow(label: '编码后端', value: backend!),
         ],
       ),
     );
@@ -598,19 +585,17 @@ class _KeyValueRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 88,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            child: Text(label, style: Theme.of(context).textTheme.bodySmall),
           ),
           Expanded(
             child: Text(
               value,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: valueColor,
-                    fontWeight:
-                        valueColor != null ? FontWeight.bold : FontWeight.normal,
-                  ),
+                color: valueColor,
+                fontWeight: valueColor != null
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+              ),
             ),
           ),
         ],

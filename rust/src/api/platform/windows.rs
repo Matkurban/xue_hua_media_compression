@@ -156,7 +156,8 @@ unsafe fn create_source_reader(input_path: &str) -> Result<IMFSourceReader, Medi
     let reader: IMFSourceReader = MFCreateSourceReaderFromURL(PCWSTR(wide.as_ptr()), None)
         .map_err(|e| MediaError::Decode(format!("MFCreateSourceReaderFromURL: {e}")))?;
 
-    let out_type: IMFMediaType = MFCreateMediaType().map_err(|e| MediaError::Decode(e.to_string()))?;
+    let out_type: IMFMediaType =
+        MFCreateMediaType().map_err(|e| MediaError::Decode(e.to_string()))?;
     out_type
         .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
         .map_err(|e| MediaError::Decode(e.to_string()))?;
@@ -210,7 +211,8 @@ unsafe fn create_hardware_encoder(
         .map_err(|e| MediaError::HardwareUnavailable(e.to_string()))?;
     CoTaskMemFree(Some(activates as *const _));
 
-    let out_type: IMFMediaType = MFCreateMediaType().map_err(|e| MediaError::Encode(e.to_string()))?;
+    let out_type: IMFMediaType =
+        MFCreateMediaType().map_err(|e| MediaError::Encode(e.to_string()))?;
     out_type
         .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
@@ -228,7 +230,8 @@ unsafe fn create_hardware_encoder(
         .SetOutputType(0, &out_type, 0)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
 
-    let in_type: IMFMediaType = MFCreateMediaType().map_err(|e| MediaError::Encode(e.to_string()))?;
+    let in_type: IMFMediaType =
+        MFCreateMediaType().map_err(|e| MediaError::Encode(e.to_string()))?;
     in_type
         .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
@@ -338,10 +341,7 @@ unsafe fn drain_encoder_output(
             Ok(()) => {
                 let sample = out_buf.pSample.take();
                 let Some(sample) = sample else { continue };
-                let is_key = sample
-                    .GetUINT32(&MFSampleExtension_CleanPoint)
-                    .unwrap_or(0)
-                    == 1;
+                let is_key = sample.GetUINT32(&MFSampleExtension_CleanPoint).unwrap_or(0) == 1;
                 let buffer = sample
                     .ConvertToContiguousBuffer()
                     .map_err(|e| MediaError::Encode(e.to_string()))?;
@@ -368,10 +368,12 @@ unsafe fn drain_encoder_output(
                 });
             }
             Err(e) if e.code() == MF_E_TRANSFORM_NEED_MORE_INPUT => break,
-            Err(e) => return Err(MediaError::Native {
-                code: e.code().0,
-                msg: format!("ProcessOutput: {e}"),
-            }),
+            Err(e) => {
+                return Err(MediaError::Native {
+                    code: e.code().0,
+                    msg: format!("ProcessOutput: {e}"),
+                })
+            }
         }
     }
     Ok(())
