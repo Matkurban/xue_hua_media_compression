@@ -268,17 +268,11 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
             Row(
               children: [
                 Expanded(
-                  child: _ImagePreview(
-                    label: '原图',
-                    path: _originalPath!,
-                  ),
+                  child: _ImagePreview(label: '原图', path: _originalPath!),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _ImagePreview(
-                    label: '压缩后',
-                    path: _compressedPath!,
-                  ),
+                  child: _ImagePreview(label: '压缩后', path: _compressedPath!),
                 ),
               ],
             ),

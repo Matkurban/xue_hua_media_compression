@@ -9,19 +9,16 @@ use ndk_context::android_context;
 pub fn open_content_uri_fd(uri: &str) -> Result<(i32, i64), MediaError> {
     let ctx = android_context();
     let vm = unsafe {
-        jni::JavaVM::from_raw(ctx.vm().cast())
-            .map_err(|e| MediaError::Native {
-                code: -1,
-                msg: format!("JavaVM::from_raw: {e}"),
-            })?
+        jni::JavaVM::from_raw(ctx.vm().cast()).map_err(|e| MediaError::Native {
+            code: -1,
+            msg: format!("JavaVM::from_raw: {e}"),
+        })?
     };
 
-    let mut env = vm
-        .attach_current_thread()
-        .map_err(|e| MediaError::Native {
-            code: -1,
-            msg: format!("attach_current_thread: {e}"),
-        })?;
+    let mut env = vm.attach_current_thread().map_err(|e| MediaError::Native {
+        code: -1,
+        msg: format!("attach_current_thread: {e}"),
+    })?;
 
     open_content_uri_fd_with_env(&mut env, uri)
 }
@@ -68,7 +65,10 @@ fn open_content_uri_fd_with_env(env: &mut JNIEnv, uri: &str) -> Result<(i32, i64
             &resolver,
             "openFileDescriptor",
             "(Landroid/net/Uri;Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;",
-            &[JValue::Object(&uri_obj), JValue::Object(&JString::from(mode))],
+            &[
+                JValue::Object(&uri_obj),
+                JValue::Object(&JString::from(mode)),
+            ],
         )
         .map_err(|e| jni_err("openFileDescriptor", e))?
         .l()

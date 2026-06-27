@@ -17,9 +17,7 @@ use core_media_sys::CMTime;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::{msg_send, AnyThread};
-use objc2_av_foundation::{
-    AVAssetReader, AVAssetReaderTrackOutput, AVMediaTypeVideo, AVURLAsset,
-};
+use objc2_av_foundation::{AVAssetReader, AVAssetReaderTrackOutput, AVMediaTypeVideo, AVURLAsset};
 use objc2_core_foundation::CFRetained;
 use objc2_core_foundation::CFString as Objc2CfString;
 use objc2_core_media::{
@@ -174,10 +172,7 @@ impl EncodeSink {
     }
 
     fn frames_submitted(&self) -> u64 {
-        self.inner
-            .lock()
-            .map(|g| g.frames_submitted)
-            .unwrap_or(0)
+        self.inner.lock().map(|g| g.frames_submitted).unwrap_or(0)
     }
 
     /// 回调结束：递增计数并 notify（回调内绝不阻塞）。
@@ -421,9 +416,7 @@ extern "C" fn compression_output_callback(
         if let Some(block) = unsafe { sbuf.data_buffer() } {
             let mut total = 0usize;
             let mut data_ptr: *mut i8 = ptr::null_mut();
-            let st = unsafe {
-                block.data_pointer(0, ptr::null_mut(), &mut total, &mut data_ptr)
-            };
+            let st = unsafe { block.data_pointer(0, ptr::null_mut(), &mut total, &mut data_ptr) };
             if st == 0 && !data_ptr.is_null() && total > 0 {
                 let avcc =
                     unsafe { std::slice::from_raw_parts(data_ptr as *const u8, total).to_vec() };
@@ -569,8 +562,7 @@ fn read_source_dimensions_avfoundation(input_path: &str) -> Result<(u32, u32, u3
 
 fn av_media_type_video() -> Result<&'static NSString, MediaError> {
     unsafe {
-        AVMediaTypeVideo
-            .ok_or_else(|| MediaError::Decode("AVMediaTypeVideo 不可用".into()))
+        AVMediaTypeVideo.ok_or_else(|| MediaError::Decode("AVMediaTypeVideo 不可用".into()))
     }
 }
 

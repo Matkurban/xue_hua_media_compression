@@ -79,8 +79,7 @@ fn encode_with_vaapi(
 
     let (frames, vps, sps, pps) = match opts.codec {
         VideoCodec::H264 => {
-            let mut encoder =
-                VaapiH264Encoder::open(out_w, out_h, fps, opts, frame_duration)?;
+            let mut encoder = VaapiH264Encoder::open(out_w, out_h, fps, opts, frame_duration)?;
             stream_decode_and_encode(
                 &mut mp4,
                 track_id,
@@ -95,8 +94,7 @@ fn encode_with_vaapi(
             encoder.finish()
         }
         VideoCodec::H265 => {
-            let mut encoder =
-                VaapiHevcEncoder::open(out_w, out_h, fps, opts, frame_duration)?;
+            let mut encoder = VaapiHevcEncoder::open(out_w, out_h, fps, opts, frame_duration)?;
             stream_decode_and_encode(
                 &mut mp4,
                 track_id,
@@ -211,7 +209,9 @@ enum InputCodec {
     H265,
 }
 
-fn detect_input_codec_from_reader(mp4: &Mp4Reader<impl std::io::Read + std::io::Seek>) -> Result<InputCodec, MediaError> {
+fn detect_input_codec_from_reader(
+    mp4: &Mp4Reader<impl std::io::Read + std::io::Seek>,
+) -> Result<InputCodec, MediaError> {
     let track = mp4
         .tracks()
         .values()

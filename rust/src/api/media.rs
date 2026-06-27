@@ -58,9 +58,8 @@ pub fn rust_compress_image_file(
     })?;
     let out = GenericImageCompressor::compress(&bytes, &opts)?;
     let output_path = prepare_output_path(&output_path)?;
-    std::fs::write(&output_path, &out).map_err(|e| {
-        MediaError::Io(format!("无法写入输出图片 ({output_path}): {e}"))
-    })?;
+    std::fs::write(&output_path, &out)
+        .map_err(|e| MediaError::Io(format!("无法写入输出图片 ({output_path}): {e}")))?;
     Ok(out.len() as u64)
 }
 
