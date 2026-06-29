@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**Version:** 1.1.0 · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
+**Version:** 1.1.1 · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
 A cross-platform Flutter FFI plugin for **image and video compression**, powered by Rust and [flutter_rust_bridge](https://codelabs.flutter.dev/codelabs/flutter-ffigen). Image compression runs entirely in Rust on all platforms; video compression uses each platform's native **hardware encoder** and muxes the result into standard MP4.
 
@@ -79,7 +79,7 @@ Add the dependency to your app's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^1.1.0
+  xue_hua_media_compression: ^1.1.1
 ```
 
 For local development (monorepo / path dependency):

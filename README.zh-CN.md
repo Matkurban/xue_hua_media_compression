@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**版本：** 1.1.0 · [English](README.md) · [更新日志](CHANGELOG.md)
+**版本：** 1.1.1 · [English](README.md) · [更新日志](CHANGELOG.md)
 
 跨平台 Flutter FFI 插件，提供**图片与视频压缩**能力。核心逻辑由 Rust 实现，通过 [flutter_rust_bridge](https://codelabs.flutter.dev/codelabs/flutter-ffigen) 与 Dart 互通。图片压缩在全平台统一走纯 Rust 管线；视频压缩调用各平台原生**硬件编码器**，并封装为标准 MP4。
 
@@ -79,7 +79,7 @@
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^1.1.0
+  xue_hua_media_compression: ^1.1.1
 ```
 
 本地开发（路径依赖）：

@@ -1,44 +1,43 @@
 //! Android `content://` URI → fd，供 AMediaExtractor 流式读取（不整文件读入内存）。
 
 use crate::api::traits::MediaError;
-use jni::objects::{JObject, JString, JValue};
-use jni::JNIEnv;
+use jni::objects::{JObject, JValue};
+use jni::{jni_sig, jni_str, Env};
 use ndk_context::android_context;
+
+impl From<jni::errors::Error> for MediaError {
+    fn from(e: jni::errors::Error) -> Self {
+        MediaError::Native {
+            code: -1,
+            msg: e.to_string(),
+        }
+    }
+}
 
 /// 通过 ContentResolver 打开 content URI，返回 fd 与文件长度。
 pub fn open_content_uri_fd(uri: &str) -> Result<(i32, i64), MediaError> {
     let ctx = android_context();
-    let vm = unsafe {
-        jni::JavaVM::from_raw(ctx.vm().cast()).map_err(|e| MediaError::Native {
-            code: -1,
-            msg: format!("JavaVM::from_raw: {e}"),
-        })?
-    };
+    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) };
 
-    let mut env = vm.attach_current_thread().map_err(|e| MediaError::Native {
-        code: -1,
-        msg: format!("attach_current_thread: {e}"),
-    })?;
-
-    open_content_uri_fd_with_env(&mut env, uri)
+    vm.attach_current_thread(|env| open_content_uri_fd_with_env(env, uri))
 }
 
-fn open_content_uri_fd_with_env(env: &mut JNIEnv, uri: &str) -> Result<(i32, i64), MediaError> {
+fn open_content_uri_fd_with_env(env: &mut Env<'_>, uri: &str) -> Result<(i32, i64), MediaError> {
     let ctx = android_context();
-    let context = unsafe { JObject::from_raw(ctx.context().cast()) };
+    let context = unsafe { JObject::from_raw(env, ctx.context().cast()) };
 
     let uri_obj = {
         let uri_class = env
-            .find_class("android/net/Uri")
+            .find_class(jni_str!("android/net/Uri"))
             .map_err(|e| jni_err("find Uri", e))?;
         let uri_str = env
             .new_string(uri)
             .map_err(|e| jni_err("new_string uri", e))?;
         env.call_static_method(
             uri_class,
-            "parse",
-            "(Ljava/lang/String;)Landroid/net/Uri;",
-            &[JValue::Object(&JString::from(uri_str))],
+            jni_str!("parse"),
+            jni_sig!((string: java.lang.String) -> android.net.Uri),
+            &[JValue::Object(&uri_str)],
         )
         .map_err(|e| jni_err("Uri.parse", e))?
         .l()
@@ -48,8 +47,8 @@ fn open_content_uri_fd_with_env(env: &mut JNIEnv, uri: &str) -> Result<(i32, i64
     let resolver = env
         .call_method(
             &context,
-            "getContentResolver",
-            "()Landroid/content/ContentResolver;",
+            jni_str!("getContentResolver"),
+            jni_sig!(() -> android.content.ContentResolver),
             &[],
         )
         .map_err(|e| jni_err("getContentResolver", e))?
@@ -63,12 +62,11 @@ fn open_content_uri_fd_with_env(env: &mut JNIEnv, uri: &str) -> Result<(i32, i64
     let pfd = env
         .call_method(
             &resolver,
-            "openFileDescriptor",
-            "(Landroid/net/Uri;Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;",
-            &[
-                JValue::Object(&uri_obj),
-                JValue::Object(&JString::from(mode)),
-            ],
+            jni_str!("openFileDescriptor"),
+            jni_sig!(
+                (uri: android.net.Uri, mode: java.lang.String) -> android.os.ParcelFileDescriptor
+            ),
+            &[JValue::Object(&uri_obj), JValue::Object(&mode)],
         )
         .map_err(|e| jni_err("openFileDescriptor", e))?
         .l()
@@ -81,13 +79,13 @@ fn open_content_uri_fd_with_env(env: &mut JNIEnv, uri: &str) -> Result<(i32, i64
     }
 
     let fd = env
-        .call_method(&pfd, "getFd", "()I", &[])
+        .call_method(&pfd, jni_str!("getFd"), jni_sig!(() -> int), &[])
         .map_err(|e| jni_err("getFd", e))?
         .i()
         .map_err(|e| jni_err("getFd result", e))?;
 
     let stat_size = env
-        .call_method(&pfd, "getStatSize", "()J", &[])
+        .call_method(&pfd, jni_str!("getStatSize"), jni_sig!(() -> long), &[])
         .map_err(|e| jni_err("getStatSize", e))?
         .j()
         .map_err(|e| jni_err("getStatSize result", e))?;

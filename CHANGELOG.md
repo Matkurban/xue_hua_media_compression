@@ -11,9 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Documentation / 文档:** [English](README.md) · [中文](README.zh-CN.md)
 
----
 
-## [Unreleased]
+## [1.1.1] - 2026-06-29
+
+### Fixed / 修复
+
+- **Android JNI (`jni` 0.22) / Android JNI 迁移** — Migrated `android_file.rs` from deprecated `JNIEnv` to `Env` / `EnvUnowned`; `JavaVM::attach_current_thread` now uses the closure API; `JObject::from_raw` and `jni_str!` / `jni_sig!` updated for 0.22. Removes `deprecated type alias jni::JNIEnv` build warnings.  
+  将 `android_file.rs` 从已弃用的 `JNIEnv` 迁移至 `Env` / `EnvUnowned`；`attach_current_thread` 改为闭包调用；`JObject::from_raw` 与 `jni_str!` / `jni_sig!` 适配 0.22，消除 Android 构建中的 JNI 弃用警告。
 
 ---
 
@@ -74,6 +78,3 @@ First public release.
 
 - **Multi-platform FFI plugin / 多平台 FFI 插件** — Android, iOS, macOS, Windows, Linux via Cargokit + flutter_rust_bridge 2.12.  
   通过 Cargokit + flutter_rust_bridge 2.12 支持 Android、iOS、macOS、Windows、Linux。
-
-[1.1.0]: https://github.com/Matkurban/xue_hua_media_compression/releases/tag/v1.1.0
-[1.0.0]: https://github.com/Matkurban/xue_hua_media_compression/releases/tag/v1.0.0

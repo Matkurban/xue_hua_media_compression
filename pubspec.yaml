@@ -1,6 +1,6 @@
 name: xue_hua_media_compression
 description: "Cross-platform Flutter FFI plugin for image and video compression powered by Rust."
-version: 1.1.0
+version: 1.1.1
 homepage: https://github.com/Matkurban/xue_hua_media_compression
 repository: https://github.com/Matkurban/xue_hua_media_compression
 issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
