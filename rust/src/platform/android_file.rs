@@ -15,7 +15,7 @@ impl From<jni::errors::Error> for MediaError {
 }
 
 /// 通过 ContentResolver 打开 content URI，返回 fd 与文件长度。
-pub fn open_content_uri_fd(uri: &str) -> Result<(i32, i64), MediaError> {
+pub(crate) fn open_content_uri_fd(uri: &str) -> Result<(i32, i64), MediaError> {
     let ctx = android_context();
     let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) };
 
@@ -94,7 +94,13 @@ fn open_content_uri_fd_with_env(env: &mut Env<'_>, uri: &str) -> Result<(i32, i6
         return Err(MediaError::Io(format!("content URI fd 无效: {uri}")));
     }
 
-    Ok((fd, stat_size))
+    // dup fd：ParcelFileDescriptor 为 JNI 局部引用，返回后须持有独立 fd 句柄。
+    let owned_fd = unsafe { libc::dup(fd) };
+    if owned_fd < 0 {
+        return Err(MediaError::Io(format!("dup content URI fd 失败: {uri}")));
+    }
+
+    Ok((owned_fd, stat_size))
 }
 
 fn jni_err(step: &str, e: jni::errors::Error) -> MediaError {

@@ -1,8 +1,7 @@
-//! 统一的压缩接口（Trait）与跨语言共享的数据类型。
+//! 统一的压缩接口与跨语言共享的数据类型。
 //!
-//! 所有平台模块都实现这里声明的 `ImageCompressor` / `VideoCompressor`，
-//! 上层 FRB 公共函数只面向 Trait 编程，再由 `api::platform` 用 `cfg` 把
-//! 具体平台实现绑定为统一别名。
+//! 图片压缩由 `image::compress`、视频压缩由各 `platform::*::compress_video` free function 实现。
+//! 上层 FRB 公共函数只经 `api::media` + `route` 路由，不导出实现类型到 Dart。
 
 use thiserror::Error;
 
@@ -131,26 +130,4 @@ pub struct VideoResult {
     /// 输出视频宽高。
     pub width: u32,
     pub height: u32,
-}
-
-// ============================================================================
-// 统一 Trait
-// ============================================================================
-
-/// 图片压缩器统一接口。各实现以无状态静态方法形式提供。
-#[flutter_rust_bridge::frb(ignore)]
-pub trait ImageCompressor {
-    /// 把输入图片字节按 `opts` 压缩，返回压缩后的字节。
-    fn compress(input: &[u8], opts: &ImageOptions) -> Result<Vec<u8>, MediaError>;
-}
-
-/// 视频压缩器统一接口。各平台用原生硬编实现。
-#[flutter_rust_bridge::frb(ignore)]
-pub trait VideoCompressor {
-    /// 读取 `input_path` 的视频，硬编后封装为 MP4 写入 `output_path`。
-    fn compress(
-        input_path: &str,
-        output_path: &str,
-        opts: &VideoOptions,
-    ) -> Result<VideoResult, MediaError>;
 }

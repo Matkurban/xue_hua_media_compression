@@ -2700,6 +2700,7 @@ dependencies = [
  "flutter_rust_bridge",
  "image",
  "jni 0.22.4",
+ "libc",
  "libheif-rs",
  "mediacodec",
  "mp4",

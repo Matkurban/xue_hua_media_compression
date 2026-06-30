@@ -19,10 +19,13 @@ library;
 
 import 'dart:typed_data';
 
+import 'options.dart';
 import 'rust/api/media.dart' as rust;
 import 'rust/api/traits.dart';
 import 'rust/frb_generated.dart';
 
+export 'options.dart'
+    show CompressionDefaults, facadeImageOptions, facadeVideoOptions;
 export 'rust/api/traits.dart'
     show
         ImageFormat,
@@ -70,12 +73,12 @@ class XueHuaImageApi {
   /// - [speed] AVIF/HEIC 编码速度；WebP method 档位；PNG→PNG oxipng 档位（1-10，越大越快）。
   Future<Uint8List> compress({
     required Uint8List input,
-    ImageFormat format = ImageFormat.jpeg,
-    int quality = 80,
+    ImageFormat format = CompressionDefaults.imageFormat,
+    int quality = CompressionDefaults.imageQuality,
     int? maxDimension,
     int? speed,
   }) {
-    final opts = ImageOptions(
+    final opts = facadeImageOptions(
       format: format,
       quality: quality,
       maxDimension: maxDimension,
@@ -96,12 +99,12 @@ class XueHuaImageApi {
   Future<int> compressFile({
     required String inputPath,
     required String outputPath,
-    ImageFormat format = ImageFormat.jpeg,
-    int quality = 80,
+    ImageFormat format = CompressionDefaults.imageFormat,
+    int quality = CompressionDefaults.imageQuality,
     int? maxDimension,
     int? speed,
   }) async {
-    final opts = ImageOptions(
+    final opts = facadeImageOptions(
       format: format,
       quality: quality,
       maxDimension: maxDimension,
@@ -132,13 +135,13 @@ class XueHuaVideoApi {
   Future<VideoResult> compress({
     required String inputPath,
     required String outputPath,
-    VideoCodec codec = VideoCodec.h264,
-    int bitrate = 2000000,
+    VideoCodec codec = CompressionDefaults.videoCodec,
+    int bitrate = CompressionDefaults.videoBitrate,
     int? fps,
     int? maxDimension,
     int? keyframeInterval,
   }) {
-    final opts = VideoOptions(
+    final opts = facadeVideoOptions(
       codec: codec,
       bitrate: bitrate,
       fps: fps,

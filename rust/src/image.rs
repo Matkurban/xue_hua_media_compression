@@ -5,42 +5,37 @@
 //! - HEIC/HEIF: 用 `libheif-rs`（封装 C++ libheif），仅在打开 `heic` feature 时启用
 //!   （需目标平台存在系统 libheif；移动端构建用 `--features heic`）。
 //!
-//! 设计为无状态：实现 [`ImageCompressor`] 这个 Trait 的静态方法。
+//! 设计为无状态 free function 入口 [`compress`]。
 
 use std::io::Cursor;
 
 use image::{DynamicImage, ImageReader};
 
-use crate::api::traits::{ImageCompressor, ImageFormat, ImageOptions, MediaError};
+use crate::api::traits::{ImageFormat, ImageOptions, MediaError};
 
-/// 全平台通用图片压缩器。
-#[flutter_rust_bridge::frb(opaque)]
-pub(crate) struct GenericImageCompressor;
+/// 压缩图片字节（全平台通用入口）。
+pub(crate) fn compress(input: &[u8], opts: &ImageOptions) -> Result<Vec<u8>, MediaError> {
+    // 快路径：PNG 输入 → PNG 输出且无缩放，直接 oxipng 优化，避免 decode/re-encode。
+    if opts.format == ImageFormat::Png && opts.max_dimension.is_none() && is_png(input) {
+        return optimize_png_bytes(input, opts);
+    }
 
-impl ImageCompressor for GenericImageCompressor {
-    fn compress(input: &[u8], opts: &ImageOptions) -> Result<Vec<u8>, MediaError> {
-        // 快路径：PNG 输入 → PNG 输出且无缩放，直接 oxipng 优化，避免 decode/re-encode。
-        if opts.format == ImageFormat::Png && opts.max_dimension.is_none() && is_png(input) {
-            return optimize_png_bytes(input, opts);
-        }
+    // 1) 解码（HEIC 输入需先单独处理，因为 `image` 不支持 HEIC 解码）。
+    let mut img = decode_any(input)?;
 
-        // 1) 解码（HEIC 输入需先单独处理，因为 `image` 不支持 HEIC 解码）。
-        let mut img = decode_any(input)?;
+    // 2) 可选等比缩放。
+    if let Some(max) = opts.max_dimension {
+        img = downscale_to_max(img, max);
+    }
 
-        // 2) 可选等比缩放。
-        if let Some(max) = opts.max_dimension {
-            img = downscale_to_max(img, max);
-        }
-
-        // 3) 按目标格式编码。
-        match opts.format {
-            ImageFormat::Jpeg => encode_jpeg(&img, opts.quality),
-            ImageFormat::Png => encode_png(&img),
-            ImageFormat::WebP => encode_webp(&img, opts),
-            ImageFormat::Gif => encode_gif(&img),
-            ImageFormat::Avif => encode_avif(&img, opts),
-            ImageFormat::Heic => encode_heic(&img, opts),
-        }
+    // 3) 按目标格式编码。
+    match opts.format {
+        ImageFormat::Jpeg => encode_jpeg(&img, opts.quality),
+        ImageFormat::Png => encode_png(&img),
+        ImageFormat::WebP => encode_webp(&img, opts),
+        ImageFormat::Gif => encode_gif(&img),
+        ImageFormat::Avif => encode_avif(&img, opts),
+        ImageFormat::Heic => encode_heic(&img, opts),
     }
 }
 
@@ -318,6 +313,21 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn write_image_fixture() {
+        if std::env::var("XUE_WRITE_FIXTURE").ok().as_deref() != Some("1") {
+            return;
+        }
+        use std::fs;
+        use std::path::PathBuf;
+        let dir =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../example/integration_test/fixtures");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("sample.jpg"), make_jpeg_bytes()).unwrap();
+        fs::write(dir.join("sample.png"), make_png_bytes()).unwrap();
+    }
+
+    #[test]
     fn is_png_detects_magic_bytes() {
         assert!(is_png(&make_png_bytes()));
         assert!(!is_png(&make_jpeg_bytes()));
@@ -335,7 +345,7 @@ mod tests {
         };
 
         let start = Instant::now();
-        let out = GenericImageCompressor::compress(&input, &opts).unwrap();
+        let out = compress(&input, &opts).unwrap();
         assert!(start.elapsed().as_secs() < 5);
         assert!(is_png(&out));
     }
@@ -350,7 +360,7 @@ mod tests {
             speed: Some(6),
         };
 
-        let out = GenericImageCompressor::compress(&input, &opts).unwrap();
+        let out = compress(&input, &opts).unwrap();
         assert!(is_png(&out));
         assert!(out.len() <= input.len());
     }
@@ -369,7 +379,7 @@ mod tests {
             speed: Some(6),
         };
 
-        let out = GenericImageCompressor::compress(&input, &opts).unwrap();
+        let out = compress(&input, &opts).unwrap();
         assert!(is_webp(&out));
     }
 
@@ -383,7 +393,7 @@ mod tests {
             speed: Some(6),
         };
 
-        let out = GenericImageCompressor::compress(&input, &opts).unwrap();
+        let out = compress(&input, &opts).unwrap();
         assert!(out.len() < input.len());
     }
 
@@ -403,8 +413,8 @@ mod tests {
             speed: Some(6),
         };
 
-        let out_low = GenericImageCompressor::compress(&input, &low).unwrap();
-        let out_high = GenericImageCompressor::compress(&input, &high).unwrap();
+        let out_low = compress(&input, &low).unwrap();
+        let out_high = compress(&input, &high).unwrap();
         assert!(out_low.len() < out_high.len());
     }
 }

@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**版本：** 1.1.1 · [English](README.md) · [更新日志](CHANGELOG.md)
+**版本：** 1.2.0 · [English](README.md) · [更新日志](CHANGELOG.md)
 
 跨平台 Flutter FFI 插件，提供**图片与视频压缩**能力。核心逻辑由 Rust 实现，通过 [flutter_rust_bridge](https://codelabs.flutter.dev/codelabs/flutter-ffigen) 与 Dart 互通。图片压缩在全平台统一走纯 Rust 管线；视频压缩调用各平台原生**硬件编码器**，并封装为标准 MP4。
 
@@ -79,7 +79,7 @@
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^1.1.1
+  xue_hua_media_compression: ^1.2.0
 ```
 
 本地开发（路径依赖）：
@@ -238,6 +238,8 @@ final backend = await XueHuaMediaCompression.videoBackendName();
 
 ## API 参考
 
+> **公开 API 边界：** 集成方仅应使用 `XueHuaMediaCompression` 及其 re-export 的类型（`ImageOptions`、`MediaError` 等）。请勿 deep import `lib/src/rust/`——内部 FRB 绑定不是稳定公开 interface。详见 [CONTEXT.md](CONTEXT.md)。
+
 ### 初始化
 
 | 方法 | 说明 |
@@ -391,18 +393,19 @@ flutter run
 
 ```
 xue_hua_media_compression/
-├── lib/                    # Dart 公开 API 与 FRB 生成绑定
+├── lib/                    # Dart 公开 API（门面 + FRB 生成绑定）
 │   └── src/
-│       ├── media_compression.dart   # 门面类 XueHuaMediaCompression
-│       ├── file_input.rs            # 路径规范化（Rust）
-│       └── rust/                    # flutter_rust_bridge 生成代码
-├── rust/                   # Rust 实现（图片 + 各平台视频）
-│   └── src/api/
+│       ├── media_compression.dart   # 门面类 XueHuaMediaCompression（唯一公开入口）
+│       └── rust/                    # flutter_rust_bridge 生成代码（勿 deep import）
+├── rust/                   # Rust 实现
+│   └── src/
+│       ├── api/media.rs    # FRB external seam
+│       ├── route.rs        # 内部压缩路由
 │       ├── image.rs        # 纯 Rust 图片压缩
-│       ├── media.rs        # FRB 入口函数
-│       └── platform/       # 各操作系统硬件视频编码
+│       └── platform/       # 各 OS 硬件视频编码
 ├── android/ ios/ macos/ linux/ windows/   # 平台构建胶水
 ├── cargokit/               # Rust ↔ Flutter 构建集成
+├── CONTEXT.md              # 领域术语与 seam 定义
 └── example/                # 示例应用
 ```
 

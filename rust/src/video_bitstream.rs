@@ -1,20 +1,6 @@
-//! 视频压缩各平台共用的 NAL/封装辅助函数。
+//! 视频码流辅助：Annex-B / AVCC 转换、参数集提取、hvcC 构建与修补。
 
 use crate::api::traits::{MediaError, VideoCodec};
-
-/// 等比缩放到最大边长（宽高对齐到偶数）。
-pub(crate) fn scale_dims(w: u32, h: u32, max: Option<u32>) -> (u32, u32) {
-    match max {
-        Some(m) if w.max(h) > m => {
-            let ratio = m as f64 / w.max(h) as f64;
-            (
-                ((w as f64 * ratio) as u32) & !1,
-                ((h as f64 * ratio) as u32) & !1,
-            )
-        }
-        _ => (w & !1, h & !1),
-    }
-}
 
 /// H.264 Annex-B 参数集。
 pub(crate) struct H264ParamSets {
@@ -89,7 +75,7 @@ pub(crate) fn extract_param_sets_for_codec(
 }
 
 /// Annex-B -> AVCC（4 字节大端长度前缀）。
-pub(crate) fn annex_b_to_avcc(data: &[u8]) -> Vec<u8> {
+pub(crate) fn annex_b_to_avcc(data: &[u8]) -> Result<Vec<u8>, MediaError> {
     let mut out = Vec::with_capacity(data.len() + 16);
     for nal in iter_annex_b_nals(data) {
         let len = nal.len() as u32;
@@ -97,10 +83,55 @@ pub(crate) fn annex_b_to_avcc(data: &[u8]) -> Vec<u8> {
         out.extend_from_slice(nal);
     }
     if out.is_empty() && !data.is_empty() {
-        // 可能已是 AVCC
-        return data.to_vec();
+        if is_valid_avcc(data) {
+            return Ok(data.to_vec());
+        }
+        return Err(MediaError::Mux(
+            "无法识别的 NAL 格式：既非 Annex-B 也非 AVCC".into(),
+        ));
     }
-    out
+    Ok(out)
+}
+
+/// 判断缓冲区是否为完整的 AVCC（长度前缀 NAL 序列）。
+fn is_valid_avcc(data: &[u8]) -> bool {
+    if data.len() < 5 {
+        return false;
+    }
+    let mut i = 0;
+    let mut nals = 0;
+    while i + 4 <= data.len() {
+        let len = u32::from_be_bytes(data[i..i + 4].try_into().unwrap()) as usize;
+        if len == 0 {
+            return false;
+        }
+        i += 4;
+        if i + len > data.len() {
+            return false;
+        }
+        i += len;
+        nals += 1;
+    }
+    nals > 0 && i == data.len()
+}
+
+/// H.264 Annex-B 流是否包含 IDR NAL（type 5）。
+pub(crate) fn annex_b_has_idr_h264_nal(annex_b: &[u8]) -> bool {
+    let mut i = 0;
+    while i + 4 < annex_b.len() {
+        if annex_b[i..].starts_with(&[0, 0, 0, 1]) {
+            i += 4;
+        } else if annex_b[i..].starts_with(&[0, 0, 1]) {
+            i += 3;
+        } else {
+            i += 1;
+            continue;
+        }
+        if i < annex_b.len() && (annex_b[i] & 0x1f) == 5 {
+            return true;
+        }
+    }
+    false
 }
 
 /// AVCC -> Annex-B。
@@ -152,7 +183,6 @@ pub(crate) fn iter_annex_b_nals(data: &[u8]) -> Vec<&[u8]> {
     nals
 }
 
-/// 遍历 Annex-B NAL（含起始码）。
 fn iter_annex_b_nals_with_start(data: &[u8]) -> Vec<&[u8]> {
     let starts = find_annex_b_starts(data);
     let mut nals = Vec::new();
@@ -244,12 +274,8 @@ pub(crate) fn patch_hvcc_in_mp4(
     let hvcc_payload = build_hvcc_payload(vps, sps, pps);
     let new_box = build_mp4_box(b"hvcC", &hvcc_payload);
 
-    let needle = b"hvcC";
-    let pos = data
-        .windows(4)
-        .position(|w| w == needle)
+    let box_start = find_hvcc_box_start(&data)
         .ok_or_else(|| MediaError::Mux("MP4 中未找到 hvcC box".into()))?;
-    let box_start = pos - 4;
     let old_size = u32::from_be_bytes(data[box_start..box_start + 4].try_into().unwrap()) as usize;
     let delta = new_box.len() as i64 - old_size as i64;
     if delta != 0 {
@@ -267,6 +293,68 @@ fn build_mp4_box(fourcc: &[u8; 4], payload: &[u8]) -> Vec<u8> {
     out.extend_from_slice(fourcc);
     out.extend_from_slice(payload);
     out
+}
+
+/// 在 stsd → hvc1/hev1 子树内定位 hvcC box 起始偏移（含 box 头）。
+fn find_hvcc_box_start(data: &[u8]) -> Option<usize> {
+    find_box_start(data, 0, data.len(), None, b"hvcC", &[b"hvc1", b"hev1"])
+}
+
+fn find_box_start(
+    data: &[u8],
+    start: usize,
+    end: usize,
+    parent_type: Option<&[u8; 4]>,
+    target: &[u8; 4],
+    valid_parents: &[&[u8; 4]],
+) -> Option<usize> {
+    let mut pos = start;
+    while pos + 8 <= end {
+        let size = u32::from_be_bytes(data[pos..pos + 4].try_into().ok()?) as usize;
+        if size < 8 {
+            break;
+        }
+        let box_end = pos + size;
+        if box_end > end {
+            break;
+        }
+        let typ: &[u8; 4] = data[pos + 4..pos + 8].try_into().ok()?;
+        if typ == target {
+            let parent_ok = parent_type
+                .map(|p| valid_parents.contains(&p))
+                .unwrap_or(false);
+            if parent_ok {
+                return Some(pos);
+            }
+        }
+        if should_recurse_into_box(typ) {
+            let content_start = box_content_start(pos, typ);
+            if let Some(found) = find_box_start(
+                data,
+                content_start,
+                box_end,
+                Some(typ),
+                target,
+                valid_parents,
+            ) {
+                return Some(found);
+            }
+        }
+        pos = box_end;
+    }
+    None
+}
+
+fn should_recurse_into_box(typ: &[u8; 4]) -> bool {
+    is_container_box(typ) || matches!(typ, b"stsd" | b"hvc1" | b"hev1" | b"avc1")
+}
+
+fn box_content_start(pos: usize, typ: &[u8; 4]) -> usize {
+    match typ {
+        b"stsd" => pos + 16,
+        b"hvc1" | b"hev1" | b"avc1" => pos + 86,
+        _ => pos + 8,
+    }
 }
 
 fn is_container_box(typ: &[u8]) -> bool {
@@ -302,80 +390,6 @@ fn update_containing_box_sizes(data: &mut [u8], target_pos: usize, delta: i64) {
     walk(data, 0, data.len(), target_pos, delta);
 }
 
-/// NV12 双线性缩放（CPU）。
-pub(crate) fn scale_nv12(src: &[u8], src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) -> Vec<u8> {
-    if src_w == dst_w && src_h == dst_h {
-        return src.to_vec();
-    }
-    let src_y_size = (src_w * src_h) as usize;
-    let dst_y_size = (dst_w * dst_h) as usize;
-    let mut dst = vec![0u8; dst_y_size + (dst_w * dst_h / 2) as usize];
-
-    for dy in 0..dst_h {
-        let sy = (dy as f32 * src_h as f32 / dst_h as f32) as u32;
-        let sy = sy.min(src_h - 1);
-        for dx in 0..dst_w {
-            let sx = (dx as f32 * src_w as f32 / dst_w as f32) as u32;
-            let sx = sx.min(src_w - 1);
-            dst[(dy * dst_w + dx) as usize] = src[(sy * src_w + sx) as usize];
-        }
-    }
-
-    let src_uv_off = src_y_size;
-    let dst_uv_off = dst_y_size;
-    let dst_uv_h = dst_h / 2;
-    let dst_uv_w = dst_w;
-    for dy in 0..dst_uv_h {
-        let sy = (dy as f32 * (src_h / 2) as f32 / dst_uv_h as f32) as u32;
-        let sy = sy.min(src_h / 2 - 1);
-        for dx in 0..dst_uv_w / 2 {
-            let sx = (dx as f32 * (src_w / 2) as f32 / (dst_uv_w / 2) as f32) as u32;
-            let sx = sx.min(src_w / 2 - 1);
-            let src_idx = src_uv_off + ((sy * src_w) + sx * 2) as usize;
-            let dst_idx = dst_uv_off + ((dy * dst_uv_w) + dx * 2) as usize;
-            if src_idx + 1 < src.len() && dst_idx + 1 < dst.len() {
-                dst[dst_idx] = src[src_idx];
-                dst[dst_idx + 1] = src[src_idx + 1];
-            }
-        }
-    }
-    dst
-}
-
-/// 从 mp4 容器读取视频轨元数据（全平台可用）。
-pub(crate) fn read_mp4_video_metadata(path: &str) -> Result<(u32, u32, u32), MediaError> {
-    use mp4::{Mp4Reader, TrackType};
-    use std::fs::File;
-    use std::io::BufReader;
-
-    let file_size = std::fs::metadata(path)?.len();
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let mp4 =
-        Mp4Reader::read_header(reader, file_size).map_err(|e| MediaError::Decode(e.to_string()))?;
-
-    for track_id in mp4.tracks().keys() {
-        let track = mp4.tracks().get(track_id).unwrap();
-        let track_type = track
-            .track_type()
-            .map_err(|e| MediaError::Decode(e.to_string()))?;
-        if track_type != TrackType::Video {
-            continue;
-        }
-        let width = track.width();
-        let height = track.height();
-        let duration_secs = track.duration().as_secs_f64();
-        let sample_count = track.sample_count();
-        let fps = if duration_secs > 0.0 {
-            (sample_count as f64 / duration_secs).round() as u32
-        } else {
-            30
-        };
-        return Ok((width as u32, height as u32, fps.max(1)));
-    }
-    Err(MediaError::Decode("MP4 中未找到视频轨".into()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,9 +397,59 @@ mod tests {
     #[test]
     fn annex_b_roundtrip() {
         let annex = [0u8, 0, 0, 1, 0x67, 0x42, 0x00, 0x1f, 0, 0, 0, 1, 0x68, 0xce];
-        let avcc = annex_b_to_avcc(&annex);
+        let avcc = annex_b_to_avcc(&annex).unwrap();
         let back = avcc_to_annex_b(&avcc);
         assert_eq!(back, annex);
+    }
+
+    #[test]
+    fn annex_b_to_avcc_rejects_garbage() {
+        let err = annex_b_to_avcc(&[0xde, 0xad, 0xbe, 0xef]).unwrap_err();
+        assert!(matches!(err, MediaError::Mux(_)));
+    }
+
+    #[test]
+    fn annex_b_to_avcc_accepts_valid_avcc_passthrough() {
+        let annex = [0u8, 0, 0, 1, 0x67, 0x42, 0x00, 0x1f];
+        let avcc = annex_b_to_avcc(&annex).unwrap();
+        let again = annex_b_to_avcc(&avcc).unwrap();
+        assert_eq!(again, avcc);
+    }
+
+    #[test]
+    fn annex_b_has_idr_h264_detects_idr() {
+        let idr = [0u8, 0, 0, 1, 0x65, 0x88];
+        assert!(annex_b_has_idr_h264_nal(&idr));
+        let trail = [0u8, 0, 0, 1, 0x41, 0x88];
+        assert!(!annex_b_has_idr_h264_nal(&trail));
+    }
+
+    #[test]
+    fn find_hvcc_ignores_false_positive_in_payload() {
+        let mut stsd_payload = Vec::new();
+        stsd_payload.extend_from_slice(&0u32.to_be_bytes());
+        stsd_payload.extend_from_slice(&1u32.to_be_bytes());
+        let mut hvc1_payload = vec![0u8; 78];
+        let hvcc_box = build_mp4_box(b"hvcC", &[0x01, 0x02, 0x03, 0x04]);
+        hvc1_payload.extend_from_slice(&hvcc_box);
+        let hvc1_box = build_mp4_box(b"hvc1", &hvc1_payload);
+        stsd_payload.extend_from_slice(&hvc1_box);
+        let stsd_box = build_mp4_box(b"stsd", &stsd_payload);
+        let stbl_box = build_mp4_box(b"stbl", &stsd_box);
+        let minf_box = build_mp4_box(b"minf", &stbl_box);
+        let mdia_box = build_mp4_box(b"mdia", &minf_box);
+        let trak_box = build_mp4_box(b"trak", &mdia_box);
+        let mut moov_payload = trak_box;
+        moov_payload.extend_from_slice(b"fakehvcC");
+        let moov_box = build_mp4_box(b"moov", &moov_payload);
+        let ftyp_box = build_mp4_box(b"ftyp", b"isom");
+        let mut file = Vec::new();
+        file.extend_from_slice(&ftyp_box);
+        file.extend_from_slice(&moov_box);
+        let false_positive = file.windows(4).position(|w| w == b"hvcC").unwrap();
+        let start = find_hvcc_box_start(&file).expect("hvcC inside hvc1");
+        assert_eq!(&file[start + 4..start + 8], b"hvcC");
+        assert_ne!(start, false_positive);
     }
 
     #[test]

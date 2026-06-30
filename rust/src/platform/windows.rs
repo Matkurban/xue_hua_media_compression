@@ -8,40 +8,34 @@ use windows::core::{Interface, PCWSTR, PWSTR};
 use windows::Win32::Media::MediaFoundation::*;
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
 
-use crate::api::traits::{MediaError, VideoCodec, VideoCompressor, VideoOptions, VideoResult};
-use crate::api::video::{mux_to_mp4, EncodedFrame, MuxParams};
-use crate::api::video_common::{
-    extract_param_sets_for_codec, read_mp4_video_metadata, scale_dims, scale_nv12,
-};
+use crate::api::traits::{MediaError, VideoCodec, VideoOptions, VideoResult};
+use crate::video_encode::{finalize_encoded, plan_encode};
+use crate::video_frame_collector::EncodedFrameCollector;
+use crate::video_input::VideoInput;
+use crate::video_mp4::read_mp4_video_metadata;
+use crate::video_scale::scale_nv12;
 
-#[flutter_rust_bridge::frb(opaque)]
-pub(crate) struct WindowsVideoCompressor;
-
-impl WindowsVideoCompressor {
-    pub(crate) fn backend_name() -> &'static str {
-        "MediaFoundation"
-    }
+pub(crate) fn backend_name() -> &'static str {
+    "MediaFoundation"
 }
 
-impl VideoCompressor for WindowsVideoCompressor {
-    fn compress(
-        input_path: &str,
-        output_path: &str,
-        opts: &VideoOptions,
-    ) -> Result<VideoResult, MediaError> {
-        unsafe { encode_with_media_foundation(input_path, output_path, opts) }
-    }
+pub(crate) fn compress_video(
+    input: &VideoInput,
+    output_path: &str,
+    opts: &VideoOptions,
+) -> Result<VideoResult, MediaError> {
+    unsafe { encode_with_media_foundation(input, output_path, opts) }
 }
 
 unsafe fn encode_with_media_foundation(
-    input_path: &str,
+    input: &VideoInput,
     output_path: &str,
     opts: &VideoOptions,
 ) -> Result<VideoResult, MediaError> {
     let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
     let _ = MFStartup(MF_VERSION, MFSTARTUP_FULL);
 
-    let result = encode_inner(input_path, output_path, opts);
+    let result = encode_inner(input, output_path, opts);
 
     let _ = MFShutdown();
     CoUninitialize();
@@ -49,24 +43,29 @@ unsafe fn encode_with_media_foundation(
 }
 
 unsafe fn encode_inner(
-    input_path: &str,
+    input: &VideoInput,
     output_path: &str,
     opts: &VideoOptions,
 ) -> Result<VideoResult, MediaError> {
-    let (src_w, src_h, src_fps) = read_source_dimensions(input_path)?;
-    let (out_w, out_h) = scale_dims(src_w, src_h, opts.max_dimension);
-    let fps = opts.fps.unwrap_or(src_fps).max(1);
-    let frame_duration = 90_000 / fps;
-
+    let input_path = input
+        .file_path()
+        .ok_or_else(|| MediaError::Decode("Windows 视频编码仅支持本地文件路径".into()))?;
+    let plan = plan_encode(input, opts)?;
     let reader = create_source_reader(input_path)?;
-    let encoder = create_hardware_encoder(opts.codec, out_w, out_h, fps, opts.bitrate)?;
+    let encoder = create_hardware_encoder(
+        opts.codec,
+        plan.out_w,
+        plan.out_h,
+        plan.fps,
+        opts.bitrate,
+        plan.keyframe_interval,
+    )?;
 
-    let mut frames: Vec<EncodedFrame> = Vec::new();
-    let mut vps = Vec::new();
-    let mut sps = Vec::new();
-    let mut pps = Vec::new();
+    let mut collector = EncodedFrameCollector::new(opts.codec, plan.frame_duration);
+
     let mut stream_index: u32 = 0;
     let mut flags = 0u32;
+    let mut frame_index: u64 = 0;
 
     loop {
         let mut sample: Option<IMFSample> = None;
@@ -88,17 +87,17 @@ unsafe fn encode_inner(
             break;
         }
 
-        let nv12 = sample_to_nv12(&sample, out_w, out_h, src_w, src_h)?;
-        feed_nv12_to_encoder(&encoder, &nv12, out_w, out_h, fps)?;
-        drain_encoder_output(
+        let nv12 = sample_to_nv12(&sample, plan.out_w, plan.out_h, plan.src_w, plan.src_h)?;
+        feed_nv12_to_encoder(
             &encoder,
-            opts.codec,
-            frame_duration,
-            &mut frames,
-            &mut vps,
-            &mut sps,
-            &mut pps,
+            &nv12,
+            plan.out_w,
+            plan.out_h,
+            plan.fps,
+            frame_index,
         )?;
+        frame_index += 1;
+        drain_encoder_output(&encoder, &mut collector)?;
     }
 
     encoder
@@ -113,42 +112,20 @@ unsafe fn encode_inner(
             code: e.code().0,
             msg: "MFT drain".into(),
         })?;
-    drain_encoder_output(
-        &encoder,
-        opts.codec,
-        frame_duration,
-        &mut frames,
-        &mut vps,
-        &mut sps,
-        &mut pps,
-    )?;
+    drain_encoder_output(&encoder, &mut collector)?;
 
-    if frames.is_empty() {
-        return Err(MediaError::Encode("Media Foundation 未产出编码帧".into()));
-    }
+    let (frames, vps, sps, pps) = collector.finish();
 
-    let params = MuxParams {
-        codec: opts.codec,
-        width: out_w as u16,
-        height: out_h as u16,
-        timescale: 90_000,
-        vps: if vps.is_empty() {
-            None
-        } else {
-            Some(vps.as_slice())
-        },
-        sps: &sps,
-        pps: &pps,
-    };
-    let size = mux_to_mp4(output_path, &params, &frames)?;
-
-    Ok(VideoResult {
-        output_path: output_path.to_string(),
-        size_bytes: size,
-        backend: WindowsVideoCompressor::backend_name().to_string(),
-        width: out_w,
-        height: out_h,
-    })
+    finalize_encoded(
+        output_path,
+        opts,
+        &plan,
+        backend_name(),
+        &frames,
+        &vps,
+        &sps,
+        &pps,
+    )
 }
 
 unsafe fn create_source_reader(input_path: &str) -> Result<IMFSourceReader, MediaError> {
@@ -180,6 +157,7 @@ unsafe fn create_hardware_encoder(
     height: u32,
     fps: u32,
     bitrate: u32,
+    keyframe_interval: u32,
 ) -> Result<IMFTransform, MediaError> {
     let subtype = match codec {
         VideoCodec::H264 => MFVideoFormat_H264,
@@ -225,6 +203,9 @@ unsafe fn create_hardware_encoder(
     MFSetAttributeSize(&out_type, &MF_MT_FRAME_SIZE, width, height)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
     MFSetAttributeRatio(&out_type, &MF_MT_FRAME_RATE, fps, 1)
+        .map_err(|e| MediaError::Encode(e.to_string()))?;
+    out_type
+        .SetUINT32(&MF_MT_MAX_KEYFRAME_SPACING, keyframe_interval)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
     encoder
         .SetOutputType(0, &out_type, 0)
@@ -286,6 +267,7 @@ unsafe fn feed_nv12_to_encoder(
     width: u32,
     height: u32,
     fps: u32,
+    frame_index: u64,
 ) -> Result<(), MediaError> {
     let sample: IMFSample = MFCreateSample().map_err(|e| MediaError::Encode(e.to_string()))?;
     let buffer: IMFMediaBuffer =
@@ -306,12 +288,12 @@ unsafe fn feed_nv12_to_encoder(
     sample
         .AddBuffer(&buffer)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
-    let frame_duration = (10_000_000u64 / fps as u64) as i64;
+    let frame_duration = 10_000_000u64 / fps as u64;
     sample
-        .SetSampleTime(frame_duration)
+        .SetSampleTime((frame_index * frame_duration) as i64)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
     sample
-        .SetSampleDuration(frame_duration)
+        .SetSampleDuration(frame_duration as i64)
         .map_err(|e| MediaError::Encode(e.to_string()))?;
     let _ = (width, height);
     encoder
@@ -322,12 +304,7 @@ unsafe fn feed_nv12_to_encoder(
 
 unsafe fn drain_encoder_output(
     encoder: &IMFTransform,
-    codec: VideoCodec,
-    frame_duration: u32,
-    frames: &mut Vec<EncodedFrame>,
-    vps: &mut Vec<u8>,
-    sps: &mut Vec<u8>,
-    pps: &mut Vec<u8>,
+    collector: &mut EncodedFrameCollector,
 ) -> Result<(), MediaError> {
     loop {
         let mut out_buf = MFT_OUTPUT_DATA_BUFFER {
@@ -353,19 +330,7 @@ unsafe fn drain_encoder_output(
                     .map_err(|e| MediaError::Encode(e.to_string()))?;
                 let nal = std::slice::from_raw_parts(ptr, cur_len as usize).to_vec();
                 buffer.Unlock().ok();
-                if sps.is_empty() {
-                    let (v, s, p) = extract_param_sets_for_codec(codec, &nal);
-                    if let Some(vv) = v {
-                        *vps = vv;
-                    }
-                    *sps = s;
-                    *pps = p;
-                }
-                frames.push(EncodedFrame {
-                    data: nal,
-                    is_keyframe: is_key,
-                    duration: frame_duration,
-                });
+                collector.push_access_unit(nal, is_key);
             }
             Err(e) if e.code() == MF_E_TRANSFORM_NEED_MORE_INPUT => break,
             Err(e) => {
@@ -381,6 +346,13 @@ unsafe fn drain_encoder_output(
 
 fn read_source_dimensions(input_path: &str) -> Result<(u32, u32, u32), MediaError> {
     read_mp4_video_metadata(input_path)
+}
+
+pub(crate) fn probe_dimensions(input: &VideoInput) -> Result<(u32, u32, u32), MediaError> {
+    let path = input
+        .file_path()
+        .ok_or_else(|| MediaError::Decode("Windows 视频元数据仅支持本地文件路径".into()))?;
+    read_source_dimensions(path)
 }
 
 fn to_wide(s: &str) -> Vec<u16> {

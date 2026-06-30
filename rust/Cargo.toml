@@ -38,6 +38,8 @@ libheif-rs = { version = "2.7.0", optional = true }
 default = []
 # 打开后启用 HEIC/HEIF 编解码（要求目标平台存在 libheif 系统库）。
 heic = ["dep:libheif-rs"]
+# 打开后 `cargo test` 走真实 platform adapter 而非 mock（需目标平台硬件/库）。
+platform-tests = []
 
 # =============================================================================
 # Windows: Media Foundation (WMF) 硬件编码
@@ -80,6 +82,7 @@ ndk = "0.9"
 ndk-sys = "0.6"
 ndk-context = "0.1.1"
 jni = "0.22.4"
+libc = "0.2"
 
 # =============================================================================
 # Linux: VA-API 硬件编码
@@ -89,6 +92,9 @@ jni = "0.22.4"
 # cros-libva（安全封装）或 libva-sys（裸 FFI）。这里用 cros-libva。
 cros-libva = "0.0.13"
 # 软件 H.264/H.265 解码（非 FFmpeg），配合 VA-API 硬编。
+openh264 = "0.9"
+
+[dev-dependencies]
 openh264 = "0.9"
 
 [build-dependencies]

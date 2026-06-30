@@ -10,10 +10,6 @@ part 'traits.freezed.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
-abstract class ImageCompressor {}
-
-abstract class VideoCompressor {}
-
 /// 目标图片格式。
 enum ImageFormat { jpeg, png, webP, gif, heic, avif }
 
@@ -28,7 +24,8 @@ class ImageOptions {
   /// 可选：等比缩放到的最大边长（像素）。`None` 表示不缩放。
   final int? maxDimension;
 
-  /// 编码速度档位 0-10（对 AVIF/HEIC 有效，越大越快质量略降）。
+  /// 编码速度档位 1-10（对 AVIF/HEIC 为编码速度；对 WebP 为 method 档位，
+  /// 越大越快、体积略大；对 PNG 输入→PNG 输出时为 oxipng 优化档位）。
   final int? speed;
 
   const ImageOptions({

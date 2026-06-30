@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Documentation / 文档:** [English](README.md) · [中文](README.zh-CN.md)
 
 
+## [1.2.0] - 2026-06-30
+
+### Changed / 变更
+
+- **Sealed external seam / 封住外部接缝** — FRB `rust_input` narrowed to `api::media` + `api::traits`; internal compressors moved behind `route` module with free-function dispatch. Dart bindings no longer export `AppleVideoCompressor`, `GenericImageCompressor`, or scaffold `greet`.  
+  收窄 FRB 扫描范围；压缩路由经 `route` module；Dart 不再导出泄漏的平台 compressor 与脚手架 `greet`。
+
+- **Removed `apple_stub.rs` / 删除 apple stub** — `platform::apple` compiles only on iOS/macOS.  
+  `platform::apple` 仅在 Apple target 编译，移除仅为 codegen 服务的 stub。
+
+- **Removed `RustLib` from public export / 公开 API 不再 export `RustLib`** — use `XueHuaMediaCompression.initialize()` instead.  
+  请统一使用 `XueHuaMediaCompression.initialize()` 初始化。
+
+### Breaking changes / 破坏性变更
+
+- Removed public export of `RustLib`.
+- Removed generated Dart bindings for direct compressor access (`AppleVideoCompressor.compress`, `GenericImageCompressor.compress`, `greet`). Use `XueHuaMediaCompression.image` / `.video` instead.
+
+---
+
 ## [1.1.1] - 2026-06-29
 
 ### Fixed / 修复

@@ -1,4 +1,4 @@
-//! Apple 端（iOS / macOS）视频硬编：VideoToolbox + AVAssetReader。
+//! VideoToolbox 硬编：VTCompressionSession + 输出回调。
 
 use std::ffi::c_void;
 use std::ptr;
@@ -15,20 +15,12 @@ use core_foundation_sys::dictionary::CFDictionaryRef;
 use core_foundation_sys::string::CFStringRef;
 use core_media_sys::CMTime;
 use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
 use objc2::{msg_send, AnyThread};
-use objc2_av_foundation::{AVAssetReader, AVAssetReaderTrackOutput, AVMediaTypeVideo, AVURLAsset};
 use objc2_core_foundation::CFRetained;
-use objc2_core_foundation::CFString as Objc2CfString;
 use objc2_core_media::{
     CMSampleBuffer, CMVideoFormatDescriptionGetH264ParameterSetAtIndex,
     CMVideoFormatDescriptionGetHEVCParameterSetAtIndex,
 };
-use objc2_core_video::{
-    kCVPixelBufferHeightKey, kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey,
-    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-};
-use objc2_foundation::{NSDictionary, NSNumber, NSString, NSURL};
 use video_toolbox_sys::codecs::video::{H264, HEVC};
 use video_toolbox_sys::compression::{
     kVTCompressionPropertyKey_AverageBitRate, kVTCompressionPropertyKey_MaxKeyFrameInterval,
@@ -43,41 +35,19 @@ use video_toolbox_sys::compression::{
 use video_toolbox_sys::cv_types::CVPixelBufferRef;
 use video_toolbox_sys::session::VTSessionSetProperty;
 
-use crate::api::traits::{MediaError, VideoCodec, VideoCompressor, VideoOptions, VideoResult};
-use crate::api::video::{mux_to_mp4, EncodedFrame, MuxParams};
-use crate::api::video_common::{avcc_to_annex_b, scale_dims};
+use crate::api::traits::{MediaError, VideoCodec, VideoOptions, VideoResult};
+use crate::video_bitstream::avcc_to_annex_b;
+use crate::video_encode::{finalize_encoded, plan_encode};
+use crate::video_frame_collector::EncodedFrameCollector;
+use crate::video_input::VideoInput;
 
 /// RealTime=false 时 VT 可延迟回调；限制在途帧数避免内存无限增长。
 const MAX_IN_FLIGHT: u64 = 8;
 
 const CALLBACK_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[flutter_rust_bridge::frb(opaque)]
-pub(crate) struct AppleVideoCompressor;
-
-impl AppleVideoCompressor {
-    pub(crate) fn backend_name() -> &'static str {
-        "VideoToolbox"
-    }
-}
-
-impl VideoCompressor for AppleVideoCompressor {
-    fn compress(
-        input_path: &str,
-        output_path: &str,
-        opts: &VideoOptions,
-    ) -> Result<VideoResult, MediaError> {
-        encode_with_video_toolbox(input_path, output_path, opts)
-    }
-}
-
 struct EncodeSinkInner {
-    frames: Vec<EncodedFrame>,
-    vps: Vec<u8>,
-    sps: Vec<u8>,
-    pps: Vec<u8>,
-    frame_duration: u32,
-    codec: VideoCodec,
+    output: EncodedFrameCollector,
     /// 已成功调用 VTCompressionSessionEncodeFrame 的次数。
     frames_submitted: u64,
     /// VT 输出回调完成次数（含 dropped / error），用于与主线程同步。
@@ -93,12 +63,7 @@ impl EncodeSink {
     fn new(frame_duration: u32, codec: VideoCodec) -> Self {
         Self {
             inner: Mutex::new(EncodeSinkInner {
-                frames: Vec::new(),
-                vps: Vec::new(),
-                sps: Vec::new(),
-                pps: Vec::new(),
-                frame_duration,
-                codec,
+                output: EncodedFrameCollector::new(codec, frame_duration),
                 frames_submitted: 0,
                 callbacks_completed: 0,
             }),
@@ -185,17 +150,17 @@ impl EncodeSink {
     }
 }
 
-fn encode_with_video_toolbox(
-    input_path: &str,
+pub(super) fn run(
+    input: &VideoInput,
     output_path: &str,
     opts: &VideoOptions,
 ) -> Result<VideoResult, MediaError> {
-    let (src_w, src_h, src_fps) = read_source_dimensions(input_path)?;
-    let (out_w, out_h) = scale_dims(src_w, src_h, opts.max_dimension);
-    let fps = opts.fps.unwrap_or(src_fps).max(1);
-    let frame_duration = 90_000 / fps;
+    let input_path = input
+        .file_path()
+        .ok_or_else(|| MediaError::Decode("Apple 视频编码仅支持本地文件路径".into()))?;
+    let plan = plan_encode(input, opts)?;
 
-    let sink = EncodeSink::new(frame_duration, opts.codec);
+    let sink = EncodeSink::new(plan.frame_duration, opts.codec);
 
     let codec_fourcc = match opts.codec {
         VideoCodec::H264 => H264,
@@ -214,8 +179,8 @@ fn encode_with_video_toolbox(
         let mut session: VTCompressionSessionRef = ptr::null_mut();
         let status = VTCompressionSessionCreate(
             kCFAllocatorDefault,
-            out_w as i32,
-            out_h as i32,
+            plan.out_w as i32,
+            plan.out_h as i32,
             codec_fourcc,
             encoder_spec.as_concrete_TypeRef() as CFDictionaryRef,
             ptr::null(),
@@ -283,7 +248,8 @@ fn encode_with_video_toolbox(
             });
         }
 
-        let (reader, output) = open_video_reader(input_path, out_w, out_h)?;
+        let (reader, output) =
+            super::reader::open_video_reader(input_path, plan.out_w, plan.out_h)?;
         if !reader.startReading() {
             VTCompressionSessionInvalidate(session);
             CFRelease(session as CFTypeRef);
@@ -305,13 +271,13 @@ fn encode_with_video_toolbox(
 
             let pts = CMTime {
                 value: frame_index as i64,
-                timescale: fps as i32,
+                timescale: plan.fps as i32,
                 flags: 1,
                 epoch: 0,
             };
             let dur = CMTime {
                 value: 1,
-                timescale: fps as i32,
+                timescale: plan.fps as i32,
                 flags: 1,
                 epoch: 0,
             };
@@ -358,37 +324,30 @@ fn encode_with_video_toolbox(
         return Err(MediaError::Decode("未能解码任何视频帧".into()));
     }
 
-    let inner = sink
-        .inner
-        .lock()
-        .map_err(|_| MediaError::Encode("VideoToolbox 编码状态锁失败".into()))?;
-
-    if inner.frames.is_empty() {
-        return Err(MediaError::Encode("VideoToolbox 未产出编码帧".into()));
-    }
-
-    let params = MuxParams {
-        codec: opts.codec,
-        width: out_w as u16,
-        height: out_h as u16,
-        timescale: 90_000,
-        vps: if inner.vps.is_empty() {
-            None
-        } else {
-            Some(inner.vps.as_slice())
-        },
-        sps: &inner.sps,
-        pps: &inner.pps,
+    let (frames, vps, sps, pps) = {
+        let mut guard = sink
+            .inner
+            .lock()
+            .map_err(|_| MediaError::Encode("VideoToolbox 编码状态锁失败".into()))?;
+        let codec = guard.output.codec();
+        let frame_duration = guard.output.frame_duration();
+        std::mem::replace(
+            &mut guard.output,
+            EncodedFrameCollector::new(codec, frame_duration),
+        )
+        .finish()
     };
-    let size = mux_to_mp4(output_path, &params, &inner.frames)?;
 
-    Ok(VideoResult {
-        output_path: output_path.to_string(),
-        size_bytes: size,
-        backend: AppleVideoCompressor::backend_name().to_string(),
-        width: out_w,
-        height: out_h,
-    })
+    finalize_encoded(
+        output_path,
+        opts,
+        &plan,
+        super::backend_name(),
+        &frames,
+        &vps,
+        &sps,
+        &pps,
+    )
 }
 
 extern "C" fn compression_output_callback(
@@ -410,7 +369,7 @@ extern "C" fn compression_output_callback(
     if let Ok(mut inner) = sink.inner.lock() {
         let is_key = sample_is_keyframe(sbuf);
         if is_key {
-            extract_format_param_sets(sbuf, &mut inner);
+            extract_format_param_sets(sbuf, &mut inner.output);
         }
 
         if let Some(block) = unsafe { sbuf.data_buffer() } {
@@ -420,12 +379,9 @@ extern "C" fn compression_output_callback(
             if st == 0 && !data_ptr.is_null() && total > 0 {
                 let avcc =
                     unsafe { std::slice::from_raw_parts(data_ptr as *const u8, total).to_vec() };
-                let duration = inner.frame_duration;
-                inner.frames.push(EncodedFrame {
-                    data: avcc_to_annex_b(&avcc),
-                    is_keyframe: is_key,
-                    duration,
-                });
+                inner
+                    .output
+                    .push_access_unit(avcc_to_annex_b(&avcc), is_key);
             }
         }
     }
@@ -467,14 +423,16 @@ extern "C" {
     ) -> CFTypeRef;
 }
 
-fn extract_format_param_sets(sample: &CMSampleBuffer, sink: &mut EncodeSinkInner) {
+fn extract_format_param_sets(sample: &CMSampleBuffer, output: &mut EncodedFrameCollector) {
     let Some(fmt) = (unsafe { sample.format_description() }) else {
         return;
     };
     let fmt = fmt.as_ref();
 
-    match sink.codec {
-        VideoCodec::H264 if sink.sps.is_empty() => {
+    match output.codec() {
+        VideoCodec::H264 if !output.param_sets_ready() => {
+            let mut sps = Vec::new();
+            let mut pps = Vec::new();
             let mut ptr: *const u8 = ptr::null();
             let mut len = 0usize;
             if unsafe {
@@ -489,9 +447,8 @@ fn extract_format_param_sets(sample: &CMSampleBuffer, sink: &mut EncodeSinkInner
             } == 0
                 && !ptr.is_null()
             {
-                let mut sps = vec![0u8, 0, 0, 1];
+                sps.extend_from_slice(&[0u8, 0, 0, 1]);
                 sps.extend_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
-                sink.sps = sps;
             }
             if unsafe {
                 CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
@@ -505,15 +462,18 @@ fn extract_format_param_sets(sample: &CMSampleBuffer, sink: &mut EncodeSinkInner
             } == 0
                 && !ptr.is_null()
             {
-                let mut pps = vec![0u8, 0, 0, 1];
+                pps.extend_from_slice(&[0u8, 0, 0, 1]);
                 pps.extend_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
-                sink.pps = pps;
             }
+            output.set_param_sets(Vec::new(), sps, pps);
         }
-        VideoCodec::H265 if sink.sps.is_empty() => {
+        VideoCodec::H265 if !output.param_sets_ready() => {
+            let mut vps = Vec::new();
+            let mut sps = Vec::new();
+            let mut pps = Vec::new();
             let mut ptr: *const u8 = ptr::null();
             let mut len = 0usize;
-            for (idx, target) in [(0, &mut sink.vps), (1, &mut sink.sps), (2, &mut sink.pps)] {
+            for (idx, target) in [(0, &mut vps), (1, &mut sps), (2, &mut pps)] {
                 if unsafe {
                     CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
                         fmt,
@@ -526,97 +486,12 @@ fn extract_format_param_sets(sample: &CMSampleBuffer, sink: &mut EncodeSinkInner
                 } == 0
                     && !ptr.is_null()
                 {
-                    let mut nal = vec![0u8, 0, 0, 1];
-                    nal.extend_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
-                    *target = nal;
+                    target.extend_from_slice(&[0u8, 0, 0, 1]);
+                    target.extend_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
                 }
             }
+            output.set_param_sets(vps, sps, pps);
         }
         _ => {}
     }
-}
-
-fn read_source_dimensions(input_path: &str) -> Result<(u32, u32, u32), MediaError> {
-    crate::api::video_common::read_mp4_video_metadata(input_path)
-        .or_else(|_| read_source_dimensions_avfoundation(input_path))
-}
-
-fn read_source_dimensions_avfoundation(input_path: &str) -> Result<(u32, u32, u32), MediaError> {
-    let media_type = av_media_type_video()?;
-    let path = NSString::from_str(input_path);
-    let url = unsafe { NSURL::fileURLWithPath(&path) };
-    let asset = unsafe { AVURLAsset::initWithURL_options(AVURLAsset::alloc(), &url, None) };
-    let tracks = unsafe { asset.tracksWithMediaType(&media_type) };
-    if tracks.count() == 0 {
-        return Err(MediaError::Decode("未找到视频轨".into()));
-    }
-    let track = unsafe { tracks.objectAtIndex(0) };
-    let size = unsafe { track.naturalSize() };
-    let fps = unsafe { track.nominalFrameRate() };
-    Ok((
-        size.width.abs() as u32 & !1,
-        size.height.abs() as u32 & !1,
-        if fps > 0.0 { fps.round() as u32 } else { 30 }.max(1),
-    ))
-}
-
-fn av_media_type_video() -> Result<&'static NSString, MediaError> {
-    unsafe {
-        AVMediaTypeVideo.ok_or_else(|| MediaError::Decode("AVMediaTypeVideo 不可用".into()))
-    }
-}
-
-/// CoreVideo 的 `kCVPixelBuffer*Key` 与 `NSString` toll-free bridged，可直接作 NSDictionary 键。
-unsafe fn cf_pixel_buffer_key(key: &'static Objc2CfString) -> &NSString {
-    &*(key as *const Objc2CfString as *const NSString)
-}
-
-fn open_video_reader(
-    input_path: &str,
-    out_w: u32,
-    out_h: u32,
-) -> Result<(Retained<AVAssetReader>, Retained<AVAssetReaderTrackOutput>), MediaError> {
-    let media_type = av_media_type_video()?;
-    let path = NSString::from_str(input_path);
-    let url = unsafe { NSURL::fileURLWithPath(&path) };
-    let asset = unsafe { AVURLAsset::initWithURL_options(AVURLAsset::alloc(), &url, None) };
-    let reader = unsafe {
-        AVAssetReader::assetReaderWithAsset_error(&asset)
-            .map_err(|e| MediaError::Decode(format!("AVAssetReader 创建失败: {e:?}")))?
-    };
-    let tracks = unsafe { asset.tracksWithMediaType(&media_type) };
-    if tracks.count() == 0 {
-        return Err(MediaError::Decode("未找到视频轨".into()));
-    }
-    let track = unsafe { tracks.objectAtIndex(0) };
-
-    let pf_key = unsafe { cf_pixel_buffer_key(kCVPixelBufferPixelFormatTypeKey) };
-    let w_key = unsafe { cf_pixel_buffer_key(kCVPixelBufferWidthKey) };
-    let h_key = unsafe { cf_pixel_buffer_key(kCVPixelBufferHeightKey) };
-    let nv12 = NSNumber::new_i32(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange as i32);
-    let w_num = NSNumber::new_i32(out_w as i32);
-    let h_num = NSNumber::new_i32(out_h as i32);
-    let dict = unsafe {
-        NSDictionary::from_slices(
-            &[pf_key, w_key, h_key],
-            &[
-                &*(&*nv12 as *const NSNumber as *const AnyObject),
-                &*(&*w_num as *const NSNumber as *const AnyObject),
-                &*(&*h_num as *const NSNumber as *const AnyObject),
-            ],
-        )
-    };
-
-    let output = unsafe {
-        AVAssetReaderTrackOutput::initWithTrack_outputSettings(
-            AVAssetReaderTrackOutput::alloc(),
-            &track,
-            Some(&dict),
-        )
-    };
-    unsafe {
-        reader.addOutput(&output);
-    }
-
-    Ok((reader, output))
 }
