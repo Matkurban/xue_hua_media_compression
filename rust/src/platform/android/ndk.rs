@@ -7,10 +7,10 @@ pub(super) type RawPtr = *mut std::ffi::c_void;
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
 pub(super) struct BufferInfo {
-    offset: i32,
-    size: i32,
-    presentation_time_us: i64,
-    flags: i32,
+    pub(super) offset: i32,
+    pub(super) size: i32,
+    pub(super) presentation_time_us: i64,
+    pub(super) flags: i32,
 }
 
 pub(super) const AMEDIA_OK: isize = 0;

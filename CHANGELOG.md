@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Documentation / 文档:** [English](README.md) · [中文](README.zh-CN.md)
 
+## [1.2.1] - 2026-6-30
+
+- fix `android` build error
+
 
 ## [1.2.0] - 2026-06-30
 

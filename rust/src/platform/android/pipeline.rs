@@ -1,6 +1,6 @@
 //! AMediaCodec 解码/编码管线。
 
-use std::ffi::CString;
+use std::ffi::{c_char, CString};
 use std::ptr::null_mut;
 use std::slice;
 

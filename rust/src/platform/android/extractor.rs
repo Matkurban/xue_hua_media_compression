@@ -95,6 +95,7 @@ fn open_extractor_file_path(input_path: &str) -> Result<RawPtr, MediaError> {
             Ok(()) => Ok(extractor),
             Err(fd_err) => {
                 AMediaExtractor_delete(extractor);
+                let diagnostics = file_open_diagnostics(input_path);
                 Err(MediaError::Decode(format!(
                     "无法打开视频文件 ({input_path}): \
                      路径方式与 fd 方式均失败 ({fd_err})。{diagnostics} \
