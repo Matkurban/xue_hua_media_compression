@@ -6,8 +6,6 @@ use crate::video_input::VideoInput;
 #[cfg(target_os = "android")]
 pub(crate) mod android;
 #[cfg(target_os = "android")]
-mod android_context;
-#[cfg(target_os = "android")]
 pub(crate) mod android_file;
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 pub(crate) mod apple;

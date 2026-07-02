@@ -1,7 +1,7 @@
 [package]
 name = "xue_hua_media_compression"
-version = "0.1.0"
-edition = "2021"
+version = "1.0.0"
+edition = "2024"
 build = "build.rs"
 
 [lib]
@@ -76,8 +76,6 @@ objc2-core-media = "0.3"
 # Android: AMediaCodec (libmediandk.so) 硬件编码
 # =============================================================================
 [target.'cfg(target_os = "android")'.dependencies]
-# mediacodec 克拉直接封装 NDK 的 AMediaCodec 接口。
-mediacodec = "0.1"
 ndk = "0.9"
 ndk-sys = "0.6"
 ndk-context = "0.1.1"

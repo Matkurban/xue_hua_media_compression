@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Documentation / 文档:** [English](README.md) · [中文](README.zh-CN.md)
 
+## [1.2.2] - 2026-07-02
+
+### Fixed / 修复
+
+- **Android NDK context init / Android NDK 上下文初始化** — Align with sibling plugins (`xue_hua_audio`, `xue_hua_device_info`): Kotlin `XueHuaMediaCompressionPlugin` with `@JvmStatic initAndroid`, dedicated `rust/src/android_init.rs`, and `CONTEXT_HOLDER` idempotent guard. Fixes `assertion failed: previous.is_none()` panic when `onAttachedToEngine` is called more than once during plugin registration.
+  对齐兄弟插件的 jni 0.22 + `ndk-context` 初始化模式；`CONTEXT_HOLDER` 幂等守卫修复插件注册阶段多次 `onAttachedToEngine` 时 `ndk_context` 重复初始化崩溃。
+
+- **Removed unused `mediacodec` dependency / 移除未使用的 `mediacodec` 依赖** — Android 视频硬编仍使用自研 NDK FFI（`platform/android/ndk.rs`）。
+  Android 视频路径未变，仅清理 Cargo 依赖。
+
 ## [1.2.1] - 2026-6-30
 
 - fix `android` build error
