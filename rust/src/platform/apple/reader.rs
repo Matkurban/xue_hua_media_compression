@@ -21,7 +21,7 @@ pub(super) fn av_media_type_video() -> Result<&'static NSString, MediaError> {
 
 /// CoreVideo 的 `kCVPixelBuffer*Key` 与 `NSString` toll-free bridged，可直接作 NSDictionary 键。
 unsafe fn cf_pixel_buffer_key(key: &'static Objc2CfString) -> &'static NSString {
-    &*(key as *const Objc2CfString as *const NSString)
+    unsafe { &*(key as *const Objc2CfString as *const NSString) }
 }
 
 pub(super) fn open_video_reader(

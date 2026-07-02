@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Documentation / 文档:** [English](README.md) · [中文](README.zh-CN.md)
 
+## [1.3.0] - 2026-07-02
+
+### Fixed / 修复
+
+- **Rust 2024 edition compatibility / Rust 2024 版本兼容** — Fix Android Gradle and cross-platform Rust builds after `edition = "2024"`: `extern "C"` FFI blocks now use `unsafe extern "C"`, and `unsafe fn` bodies wrap NDK / WMF / CoreVideo calls in explicit `unsafe { }` blocks (`unsafe_op_in_unsafe_fn` / E0133). Resolves `assembleDebug` / `cargo build` failures on current Rust toolchains.
+  修复升级 `edition = "2024"` 后的编译失败：`extern "C"` 改为 `unsafe extern "C"`；Android `pipeline`、NDK 工具函数、Windows Media Foundation、Apple `reader` 等 `unsafe fn` 内补齐显式 `unsafe` 块，消除 E0133 警告并恢复 Android 构建。
+
 ## [1.2.2] - 2026-07-02
 
 ### Fixed / 修复

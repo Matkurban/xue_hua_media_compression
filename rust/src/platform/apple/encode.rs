@@ -415,7 +415,7 @@ fn sample_is_keyframe(sample: &CMSampleBuffer) -> bool {
 }
 
 #[link(name = "CoreMedia", kind = "framework")]
-extern "C" {
+unsafe extern "C" {
     fn CMGetAttachment(
         target: CFTypeRef,
         key: CFStringRef,

@@ -23,7 +23,7 @@ pub(super) const COLOR_FORMAT_YUV420_FLEXIBLE: i32 = 0x7F420888;
 pub(super) const TIMEOUT_US: i64 = 10_000;
 
 #[link(name = "mediandk")]
-extern "C" {
+unsafe extern "C" {
     pub(super) fn AMediaExtractor_new() -> RawPtr;
     pub(super) fn AMediaExtractor_delete(extractor: RawPtr) -> isize;
     pub(super) fn AMediaExtractor_setDataSource(
@@ -109,6 +109,6 @@ pub(super) unsafe fn c_ptr_to_string(ptr: *const c_char) -> String {
     if ptr.is_null() {
         String::new()
     } else {
-        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+        unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
     }
 }
