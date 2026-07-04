@@ -1,8 +1,8 @@
 //! AVAssetReader 解码 seam：本地 MP4 → NV12 CVPixelBuffer。
 
+use objc2::AnyThread;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2::AnyThread;
 use objc2_av_foundation::{AVAssetReader, AVAssetReaderTrackOutput, AVMediaTypeVideo, AVURLAsset};
 use objc2_core_foundation::CFString as Objc2CfString;
 use objc2_core_video::{

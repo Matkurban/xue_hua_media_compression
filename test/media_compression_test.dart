@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xue_hua_media_compression/src/media_compression.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
 void main() {

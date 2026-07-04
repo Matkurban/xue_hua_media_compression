@@ -1,6 +1,6 @@
 //! NDK Media API FFI 绑定与常量。
 
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, c_char};
 
 pub(super) type RawPtr = *mut std::ffi::c_void;
 

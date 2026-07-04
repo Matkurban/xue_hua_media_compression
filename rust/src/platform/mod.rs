@@ -70,7 +70,7 @@ fn mock_compress_video(
     opts: &VideoOptions,
 ) -> Result<VideoResult, MediaError> {
     use crate::video::frame_duration_for_fps;
-    use crate::video_encode::{finalize_encoded, plan_encode, EncodePlan};
+    use crate::video_encode::{EncodePlan, finalize_encoded, plan_encode};
     use crate::video_frame_collector::EncodedFrameCollector;
 
     let plan = plan_encode(input, opts).unwrap_or_else(|_| {

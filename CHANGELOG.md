@@ -1,55 +1,58 @@
-# Changelog / 更新日志
+## [1.3.1] - 2026-07-04
 
-All notable changes to this project will be documented in this file.  
-本项目的所有重要变更均记录于此。
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
-版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
-
-**Documentation / 文档:** [English](README.md) · [中文](README.zh-CN.md)
+- Optimized initialization
 
 ## [1.3.0] - 2026-07-02
 
 ### Fixed / 修复
 
-- **Rust 2024 edition compatibility / Rust 2024 版本兼容** — Fix Android Gradle and cross-platform Rust builds after `edition = "2024"`: `extern "C"` FFI blocks now use `unsafe extern "C"`, and `unsafe fn` bodies wrap NDK / WMF / CoreVideo calls in explicit `unsafe { }` blocks (`unsafe_op_in_unsafe_fn` / E0133). Resolves `assembleDebug` / `cargo build` failures on current Rust toolchains.
-  修复升级 `edition = "2024"` 后的编译失败：`extern "C"` 改为 `unsafe extern "C"`；Android `pipeline`、NDK 工具函数、Windows Media Foundation、Apple `reader` 等 `unsafe fn` 内补齐显式 `unsafe` 块，消除 E0133 警告并恢复 Android 构建。
+- **Rust 2024 edition compatibility / Rust 2024 版本兼容** — Fix Android Gradle and cross-platform Rust builds after
+  `edition = "2024"`: `extern "C"` FFI blocks now use `unsafe extern "C"`, and `unsafe fn` bodies wrap NDK / WMF /
+  CoreVideo calls in explicit `unsafe { }` blocks (`unsafe_op_in_unsafe_fn` / E0133). Resolves `assembleDebug` /
+  `cargo build` failures on current Rust toolchains.
+  修复升级 `edition = "2024"` 后的编译失败：`extern "C"` 改为 `unsafe extern "C"`；Android `pipeline`、NDK 工具函数、Windows
+  Media Foundation、Apple `reader` 等 `unsafe fn` 内补齐显式 `unsafe` 块，消除 E0133 警告并恢复 Android 构建。
 
 ## [1.2.2] - 2026-07-02
 
 ### Fixed / 修复
 
-- **Android NDK context init / Android NDK 上下文初始化** — Align with sibling plugins (`xue_hua_audio`, `xue_hua_device_info`): Kotlin `XueHuaMediaCompressionPlugin` with `@JvmStatic initAndroid`, dedicated `rust/src/android_init.rs`, and `CONTEXT_HOLDER` idempotent guard. Fixes `assertion failed: previous.is_none()` panic when `onAttachedToEngine` is called more than once during plugin registration.
-  对齐兄弟插件的 jni 0.22 + `ndk-context` 初始化模式；`CONTEXT_HOLDER` 幂等守卫修复插件注册阶段多次 `onAttachedToEngine` 时 `ndk_context` 重复初始化崩溃。
+- **Android NDK context init / Android NDK 上下文初始化** — Align with sibling plugins (`xue_hua_audio`,
+  `xue_hua_device_info`): Kotlin `XueHuaMediaCompressionPlugin` with `@JvmStatic initAndroid`, dedicated
+  `rust/src/android_init.rs`, and `CONTEXT_HOLDER` idempotent guard. Fixes `assertion failed: previous.is_none()` panic
+  when `onAttachedToEngine` is called more than once during plugin registration.
+  对齐兄弟插件的 jni 0.22 + `ndk-context` 初始化模式；`CONTEXT_HOLDER` 幂等守卫修复插件注册阶段多次 `onAttachedToEngine`
+  时 `ndk_context` 重复初始化崩溃。
 
-- **Removed unused `mediacodec` dependency / 移除未使用的 `mediacodec` 依赖** — Android 视频硬编仍使用自研 NDK FFI（`platform/android/ndk.rs`）。
+- **Removed unused `mediacodec` dependency / 移除未使用的 `mediacodec` 依赖** — Android 视频硬编仍使用自研 NDK FFI（
+  `platform/android/ndk.rs`）。
   Android 视频路径未变，仅清理 Cargo 依赖。
 
 ## [1.2.1] - 2026-6-30
 
 - fix `android` build error
 
-
 ## [1.2.0] - 2026-06-30
 
 ### Changed / 变更
 
-- **Sealed external seam / 封住外部接缝** — FRB `rust_input` narrowed to `api::media` + `api::traits`; internal compressors moved behind `route` module with free-function dispatch. Dart bindings no longer export `AppleVideoCompressor`, `GenericImageCompressor`, or scaffold `greet`.  
+- **Sealed external seam / 封住外部接缝** — FRB `rust_input` narrowed to `api::media` + `api::traits`; internal
+  compressors moved behind `route` module with free-function dispatch. Dart bindings no longer export
+  `AppleVideoCompressor`, `GenericImageCompressor`, or scaffold `greet`.  
   收窄 FRB 扫描范围；压缩路由经 `route` module；Dart 不再导出泄漏的平台 compressor 与脚手架 `greet`。
 
 - **Removed `apple_stub.rs` / 删除 apple stub** — `platform::apple` compiles only on iOS/macOS.  
   `platform::apple` 仅在 Apple target 编译，移除仅为 codegen 服务的 stub。
 
-- **Removed `RustLib` from public export / 公开 API 不再 export `RustLib`** — use `XueHuaMediaCompression.initialize()` instead.  
+- **Removed `RustLib` from public export / 公开 API 不再 export `RustLib`** — use `XueHuaMediaCompression.initialize()`
+  instead.  
   请统一使用 `XueHuaMediaCompression.initialize()` 初始化。
 
 ### Breaking changes / 破坏性变更
 
 - Removed public export of `RustLib`.
-- Removed generated Dart bindings for direct compressor access (`AppleVideoCompressor.compress`, `GenericImageCompressor.compress`, `greet`). Use `XueHuaMediaCompression.image` / `.video` instead.
+- Removed generated Dart bindings for direct compressor access (`AppleVideoCompressor.compress`,
+  `GenericImageCompressor.compress`, `greet`). Use `XueHuaMediaCompression.image` / `.video` instead.
 
 ---
 
@@ -57,8 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed / 修复
 
-- **Android JNI (`jni` 0.22) / Android JNI 迁移** — Migrated `android_file.rs` from deprecated `JNIEnv` to `Env` / `EnvUnowned`; `JavaVM::attach_current_thread` now uses the closure API; `JObject::from_raw` and `jni_str!` / `jni_sig!` updated for 0.22. Removes `deprecated type alias jni::JNIEnv` build warnings.  
-  将 `android_file.rs` 从已弃用的 `JNIEnv` 迁移至 `Env` / `EnvUnowned`；`attach_current_thread` 改为闭包调用；`JObject::from_raw` 与 `jni_str!` / `jni_sig!` 适配 0.22，消除 Android 构建中的 JNI 弃用警告。
+- **Android JNI (`jni` 0.22) / Android JNI 迁移** — Migrated `android_file.rs` from deprecated `JNIEnv` to `Env` /
+  `EnvUnowned`; `JavaVM::attach_current_thread` now uses the closure API; `JObject::from_raw` and `jni_str!` /
+  `jni_sig!` updated for 0.22. Removes `deprecated type alias jni::JNIEnv` build warnings.  
+  将 `android_file.rs` 从已弃用的 `JNIEnv` 迁移至 `Env` / `EnvUnowned`；`attach_current_thread` 改为闭包调用；
+  `JObject::from_raw` 与 `jni_str!` / `jni_sig!` 适配 0.22，消除 Android 构建中的 JNI 弃用警告。
 
 ---
 
@@ -66,22 +72,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed / 变更
 
-- **Direct path input / 路径直传** — File picker paths (`xFile.path`) are passed directly to Rust; no Dart-side cache copy or `readAsBytes`. Rust normalizes `file://` prefixes and reads files by path.  
+- **Direct path input / 路径直传** — File picker paths (`xFile.path`) are passed directly to Rust; no Dart-side cache
+  copy or `readAsBytes`. Rust normalizes `file://` prefixes and reads files by path.  
   文件选择器路径（`xFile.path`）直接传给 Rust，不再在 Dart 侧复制到缓存或 `readAsBytes`；Rust 规范化 `file://` 并按路径读文件。
 
-- **Android `content://` / Android content URI** — Opened in Rust via `ContentResolver` + fd for `AMediaExtractor` (streaming, no full-file load in Dart).  
+- **Android `content://` / Android content URI** — Opened in Rust via `ContentResolver` + fd for `AMediaExtractor` (
+  streaming, no full-file load in Dart).  
   Android `content://` 由 Rust 通过 `ContentResolver` 取 fd 供 `AMediaExtractor` 流式读取。
 
-- **Linux video streaming / Linux 视频流式处理** — VA-API pipeline decodes and encodes one frame at a time with a fixed surface pool; no longer buffers all NV12 frames in memory (same class of OOM fix as Apple VideoToolbox).  
+- **Linux video streaming / Linux 视频流式处理** — VA-API pipeline decodes and encodes one frame at a time with a fixed
+  surface pool; no longer buffers all NV12 frames in memory (same class of OOM fix as Apple VideoToolbox).  
   Linux VA-API 管线改为逐帧解码+编码并使用固定 surface 池，不再将全部 NV12 帧载入内存（与 Apple VideoToolbox 同类 OOM 修复）。
 
-- **Apple (macOS/iOS) video streaming / Apple 视频流式处理** — VideoToolbox pipeline streams decode+encode per frame instead of loading all CVPixelBuffers.  
+- **Apple (macOS/iOS) video streaming / Apple 视频流式处理** — VideoToolbox pipeline streams decode+encode per frame
+  instead of loading all CVPixelBuffers.  
   VideoToolbox 改为逐帧流式解码+编码，不再一次性加载全部 CVPixelBuffer。
 
-- **Output path parent dirs / 输出目录** — Rust creates parent directories before writing image/video output (`prepare_output_path`).  
+- **Output path parent dirs / 输出目录** — Rust creates parent directories before writing image/video output (
+  `prepare_output_path`).  
   Rust 写入图片/视频输出前自动创建父目录（`prepare_output_path`）。
 
-- **Example temp dir / 示例临时目录** — Example uses `Directory.systemTemp` instead of `path_provider` (avoids macOS native dependency conflicts).  
+- **Example temp dir / 示例临时目录** — Example uses `Directory.systemTemp` instead of `path_provider` (avoids macOS
+  native dependency conflicts).  
   示例改用 `Directory.systemTemp`，不再依赖 `path_provider`（避免 macOS 原生依赖冲突）。
 
 ### Removed / 移除
@@ -98,24 +110,28 @@ First public release.
 
 ### Added / 新增
 
-- **Image compression / 图片压缩** — Pure Rust pipeline on all platforms; output JPEG, PNG, WebP, GIF, AVIF; optional HEIC (build-time feature). Supports quality, max-dimension downscale, and format-specific speed options.  
+- **Image compression / 图片压缩** — Pure Rust pipeline on all platforms; output JPEG, PNG, WebP, GIF, AVIF; optional
+  HEIC (build-time feature). Supports quality, max-dimension downscale, and format-specific speed options.  
   全平台纯 Rust 图片压缩管线；支持输出 JPEG、PNG、WebP、GIF、AVIF；可选 HEIC（构建时 feature）。支持质量、最大边长缩放及格式相关速度参数。
 
 - **Video compression / 视频压缩** — Platform-native hardware encoding with MP4 muxing:  
   各平台原生硬件编码并封装 MP4：
-  - Android — AMediaCodec (NDK)
-  - iOS / macOS — VideoToolbox
-  - Windows — Media Foundation
-  - Linux — VA-API
+    - Android — AMediaCodec (NDK)
+    - iOS / macOS — VideoToolbox
+    - Windows — Media Foundation
+    - Linux — VA-API
 
-- **Dart facade API / Dart 门面 API** — `XueHuaMediaCompression.initialize()`, `.image.*`, `.video.*`, and `videoBackendName()` for diagnostics.  
+- **Dart facade API / Dart 门面 API** — `XueHuaMediaCompression.initialize()`, `.image.*`, `.video.*`, and
+  `videoBackendName()` for diagnostics.  
   `XueHuaMediaCompression.initialize()`、`.image.*`、`.video.*` 及诊断用 `videoBackendName()`。
 
-- **`ensureLocalVideoInput` helper / 辅助函数** — Copies picker `content://` or inaccessible paths to a local cache file on Android (with size and container validation).  
+- **`ensureLocalVideoInput` helper / 辅助函数** — Copies picker `content://` or inaccessible paths to a local cache file
+  on Android (with size and container validation).  
   在 Android 上将选择器 `content://` 或不可直接访问的路径复制到本地缓存（含大小与容器校验）。
 
 - **Example app / 示例应用** — Interactive demo for image and video compression in `example/`.  
   `example/` 目录下的图片与视频压缩交互式 Demo。
 
-- **Multi-platform FFI plugin / 多平台 FFI 插件** — Android, iOS, macOS, Windows, Linux via Cargokit + flutter_rust_bridge 2.12.  
+- **Multi-platform FFI plugin / 多平台 FFI 插件** — Android, iOS, macOS, Windows, Linux via Cargokit +
+  flutter_rust_bridge 2.12.  
   通过 Cargokit + flutter_rust_bridge 2.12 支持 Android、iOS、macOS、Windows、Linux。

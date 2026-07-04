@@ -1,5 +1,6 @@
 //! Linux VA-API 硬件编码（H.264 / H.265）。
 
+use cros_libva::Context;
 use cros_libva::bindings;
 use cros_libva::buffer::{
     BufferType, EncPictureParameter, EncPictureParameterBufferH264, EncPictureParameterBufferHEVC,
@@ -12,7 +13,6 @@ use cros_libva::buffer::{
 use cros_libva::display::Display;
 use cros_libva::picture::Picture;
 use cros_libva::surface::UsageHint;
-use cros_libva::Context;
 
 use crate::api::traits::{MediaError, VideoCodec, VideoOptions};
 use crate::video::EncodedFrame;

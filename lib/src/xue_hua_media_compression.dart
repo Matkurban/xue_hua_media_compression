@@ -1,5 +1,12 @@
-/// XueHuaMediaCompression 门面（Facade）。
-///
+import 'dart:typed_data';
+
+import 'options.dart';
+import 'rust/api/media.dart' as rust;
+import 'rust/api/traits.dart';
+import 'rust/frb_generated.dart';
+
+import 'dart:developer';
+
 /// flutter_rust_bridge 只能导出扁平的自由函数（如 `rustCompressImage`），
 /// 这里把它们包装成符合插件命名规范的命名空间：
 ///   - `XueHuaMediaCompression.initialize()`            初始化
@@ -14,28 +21,6 @@
 ///   format: ImageFormat.avif,
 ///   quality: 70,
 /// );
-/// ```
-library;
-
-import 'dart:typed_data';
-
-import 'options.dart';
-import 'rust/api/media.dart' as rust;
-import 'rust/api/traits.dart';
-import 'rust/frb_generated.dart';
-
-export 'options.dart'
-    show CompressionDefaults, facadeImageOptions, facadeVideoOptions;
-export 'rust/api/traits.dart'
-    show
-        ImageFormat,
-        ImageOptions,
-        VideoCodec,
-        VideoOptions,
-        VideoResult,
-        MediaError;
-
-/// 插件统一入口门面类。
 class XueHuaMediaCompression {
   XueHuaMediaCompression._();
 
@@ -52,7 +37,18 @@ class XueHuaMediaCompression {
   /// 幂等：重复调用只会初始化一次。
   static Future<void> initialize() async {
     if (_initialized) return;
-    await RustLib.init();
+    try {
+      if (!RustLib.instance.initialized) {
+        await RustLib.init();
+      }
+    } catch (e, s) {
+      log(
+        e.toString(),
+        error: e,
+        stackTrace: s,
+        name: 'XueHuaMediaCompression.initialize',
+      );
+    }
     _initialized = true;
   }
 

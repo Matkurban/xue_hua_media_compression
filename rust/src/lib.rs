@@ -1,6 +1,6 @@
-pub mod api;
 #[cfg(target_os = "android")]
 mod android_init;
+pub mod api;
 mod frb_generated;
 mod route;
 

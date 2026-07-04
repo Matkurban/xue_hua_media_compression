@@ -1,6 +1,6 @@
 //! AMediaCodec 解码/编码管线。
 
-use std::ffi::{c_char, CString};
+use std::ffi::{CString, c_char};
 use std::ptr::null_mut;
 use std::slice;
 
@@ -23,93 +23,95 @@ pub(super) unsafe fn run(
     opts: &VideoOptions,
 ) -> Result<VideoResult, MediaError> {
     unsafe {
-    let plan = plan_encode(input, opts)?;
-    let needs_scale = plan.out_w != plan.src_w || plan.out_h != plan.src_h;
+        let plan = plan_encode(input, opts)?;
+        let needs_scale = plan.out_w != plan.src_w || plan.out_h != plan.src_h;
 
-    let (decoder, encoder, extractor, dec_fmt, enc_fmt) =
-        create_codecs(input, opts, plan.out_w, plan.out_h, plan.fps)?;
+        let (decoder, encoder, extractor, dec_fmt, enc_fmt) =
+            create_codecs(input, opts, plan.out_w, plan.out_h, plan.fps)?;
 
-    let mut collector = EncodedFrameCollector::new(opts.codec, plan.frame_duration);
-    let mut sink = EncoderSink {
-        collector: &mut collector,
-    };
+        let mut collector = EncodedFrameCollector::new(opts.codec, plan.frame_duration);
+        let mut sink = EncoderSink {
+            collector: &mut collector,
+        };
 
-    let mut input_done = false;
-    let mut decoder_done = false;
-    let mut encoder_output_eos = false;
+        let mut input_done = false;
+        let mut decoder_done = false;
+        let mut encoder_output_eos = false;
 
-    while !encoder_output_eos {
-        if !input_done {
-            feed_decoder_input(decoder, extractor, &mut input_done)?;
-        }
+        while !encoder_output_eos {
+            if !input_done {
+                feed_decoder_input(decoder, extractor, &mut input_done)?;
+            }
 
-        if !decoder_done {
-            loop {
-                let mut dec_info = BufferInfo::default();
-                let dec_out = AMediaCodec_dequeueOutputBuffer(decoder, &mut dec_info, 0);
-                if dec_out == AMEDIACODEC_INFO_TRY_AGAIN_LATER {
-                    break;
-                }
-                if dec_out < 0 {
-                    break;
-                }
+            if !decoder_done {
+                loop {
+                    let mut dec_info = BufferInfo::default();
+                    let dec_out = AMediaCodec_dequeueOutputBuffer(decoder, &mut dec_info, 0);
+                    if dec_out == AMEDIACODEC_INFO_TRY_AGAIN_LATER {
+                        break;
+                    }
+                    if dec_out < 0 {
+                        break;
+                    }
 
-                if dec_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM != 0 {
-                    queue_encoder_eos(encoder, &mut sink)?;
-                    decoder_done = true;
-                } else if dec_info.size > 0 {
-                    let mut cap = 0usize;
-                    let out_buf = AMediaCodec_getOutputBuffer(decoder, dec_out as usize, &mut cap);
-                    if !out_buf.is_null() {
-                        let src_ptr = out_buf.add(dec_info.offset as usize);
-                        let src_len = dec_info.size as usize;
-                        let pts = dec_info.presentation_time_us.max(0) as u64;
-                        if needs_scale {
-                            let yuv = slice::from_raw_parts(src_ptr, src_len).to_vec();
-                            let scaled =
-                                scale_nv12(&yuv, plan.src_w, plan.src_h, plan.out_w, plan.out_h);
-                            queue_yuv_to_encoder(
-                                encoder,
-                                scaled.as_ptr(),
-                                scaled.len(),
-                                pts,
-                                &mut sink,
-                            )?;
-                        } else {
-                            queue_yuv_to_encoder(encoder, src_ptr, src_len, pts, &mut sink)?;
+                    if dec_info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM != 0 {
+                        queue_encoder_eos(encoder, &mut sink)?;
+                        decoder_done = true;
+                    } else if dec_info.size > 0 {
+                        let mut cap = 0usize;
+                        let out_buf =
+                            AMediaCodec_getOutputBuffer(decoder, dec_out as usize, &mut cap);
+                        if !out_buf.is_null() {
+                            let src_ptr = out_buf.add(dec_info.offset as usize);
+                            let src_len = dec_info.size as usize;
+                            let pts = dec_info.presentation_time_us.max(0) as u64;
+                            if needs_scale {
+                                let yuv = slice::from_raw_parts(src_ptr, src_len).to_vec();
+                                let scaled = scale_nv12(
+                                    &yuv, plan.src_w, plan.src_h, plan.out_w, plan.out_h,
+                                );
+                                queue_yuv_to_encoder(
+                                    encoder,
+                                    scaled.as_ptr(),
+                                    scaled.len(),
+                                    pts,
+                                    &mut sink,
+                                )?;
+                            } else {
+                                queue_yuv_to_encoder(encoder, src_ptr, src_len, pts, &mut sink)?;
+                            }
                         }
                     }
+                    AMediaCodec_releaseOutputBuffer(decoder, dec_out as usize, false);
                 }
-                AMediaCodec_releaseOutputBuffer(decoder, dec_out as usize, false);
+            }
+
+            let drain_timeout = if decoder_done { TIMEOUT_US } else { 0 };
+            if drain_encoder(encoder, &mut sink, drain_timeout)? {
+                encoder_output_eos = true;
             }
         }
 
-        let drain_timeout = if decoder_done { TIMEOUT_US } else { 0 };
-        if drain_encoder(encoder, &mut sink, drain_timeout)? {
-            encoder_output_eos = true;
-        }
-    }
+        AMediaCodec_stop(decoder);
+        AMediaCodec_delete(decoder);
+        AMediaCodec_stop(encoder);
+        AMediaCodec_delete(encoder);
+        AMediaFormat_delete(dec_fmt);
+        AMediaFormat_delete(enc_fmt);
+        AMediaExtractor_delete(extractor);
 
-    AMediaCodec_stop(decoder);
-    AMediaCodec_delete(decoder);
-    AMediaCodec_stop(encoder);
-    AMediaCodec_delete(encoder);
-    AMediaFormat_delete(dec_fmt);
-    AMediaFormat_delete(enc_fmt);
-    AMediaExtractor_delete(extractor);
+        let (frames, vps, sps, pps) = collector.finish();
 
-    let (frames, vps, sps, pps) = collector.finish();
-
-    finalize_encoded(
-        output_path,
-        opts,
-        &plan,
-        super::backend_name(),
-        &frames,
-        &vps,
-        &sps,
-        &pps,
-    )
+        finalize_encoded(
+            output_path,
+            opts,
+            &plan,
+            super::backend_name(),
+            &frames,
+            &vps,
+            &sps,
+            &pps,
+        )
     }
 }
 

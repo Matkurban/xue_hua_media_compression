@@ -11,7 +11,7 @@ Cross-platform Flutter FFI plugin for image and video compression powered by Rus
                        DESC
   s.homepage         = 'https://github.com/Matkurban/xue_hua_media_compression'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'XueHua' => '3496354336@qq.com' }
+  s.author           = { 'Matkurban' => '3496354336@qq.com' }
   s.module_name      = 'xue_hua_media_compression'
 
   # This will ensure the source files in Classes/ are included in the native

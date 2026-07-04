@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xue_hua_media_compression/src/media_compression.dart';
 import 'package:xue_hua_media_compression/src/rust/frb_generated.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 

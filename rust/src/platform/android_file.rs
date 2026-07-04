@@ -2,7 +2,7 @@
 
 use crate::api::traits::MediaError;
 use jni::objects::{JObject, JValue};
-use jni::{jni_sig, jni_str, Env};
+use jni::{Env, jni_sig, jni_str};
 use ndk_context::android_context;
 
 impl From<jni::errors::Error> for MediaError {

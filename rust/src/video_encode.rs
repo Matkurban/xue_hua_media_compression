@@ -1,7 +1,7 @@
 //! 视频编码 prelude / epilogue：统一 scale、fps、GOP、frame_duration 与 mux 收尾。
 
 use crate::api::traits::{MediaError, VideoOptions, VideoResult};
-use crate::video::{finalize_to_mp4, frame_duration_for_fps, EncodedFrame};
+use crate::video::{EncodedFrame, finalize_to_mp4, frame_duration_for_fps};
 use crate::video_input::VideoInput;
 use crate::video_scale::scale_dims;
 

@@ -10,12 +10,12 @@ use core_foundation::boolean::CFBoolean;
 use core_foundation::dictionary::CFDictionary;
 use core_foundation::number::CFNumber;
 use core_foundation::string::CFString as CfString;
-use core_foundation_sys::base::{kCFAllocatorDefault, CFGetTypeID, CFRelease, CFTypeRef, OSStatus};
+use core_foundation_sys::base::{CFGetTypeID, CFRelease, CFTypeRef, OSStatus, kCFAllocatorDefault};
 use core_foundation_sys::dictionary::CFDictionaryRef;
 use core_foundation_sys::string::CFStringRef;
 use core_media_sys::CMTime;
 use objc2::rc::Retained;
-use objc2::{msg_send, AnyThread};
+use objc2::{AnyThread, msg_send};
 use objc2_core_foundation::CFRetained;
 use objc2_core_media::{
     CMSampleBuffer, CMVideoFormatDescriptionGetH264ParameterSetAtIndex,
@@ -23,14 +23,14 @@ use objc2_core_media::{
 };
 use video_toolbox_sys::codecs::video::{H264, HEVC};
 use video_toolbox_sys::compression::{
+    VTCompressionSessionCompleteFrames, VTCompressionSessionCreate,
+    VTCompressionSessionEncodeFrame, VTCompressionSessionInvalidate,
+    VTCompressionSessionPrepareToEncodeFrames, VTCompressionSessionRef, VTEncodeInfoFlags,
     kVTCompressionPropertyKey_AverageBitRate, kVTCompressionPropertyKey_MaxKeyFrameInterval,
     kVTCompressionPropertyKey_ProfileLevel, kVTCompressionPropertyKey_RealTime,
     kVTEncodeInfo_FrameDropped, kVTProfileLevel_H264_High_AutoLevel,
     kVTProfileLevel_HEVC_Main_AutoLevel,
     kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder,
-    VTCompressionSessionCompleteFrames, VTCompressionSessionCreate,
-    VTCompressionSessionEncodeFrame, VTCompressionSessionInvalidate,
-    VTCompressionSessionPrepareToEncodeFrames, VTCompressionSessionRef, VTEncodeInfoFlags,
 };
 use video_toolbox_sys::cv_types::CVPixelBufferRef;
 use video_toolbox_sys::session::VTSessionSetProperty;

@@ -1,6 +1,6 @@
 //! AMediaExtractor 打开与尺寸探测。
 
-use std::ffi::{c_char, CString};
+use std::ffi::{CString, c_char};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::io::AsRawFd;

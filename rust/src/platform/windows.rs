@@ -4,9 +4,9 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
 
-use windows::core::{Interface, PCWSTR, PWSTR};
 use windows::Win32::Media::MediaFoundation::*;
-use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
+use windows::core::{Interface, PCWSTR, PWSTR};
 
 use crate::api::traits::{MediaError, VideoCodec, VideoOptions, VideoResult};
 use crate::video_encode::{finalize_encoded, plan_encode};
@@ -281,8 +281,8 @@ unsafe fn feed_nv12_to_encoder(
 ) -> Result<(), MediaError> {
     unsafe {
         let sample: IMFSample = MFCreateSample().map_err(|e| MediaError::Encode(e.to_string()))?;
-        let buffer: IMFMediaBuffer =
-            MFCreateMemoryBuffer(nv12.len() as u32).map_err(|e| MediaError::Encode(e.to_string()))?;
+        let buffer: IMFMediaBuffer = MFCreateMemoryBuffer(nv12.len() as u32)
+            .map_err(|e| MediaError::Encode(e.to_string()))?;
         let mut ptr = null_mut();
         let mut max_len = 0u32;
         let mut cur_len = 0u32;
@@ -350,7 +350,7 @@ unsafe fn drain_encoder_output(
                     return Err(MediaError::Native {
                         code: e.code().0,
                         msg: format!("ProcessOutput: {e}"),
-                    })
+                    });
                 }
             }
         }

@@ -40,7 +40,7 @@ pub(crate) fn read_mp4_video_metadata(path: &str) -> Result<(u32, u32, u32), Med
 mod tests {
     use super::*;
     use crate::api::traits::VideoCodec;
-    use crate::video::{finalize_to_mp4, EncodedFrame};
+    use crate::video::{EncodedFrame, finalize_to_mp4};
     use std::path::PathBuf;
 
     fn temp_mp4(name: &str) -> PathBuf {
