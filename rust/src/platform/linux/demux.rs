@@ -10,7 +10,7 @@ use cros_libva::buffer::{
 };
 use cros_libva::display::Display;
 use cros_libva::picture::Picture;
-use cros_libva::surface::UsageHint;
+use cros_libva::UsageHint;
 use mp4::{Mp4Reader, TrackType};
 use openh264::decoder::Decoder;
 use openh264::formats::YUVSource;
@@ -50,8 +50,8 @@ pub(super) fn detect_input_codec_from_reader(
     }
 }
 
-pub(super) fn stream_decode_and_encode<E: Nv12EncoderSink>(
-    mp4: &mut Mp4Reader<BufReader<File>>,
+pub(super) fn stream_decode_and_encode<E: Nv12EncoderSink, R: std::io::Read + std::io::Seek>(
+    mp4: &mut Mp4Reader<R>,
     track_id: u32,
     sample_count: u32,
     input_codec: InputCodec,
@@ -139,7 +139,7 @@ fn i420_to_nv12(yuv: &impl YUVSource) -> Vec<u8> {
 
 struct HevcVldDecoder {
     context: std::rc::Rc<cros_libva::Context>,
-    surfaces: Vec<cros_libva::surface::Surface>,
+    surfaces: Vec<Option<cros_libva::surface::Surface<()>>>,
     image_fmt: bindings::VAImageFormat,
     width: u32,
     height: u32,
@@ -148,8 +148,9 @@ struct HevcVldDecoder {
 
 impl HevcVldDecoder {
     fn open(width: u32, height: u32) -> Result<Self, MediaError> {
-        let display = Display::open()
-            .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
+        let display = Display::open().ok_or_else(|| {
+            MediaError::HardwareUnavailable("打开 VA-API 设备失败".into())
+        })?;
 
         let profile = bindings::VAProfile::VAProfileHEVCMain;
         let entrypoint = bindings::VAEntrypoint::VAEntrypointVLD;
@@ -191,7 +192,7 @@ impl HevcVldDecoder {
 
         Ok(Self {
             context,
-            surfaces,
+            surfaces: surfaces.into_iter().map(Some).collect(),
             image_fmt,
             width,
             height,
@@ -201,7 +202,9 @@ impl HevcVldDecoder {
 
     fn decode_sample(&mut self, annex_b: &[u8]) -> Result<Vec<u8>, MediaError> {
         let idx = (self.poc as usize) % self.surfaces.len();
-        let surface = self.surfaces[idx].clone();
+        let surface = self.surfaces[idx]
+            .take()
+            .ok_or_else(|| MediaError::Decode("VA surface pool exhausted".into()))?;
         let surface_id = surface.id();
         let is_idr = is_hevc_idr_nal(annex_b);
 
@@ -218,7 +221,6 @@ impl HevcVldDecoder {
             0,
             0,
             1,
-            0,
             0,
             0,
             0,
@@ -251,18 +253,19 @@ impl HevcVldDecoder {
             0,
             0,
             0,
+            4,
             [0; 19],
             [0; 21],
             &slice_parsing,
-            4,
             0,
             0,
             0,
             0,
             0,
             0,
-            0,
-            0,
+            0i8,
+            0u8,
+            0u32,
         );
         let long_slice =
             HevcLongSliceFlags::new(1, 0, if is_idr { 2 } else { 0 }, 0, 1, 1, 0, 0, 1, 0, 0, 1);
@@ -283,18 +286,19 @@ impl HevcVldDecoder {
             0,
             0,
             0,
-            [0; 15],
-            [0; 15],
-            [[0; 2]; 15],
-            [[0; 2]; 15],
-            [0; 15],
-            [0; 15],
-            [[0; 2]; 15],
-            [[0; 2]; 15],
             0,
-            0,
-            0,
-            0,
+            [0i8; 15],
+            [0i8; 15],
+            [[0i8; 2]; 15],
+            [[0i8; 2]; 15],
+            [0i8; 15],
+            [0i8; 15],
+            [[0i8; 2]; 15],
+            [[0i8; 2]; 15],
+            0u8,
+            0u16,
+            0u16,
+            0u16,
         );
         slice_param.set_as_last();
 
@@ -318,7 +322,7 @@ impl HevcVldDecoder {
         let mut picture = Picture::new(
             self.poc as u64,
             std::rc::Rc::clone(&self.context),
-            surface.clone(),
+            surface,
         );
         picture.add_buffer(pic_buf);
         picture.add_buffer(slice_buf);
@@ -333,12 +337,17 @@ impl HevcVldDecoder {
         let picture = picture
             .end()
             .map_err(|e| MediaError::Decode(e.to_string()))?;
-        picture
+        let picture = picture
             .sync()
             .map_err(|(e, _)| MediaError::Decode(e.to_string()))?;
+        let surface = picture
+            .take_surface()
+            .map_err(|_| MediaError::Decode("无法回收 VA surface".into()))?;
 
         self.poc += 1;
-        read_nv12_from_surface(&surface, &self.image_fmt, self.width, self.height)
+        let nv12 = read_nv12_from_surface(&surface, &self.image_fmt, self.width, self.height)?;
+        self.surfaces[idx] = Some(surface);
+        Ok(nv12)
     }
 
     fn width(&self) -> u32 {
@@ -376,7 +385,7 @@ fn is_hevc_idr_nal(annex_b: &[u8]) -> bool {
 }
 
 fn read_nv12_from_surface(
-    surface: &cros_libva::surface::Surface,
+    surface: &cros_libva::surface::Surface<()>,
     image_fmt: &bindings::VAImageFormat,
     width: u32,
     height: u32,

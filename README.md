@@ -69,7 +69,7 @@ A cross-platform Flutter FFI plugin for **image and video compression**, powered
 | **Android** | Android SDK, NDK (version declared in your app's `android/app/build.gradle`) |
 | **iOS / macOS** | Xcode, CocoaPods |
 | **Windows** | Visual Studio with C++ desktop development, CMake |
-| **Linux** | CMake, VA-API drivers (`libva`, GPU/driver with H.264/H.265 encode support) |
+| **Linux** | CMake, `libva-dev` (headers for the Rust build), VA-API drivers and GPU driver with H.264/H.265 encode support (verify with `vainfo`) |
 
 ---
 
@@ -137,6 +137,14 @@ This plugin is an **FFI plugin** (`ffiPlugin: true`). Cargokit invokes `cargo` f
 | Linux / Windows | CMake | `linux/CMakeLists.txt`, `windows/CMakeLists.txt` |
 
 Rust source lives in `rust/`. The first build may take several minutes while dependencies compile (e.g. `rav1e` for AVIF).
+
+On Linux, install development packages before building, for example:
+
+```bash
+sudo apt install libva-dev vainfo
+```
+
+> Note: On systems with libva ≥ 2.23, this repo vendors a patched `cros-libva` 0.0.13 under `rust/third_party/cros-libva` (see `README.patch`). Remove it once [chromeos/cros-libva#37](https://github.com/chromeos/cros-libva/pull/37) lands in a crates.io release.
 
 ### Regenerate Dart ↔ Rust bindings
 
