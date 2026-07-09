@@ -69,7 +69,7 @@
 | **Android** | Android SDK、NDK（版本由宿主 App 的 `android/app/build.gradle` 指定） |
 | **iOS / macOS** | Xcode、CocoaPods |
 | **Windows** | Visual Studio（含 C++ 桌面开发）、CMake |
-| **Linux** | CMake、VA-API 驱动（`libva`，GPU/驱动需支持 H.264/H.265 编码） |
+| **Linux** | CMake、`libva-dev`（构建期头文件）、VA-API 驱动与 GPU 驱动（需支持 H.264/H.265 硬编；可用 `vainfo` 检查） |
 
 ---
 
@@ -137,6 +137,14 @@ flutter build linux --release
 | Linux / Windows | CMake | `linux/CMakeLists.txt`、`windows/CMakeLists.txt` |
 
 Rust 源码位于 `rust/`。首次编译可能耗时较长（例如 AVIF 依赖 `rav1e`）。
+
+Linux 构建前请安装开发包，例如：
+
+```bash
+sudo apt install libva-dev vainfo
+```
+
+> 说明：在 libva ≥ 2.23 的系统上，本项目通过 `rust/third_party/cros-libva` 对上游 `cros-libva` 0.0.13 打了兼容补丁（见 `README.patch`），待 [chromeos/cros-libva#37](https://github.com/chromeos/cros-libva/pull/37) 合并发布后可移除。
 
 ### 重新生成 Dart ↔ Rust 绑定
 

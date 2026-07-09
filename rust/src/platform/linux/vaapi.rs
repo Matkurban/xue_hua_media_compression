@@ -12,7 +12,7 @@ use cros_libva::buffer::{
 };
 use cros_libva::display::Display;
 use cros_libva::picture::Picture;
-use cros_libva::surface::UsageHint;
+use cros_libva::UsageHint;
 
 use crate::api::traits::{MediaError, VideoCodec, VideoOptions};
 use crate::video::EncodedFrame;
@@ -26,7 +26,7 @@ const VAAPI_SURFACE_POOL: usize = 4;
 
 pub(super) struct VaapiH264Encoder {
     context: std::rc::Rc<Context>,
-    surfaces: Vec<cros_libva::surface::Surface>,
+    surfaces: Vec<Option<cros_libva::surface::Surface<()>>>,
     image_fmt: bindings::VAImageFormat,
     width: u32,
     height: u32,
@@ -46,8 +46,9 @@ impl VaapiH264Encoder {
         opts: &VideoOptions,
         frame_duration: u32,
     ) -> Result<Self, MediaError> {
-        let display = Display::open()
-            .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
+        let display = Display::open().ok_or_else(|| {
+            MediaError::HardwareUnavailable("打开 VA-API 设备失败".into())
+        })?;
 
         let format = bindings::VA_RT_FORMAT_YUV420;
         let entrypoint = bindings::VAEntrypoint::VAEntrypointEncSliceLP;
@@ -94,7 +95,7 @@ impl VaapiH264Encoder {
 
         Ok(Self {
             context,
-            surfaces,
+            surfaces: surfaces.into_iter().map(Some).collect(),
             image_fmt,
             width,
             height,
@@ -119,7 +120,9 @@ impl Nv12EncoderSink for VaapiH264Encoder {
 
     fn encode_frame(&mut self, nv12: &[u8], frame_index: usize) -> Result<(), MediaError> {
         let surface_idx = frame_index % self.surfaces.len();
-        let surface = self.surfaces[surface_idx].clone();
+        let surface = self.surfaces[surface_idx]
+            .take()
+            .ok_or_else(|| MediaError::Encode("VA surface pool exhausted".into()))?;
         let surface_id = surface.id();
 
         upload_nv12_to_surface(&surface, &self.image_fmt, self.width, self.height, nv12)?;
@@ -150,9 +153,13 @@ impl Nv12EncoderSink for VaapiH264Encoder {
         let picture = picture
             .end()
             .map_err(|e| MediaError::Encode(e.to_string()))?;
-        picture
+        let picture = picture
             .sync()
             .map_err(|(e, _)| MediaError::Encode(e.to_string()))?;
+        let surface = picture
+            .take_surface()
+            .map_err(|_| MediaError::Encode("无法回收 VA surface".into()))?;
+        self.surfaces[surface_idx] = Some(surface);
 
         let mapped =
             MappedCodedBuffer::new(&coded_buffer).map_err(|e| MediaError::Encode(e.to_string()))?;
@@ -168,7 +175,7 @@ impl Nv12EncoderSink for VaapiH264Encoder {
 
 pub(super) struct VaapiHevcEncoder {
     context: std::rc::Rc<Context>,
-    surfaces: Vec<cros_libva::surface::Surface>,
+    surfaces: Vec<Option<cros_libva::surface::Surface<()>>>,
     image_fmt: bindings::VAImageFormat,
     width: u32,
     height: u32,
@@ -188,8 +195,9 @@ impl VaapiHevcEncoder {
         opts: &VideoOptions,
         frame_duration: u32,
     ) -> Result<Self, MediaError> {
-        let display = Display::open()
-            .map_err(|e| MediaError::HardwareUnavailable(format!("打开 VA-API 设备失败: {e}")))?;
+        let display = Display::open().ok_or_else(|| {
+            MediaError::HardwareUnavailable("打开 VA-API 设备失败".into())
+        })?;
 
         let format = bindings::VA_RT_FORMAT_YUV420;
         let entrypoint = bindings::VAEntrypoint::VAEntrypointEncSliceLP;
@@ -237,7 +245,7 @@ impl VaapiHevcEncoder {
 
         Ok(Self {
             context,
-            surfaces,
+            surfaces: surfaces.into_iter().map(Some).collect(),
             image_fmt,
             width,
             height,
@@ -262,7 +270,9 @@ impl Nv12EncoderSink for VaapiHevcEncoder {
 
     fn encode_frame(&mut self, nv12: &[u8], frame_index: usize) -> Result<(), MediaError> {
         let surface_idx = frame_index % self.surfaces.len();
-        let surface = self.surfaces[surface_idx].clone();
+        let surface = self.surfaces[surface_idx]
+            .take()
+            .ok_or_else(|| MediaError::Encode("VA surface pool exhausted".into()))?;
         let surface_id = surface.id();
         upload_nv12_to_surface(&surface, &self.image_fmt, self.width, self.height, nv12)?;
 
@@ -303,9 +313,13 @@ impl Nv12EncoderSink for VaapiHevcEncoder {
         let picture = picture
             .end()
             .map_err(|e| MediaError::Encode(e.to_string()))?;
-        picture
+        let picture = picture
             .sync()
             .map_err(|(e, _)| MediaError::Encode(e.to_string()))?;
+        let surface = picture
+            .take_surface()
+            .map_err(|_| MediaError::Encode("无法回收 VA surface".into()))?;
+        self.surfaces[surface_idx] = Some(surface);
 
         let mapped =
             MappedCodedBuffer::new(&coded_buffer).map_err(|e| MediaError::Encode(e.to_string()))?;
@@ -324,7 +338,7 @@ impl Nv12EncoderSink for VaapiHevcEncoder {
 }
 
 fn upload_nv12_to_surface(
-    surface: &cros_libva::surface::Surface,
+    surface: &cros_libva::surface::Surface<()>,
     image_fmt: &bindings::VAImageFormat,
     width: u32,
     height: u32,
@@ -361,7 +375,7 @@ fn upload_nv12_to_surface(
 }
 
 fn create_seq_buffer(
-    context: &Context,
+    context: &std::rc::Rc<Context>,
     mb_w: u16,
     mb_h: u16,
     fps: u32,
@@ -373,7 +387,7 @@ fn create_seq_buffer(
             0,
             10,
             10,
-            fps as i32,
+            fps,
             1,
             0,
             1,
@@ -392,7 +406,7 @@ fn create_seq_buffer(
             1,
             1,
             1,
-            (opts.bitrate / 1000).min(60_000) as i32,
+            (opts.bitrate / 1000).min(60_000),
         ),
     ));
     context
@@ -401,7 +415,7 @@ fn create_seq_buffer(
 }
 
 fn create_pic_buffer(
-    context: &Context,
+    context: &std::rc::Rc<Context>,
     surface_id: bindings::VASurfaceID,
     coded_id: bindings::VABufferID,
 ) -> Result<cros_libva::buffer::Buffer, MediaError> {
@@ -437,11 +451,20 @@ fn create_pic_buffer(
 }
 
 fn create_slice_buffer(
-    context: &Context,
+    context: &std::rc::Rc<Context>,
     mb_w: u16,
     mb_h: u16,
 ) -> Result<cros_libva::buffer::Buffer, MediaError> {
-    let ref_pic_list: [PictureH264; 32] = std::array::from_fn(|_| {
+    let ref_pic_list_0: [PictureH264; 32] = std::array::from_fn(|_| {
+        PictureH264::new(
+            bindings::VA_INVALID_ID,
+            0,
+            bindings::VA_INVALID_SURFACE,
+            0,
+            0,
+        )
+    });
+    let ref_pic_list_1: [PictureH264; 32] = std::array::from_fn(|_| {
         PictureH264::new(
             bindings::VA_INVALID_ID,
             0,
@@ -465,8 +488,8 @@ fn create_slice_buffer(
             0,
             0,
             0,
-            ref_pic_list,
-            ref_pic_list,
+            ref_pic_list_0,
+            ref_pic_list_1,
             0,
             0,
             0,
@@ -497,7 +520,7 @@ fn invalid_hevc_ref_array() -> [PictureHEVC; 15] {
 }
 
 fn create_hevc_seq_buffer(
-    context: &Context,
+    context: &std::rc::Rc<Context>,
     width: u32,
     height: u32,
     fps: u32,
@@ -546,7 +569,7 @@ fn create_hevc_seq_buffer(
 }
 
 fn create_hevc_pic_buffer(
-    context: &Context,
+    context: &std::rc::Rc<Context>,
     surface_id: bindings::VASurfaceID,
     coded_id: bindings::VABufferID,
     ref_frames: &[PictureHEVC; 15],
@@ -607,7 +630,7 @@ fn create_hevc_pic_buffer(
 }
 
 fn create_hevc_enc_slice_buffer(
-    context: &Context,
+    context: &std::rc::Rc<Context>,
     num_ctu: u32,
     is_idr: bool,
 ) -> Result<cros_libva::buffer::Buffer, MediaError> {
@@ -633,7 +656,6 @@ fn create_hevc_enc_slice_buffer(
             [0; 15],
             [[0; 2]; 15],
             [[0; 2]; 15],
-            0,
             0,
             0,
             0,

@@ -1,0 +1,12 @@
+# cros-libva local patch (0.0.13)
+
+Upstream crates.io release fails to compile against libva >= 2.23.0 (VA API 1.23.0)
+due to missing fields in `EncPictureParameterBufferVP9::new()`.
+
+Patches applied (from https://github.com/chromeos/cros-libva/pull/37):
+
+- `build.rs`: emit `libva_1_22_or_higher` and `libva_1_23_or_higher` cfg flags
+- `src/buffer/vp9.rs`: gate `seg_id_block_size` and `va_reserved8` for libva 1.23+
+
+Remove this vendored copy and the `[patch.crates-io]` entry in `rust/Cargo.toml`
+once upstream merges the fix and publishes a new release.
