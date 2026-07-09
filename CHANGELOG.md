@@ -1,3 +1,7 @@
+## [1.3.2] - 2026-07-10
+
+- Android 使用 current_thread FRB handler，避免多插件并存时 pthread_key 耗尽。
+
 ## [1.3.1] - 2026-07-04
 
 - Optimized initialization

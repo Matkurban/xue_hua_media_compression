@@ -6,5 +6,6 @@
 //! 图片、视频、平台实现位于 crate 根下的 `image` / `platform` / `video` 等内部 module，
 //! 物理路径与 `lib.rs` 模块名一致，不在 FRB `rust_input` 扫描范围内。
 
+pub mod frb_handler;
 pub mod media;
 pub mod traits;

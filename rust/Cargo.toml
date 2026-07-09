@@ -29,6 +29,8 @@ mp4 = "0.14.0"
 thiserror = "2.0.18"
 anyhow = "1.0.103"
 bytes = "1.12.0"
+tokio = { version = "1.52.3", features = ["rt", "macros"] }
+threadpool = "1.8.1"
 zenwebp = "0.4.4"
 # HEIC/HEIF 通过 libheif-rs（封装 C++ libheif）。需要系统安装 libheif + pkg-config，
 # 因此默认关闭，移动端构建时用 `--features heic` 打开（见 [features]）。
