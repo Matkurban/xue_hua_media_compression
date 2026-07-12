@@ -1,3 +1,13 @@
+## [1.3.4] - 2026-07-13
+
+### Fixed / 修复
+
+- **macOS/iOS Pod build scripts CRLF / Pod 构建脚本行尾** — Ensure `cargokit/*.sh` ship with LF line
+  endings and add `.gitattributes` so Windows `autocrlf` checkouts cannot republish CRLF scripts.
+  Fixes Xcode `PhaseScriptExecution` failure (`set: - : invalid option`) when integrating from pub.dev.
+  保证 `cargokit/*.sh` 以 LF 发布，并通过 `.gitattributes` 防止 Windows 检出后再发坏包；修复集成后
+  Xcode 报 `set: - : invalid option` 导致 Pod 构建失败。
+
 ## [1.3.3] - 2026-07-12
 
 ### Fixed / 修复
