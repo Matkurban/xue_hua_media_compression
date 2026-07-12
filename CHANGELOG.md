@@ -1,3 +1,16 @@
+## [1.3.3] - 2026-07-12
+
+### Fixed / 修复
+
+- **Windows Media Foundation video encode / Windows 视频编码** — Replaced the fragile direct async hardware MFT
+  `ProcessInput`/`ProcessOutput` loop with `IMFSourceReader` + `IMFSinkWriter`. Fixes build errors against
+  `windows` 0.62 and runtime failures (`MF_E_TRANSFORM_ASYNC_LOCKED` `0xC00D6D77`, `MF_E_INVALIDMEDIATYPE`
+  `0xC00D36B4`, `MF_E_NOTACCEPTING` `0xC00D36B5`, `E_UNEXPECTED` `0x8000FFFF`). SinkWriter correctly handles
+  sync/async and hardware/software encoders; NV12 scaling is applied before write when `max_dimension` requires it.
+  Covered by Windows unit tests (synthetic SinkWriter encode, full compress round-trip, scale-down).  
+  将易错的异步硬件 MFT 直驱改为 SourceReader + SinkWriter；修复 `windows` 0.62 编译与上述运行时 HRESULT；
+  缩放在写入前完成；补充 Windows 自动化测试。
+
 ## [1.3.2] - 2026-07-10
 
 - Android 使用 current_thread FRB handler，避免多插件并存时 pthread_key 耗尽。
