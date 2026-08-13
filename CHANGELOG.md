@@ -1,3 +1,20 @@
+## [1.4.0] - 2026-08-13
+
+### Changed / 变更
+
+- **Android `compileSdk` 36 / Android 编译 SDK** — Plugin `compileSdkVersion` raised from 33 to 36 so the
+  library builds against current Android / Flutter toolchains. Host apps that still pin a lower
+  `compileSdk` should bump it to at least 36.
+  插件 `compileSdkVersion` 从 33 升至 36，以适配当前 Android / Flutter 工具链；仍锁定更低 `compileSdk` 的宿主
+  应用需同步升至 36 及以上。
+
+- **Android `minSdk` 21 / Android 最低 SDK** — Plugin `minSdkVersion` raised from 19 to 21 (Android 5.0).
+  Apps that still target API 19–20 can no longer consume this plugin without raising their own `minSdk`.
+  插件 `minSdkVersion` 从 19 升至 21（Android 5.0）；仍支持 API 19–20 的应用需同步提高 `minSdk` 才能依赖本插件。
+
+- **Example Android Gradle Plugin / 示例 AGP** — Example app AGP updated from 8.11.1 to 8.13.2.
+  示例工程 Android Gradle Plugin 从 8.11.1 升级到 8.13.2。
+
 ## [1.3.4] - 2026-07-13
 
 ### Fixed / 修复
