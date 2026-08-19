@@ -1,4 +1,16 @@
 include: package:flutter_lints/flutter.yaml
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.g.kt'
+    - '**/*.g.swift'
+    - '**/*.g.h'
+    - '**/*.g.cpp'
+    - '**/*.g.cc'
+    - 'example/build/**'
+    - 'test_driver/**'

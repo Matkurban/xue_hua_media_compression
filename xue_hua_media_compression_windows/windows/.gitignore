@@ -1,0 +1,13 @@
+flutter/
+
+# Visual Studio user-specific files.
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+x64/
+x86/
+
+*.[Cc]ache
+!*.[Cc]ache/

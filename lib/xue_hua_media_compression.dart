@@ -1,14 +1,16 @@
-library;
-
-export '/src/options.dart'
-    show CompressionDefaults, facadeImageOptions, facadeVideoOptions;
-export 'src/rust/api/traits.dart'
+export 'package:xue_hua_media_compression_platform_interface/xue_hua_media_compression_platform_interface.dart'
     show
+        CompressionSession,
+        ImageCompressOptions,
+        ImageCompressResult,
+        ImageCompressionCapabilities,
         ImageFormat,
-        ImageOptions,
+        MediaCompressionException,
+        MediaDestination,
+        MediaSource,
         VideoCodec,
-        VideoOptions,
-        VideoResult,
-        MediaError;
+        VideoCompressOptions,
+        VideoCompressResult,
+        VideoCompressionCapabilities;
 
 export 'src/xue_hua_media_compression.dart';

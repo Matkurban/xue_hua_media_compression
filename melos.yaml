@@ -1,0 +1,26 @@
+name: xue_hua_media_compression
+
+packages:
+  - .
+  - example
+  - xue_hua_media_compression_platform_interface
+  - xue_hua_media_compression_android
+  - xue_hua_media_compression_darwin
+  - xue_hua_media_compression_windows
+  - xue_hua_media_compression_linux
+
+scripts:
+  pigeon:
+    run: dart run pigeon --input pigeons/messages.dart
+    exec:
+      concurrency: 1
+    packageFilters:
+      scope: xue_hua_media_compression_platform_interface
+  analyze:
+    run: dart analyze --fatal-infos
+    exec: true
+  test:
+    run: flutter test
+    exec: true
+    packageFilters:
+      dirExists: test

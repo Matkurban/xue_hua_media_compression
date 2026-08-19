@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
@@ -6,7 +7,6 @@ import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await XueHuaMediaCompression.initialize();
   runApp(const MyApp());
 }
 
@@ -23,7 +23,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// 把字节数格式化为人类可读的字符串。
 String formatBytes(int bytes) {
   if (bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -36,40 +35,13 @@ String formatBytes(int bytes) {
   return '${size.toStringAsFixed(unit == 0 ? 0 : 2)} ${units[unit]}';
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  String _backend = '...';
-
-  @override
-  void initState() {
-    super.initState();
-    XueHuaMediaCompression.videoBackendName().then((value) {
-      if (mounted) setState(() => _backend = value);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('雪花媒体压缩 Demo'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '当前平台视频硬编后端: $_backend',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ),
-      ),
+      appBar: AppBar(title: const Text('雪花媒体压缩 Demo')),
       body: const SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -85,10 +57,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ===========================================================================
-// 图片压缩卡片
-// ===========================================================================
-
 class ImageCompressionCard extends StatefulWidget {
   const ImageCompressionCard({super.key});
 
@@ -97,17 +65,12 @@ class ImageCompressionCard extends StatefulWidget {
 }
 
 class _ImageCompressionCardState extends State<ImageCompressionCard> {
-  static const _formats = <String, ImageFormat>{
-    'JPEG': ImageFormat.jpeg,
-    'PNG': ImageFormat.png,
-    'WebP': ImageFormat.webP,
-    'AVIF': ImageFormat.avif,
-  };
-
+  ImageCompressionCapabilities? _caps;
   ImageFormat _format = ImageFormat.jpeg;
   double _quality = 80;
-
   bool _busy = false;
+  double _progress = 0;
+  CompressionSession<ImageCompressResult>? _session;
   String? _name;
   String? _originalPath;
   String? _compressedPath;
@@ -116,12 +79,34 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
   Duration? _elapsed;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCaps());
+  }
+
+  Future<void> _loadCaps() async {
+    try {
+      final caps = await XueHuaMediaCompression.image.queryCapabilities();
+      if (!mounted) return;
+      setState(() {
+        _caps = caps;
+        if (!caps.outputFormats.contains(_format) &&
+            caps.outputFormats.isNotEmpty) {
+          _format = caps.outputFormats.first;
+        }
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    }
+  }
+
   Future<void> _pickAndCompress() async {
     setState(() {
       _busy = true;
       _error = null;
+      _progress = 0;
     });
-    String? tempOutPath;
     try {
       const typeGroup = XTypeGroup(
         label: 'images',
@@ -141,44 +126,66 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
         setState(() => _busy = false);
         return;
       }
-
-      final inputPath = file.path;
-      final originalSize = await file.length();
-      final tmpDir = Directory.systemTemp;
-      final ts = DateTime.now().millisecondsSinceEpoch;
-      tempOutPath = '${tmpDir.path}/xh_img_out_$ts${_outputExtension(_format)}';
-
-      final sw = Stopwatch()..start();
-      await XueHuaMediaCompression.image.compressFile(
-        inputPath: inputPath,
-        outputPath: tempOutPath,
-        format: _format,
-        quality: _quality.round(),
+      final tmp =
+          '${Directory.systemTemp.path}/xh_img_out_${DateTime.now().millisecondsSinceEpoch}${_ext(_format)}';
+      final session = XueHuaMediaCompression.image.compress(
+        source: MediaSource.path(file.path),
+        destination: MediaDestination.path(tmp),
+        options: ImageCompressOptions(
+          format: _format,
+          quality: _quality.round(),
+        ),
       );
+      _session = session;
+      final sub = session.progress.listen((value) {
+        if (mounted) setState(() => _progress = value);
+      });
+      final sw = Stopwatch()..start();
+      final result = await session.result;
       sw.stop();
-
-      final compressedSize = await File(tempOutPath).length();
-
+      await sub.cancel();
+      await session.dispose();
+      _session = null;
+      if (!mounted) return;
       setState(() {
         _name = file.name;
-        _originalPath = inputPath;
-        _compressedPath = tempOutPath;
-        _originalSize = originalSize;
-        _compressedSize = compressedSize;
+        _originalPath = file.path;
+        _compressedPath = result.outputPath;
+        _originalSize = awaitSizeSync(file.path);
+        _compressedSize = result.sizeBytes;
         _elapsed = sw.elapsed;
+        _progress = 1;
       });
-    } catch (e) {
-      setState(() => _error = '$e');
+    } on MediaCompressionException catch (error) {
+      if (error.code == MediaCompressionException.cancelled) {
+        setState(() => _error = '已取消');
+      } else {
+        setState(() => _error = '$error');
+      }
+    } catch (error) {
+      setState(() => _error = '$error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  String _outputExtension(ImageFormat format) {
+  Future<void> _cancel() async {
+    await _session?.cancel();
+  }
+
+  static int awaitSizeSync(String path) {
+    try {
+      return File(path).lengthSync();
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String _ext(ImageFormat format) {
     return switch (format) {
       ImageFormat.jpeg => '.jpg',
       ImageFormat.png => '.png',
-      ImageFormat.webP => '.webp',
+      ImageFormat.webp => '.webp',
       ImageFormat.gif => '.gif',
       ImageFormat.avif => '.avif',
       ImageFormat.heic => '.heic',
@@ -187,6 +194,7 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
 
   @override
   Widget build(BuildContext context) {
+    final formats = _caps?.outputFormats.toList() ?? [ImageFormat.jpeg];
     return _SectionCard(
       icon: Icons.image_outlined,
       title: '图片压缩',
@@ -198,12 +206,9 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
               const Text('目标格式: '),
               const SizedBox(width: 8),
               DropdownButton<ImageFormat>(
-                value: _format,
-                items: _formats.entries
-                    .map(
-                      (e) =>
-                          DropdownMenuItem(value: e.value, child: Text(e.key)),
-                    )
+                value: formats.contains(_format) ? _format : formats.first,
+                items: formats
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f.name)))
                     .toList(),
                 onChanged: _busy
                     ? null
@@ -211,14 +216,7 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
               ),
             ],
           ),
-          if (_format == ImageFormat.png)
-            Text(
-              'PNG 为无损格式，从 JPEG 转换后体积通常会增大；PNG→PNG 可无损优化体积。',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            )
-          else
+          if (_format != ImageFormat.png)
             Row(
               children: [
                 const Text('质量: '),
@@ -237,17 +235,23 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
                 SizedBox(width: 36, child: Text(_quality.round().toString())),
               ],
             ),
+          if (_busy)
+            LinearProgressIndicator(value: _progress == 0 ? null : _progress),
           const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _pickAndCompress,
-            icon: _busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file),
-            label: Text(_busy ? '压缩中...' : '选择图片并压缩'),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _pickAndCompress,
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(_busy ? '压缩中...' : '选择图片并压缩'),
+                ),
+              ),
+              if (_busy) ...[
+                const SizedBox(width: 8),
+                OutlinedButton(onPressed: _cancel, child: const Text('取消')),
+              ],
+            ],
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -283,10 +287,6 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
   }
 }
 
-// ===========================================================================
-// 视频压缩卡片
-// ===========================================================================
-
 class VideoCompressionCard extends StatefulWidget {
   const VideoCompressionCard({super.key});
 
@@ -295,31 +295,47 @@ class VideoCompressionCard extends StatefulWidget {
 }
 
 class _VideoCompressionCardState extends State<VideoCompressionCard> {
-  static const _codecs = <String, VideoCodec>{
-    'H.264': VideoCodec.h264,
-    'H.265 (HEVC)': VideoCodec.h265,
-  };
-
+  VideoCompressionCapabilities? _caps;
   VideoCodec _codec = VideoCodec.h264;
   double _bitrateMbps = 2;
-
   bool _busy = false;
+  double _progress = 0;
+  CompressionSession<VideoCompressResult>? _session;
   String? _name;
   int? _originalSize;
   int? _compressedSize;
-  String? _resultBackend;
+  String? _encoderName;
   Duration? _elapsed;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCaps());
+  }
+
+  Future<void> _loadCaps() async {
+    try {
+      final caps = await XueHuaMediaCompression.video.queryCapabilities();
+      if (!mounted) return;
+      setState(() {
+        _caps = caps;
+        if (!caps.codecs.contains(_codec) && caps.codecs.isNotEmpty) {
+          _codec = caps.codecs.first;
+        }
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    }
+  }
 
   Future<void> _pickAndCompress() async {
     setState(() {
       _busy = true;
       _error = null;
+      _progress = 0;
       _compressedSize = null;
-      _elapsed = null;
     });
-    String? tempOutputPath;
-    var succeeded = false;
     try {
       const typeGroup = XTypeGroup(
         label: 'videos',
@@ -330,66 +346,73 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
         setState(() => _busy = false);
         return;
       }
-
-      final originalSize = await file.length();
-      final tmpDir = Directory.systemTemp;
-      tempOutputPath =
-          '${tmpDir.path}/xh_compressed_${DateTime.now().millisecondsSinceEpoch}.mp4';
-
+      final output =
+          '${Directory.systemTemp.path}/xh_compressed_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final originalSize = await File(file.path).length();
       setState(() {
         _name = file.name;
         _originalSize = originalSize;
       });
-
-      final sw = Stopwatch()..start();
-      final result = await XueHuaMediaCompression.video.compress(
+      final session = XueHuaMediaCompression.video.compress(
         inputPath: file.path,
-        outputPath: tempOutputPath,
-        codec: _codec,
-        bitrate: (_bitrateMbps * 1000000).round(),
+        outputPath: output,
+        options: VideoCompressOptions(
+          codec: _codec,
+          bitrate: (_bitrateMbps * 1000000).round(),
+        ),
       );
-      sw.stop();
-
-      setState(() {
-        _compressedSize = result.sizeBytes.toInt();
-        _resultBackend = result.backend;
-        _elapsed = sw.elapsed;
+      _session = session;
+      final sub = session.progress.listen((value) {
+        if (mounted) setState(() => _progress = value);
       });
-      succeeded = true;
-    } catch (e) {
-      setState(() => _error = '$e');
-    } finally {
-      if (!succeeded && tempOutputPath != null) {
-        try {
-          final f = File(tempOutputPath);
-          if (await f.exists()) {
-            await f.delete();
-          }
-        } catch (_) {}
+      final sw = Stopwatch()..start();
+      final result = await session.result;
+      sw.stop();
+      await sub.cancel();
+      await session.dispose();
+      _session = null;
+      if (!mounted) return;
+      setState(() {
+        _compressedSize = result.sizeBytes;
+        _encoderName = result.encoderName;
+        _elapsed = sw.elapsed;
+        _progress = 1;
+      });
+    } on MediaCompressionException catch (error) {
+      if (error.code == MediaCompressionException.cancelled) {
+        setState(() => _error = '已取消');
+      } else {
+        setState(() => _error = '$error');
       }
+    } catch (error) {
+      setState(() => _error = '$error');
+    } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Future<void> _cancel() async {
+    await _session?.cancel();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final codecs = _caps?.codecs.toList() ?? [VideoCodec.h264];
     return _SectionCard(
       icon: Icons.movie_outlined,
       title: '视频压缩',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_caps?.encoderName != null) Text('硬编: ${_caps!.encoderName}'),
           Row(
             children: [
               const Text('编码: '),
               const SizedBox(width: 8),
               DropdownButton<VideoCodec>(
-                value: _codec,
-                items: _codecs.entries
-                    .map(
-                      (e) =>
-                          DropdownMenuItem(value: e.value, child: Text(e.key)),
-                    )
+                value: codecs.contains(_codec) ? _codec : codecs.first,
+                items: codecs
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
                     .toList(),
                 onChanged: _busy
                     ? null
@@ -418,33 +441,38 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
               ),
             ],
           ),
+          if (_busy)
+            LinearProgressIndicator(value: _progress == 0 ? null : _progress),
           const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy ? null : _pickAndCompress,
-            icon: _busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.video_file),
-            label: Text(_busy ? '压缩中...' : '选择视频并压缩'),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _pickAndCompress,
+                  icon: const Icon(Icons.video_file),
+                  label: Text(_busy ? '压缩中...' : '选择视频并压缩'),
+                ),
+              ),
+              if (_busy) ...[
+                const SizedBox(width: 8),
+                OutlinedButton(onPressed: _cancel, child: const Text('取消')),
+              ],
+            ],
           ),
           if (_originalSize != null) ...[
             const SizedBox(height: 12),
             _KeyValueRow(label: '文件', value: _name ?? ''),
             _KeyValueRow(label: '原始大小', value: formatBytes(_originalSize!)),
           ],
-          if (_compressedSize != null) ...[
+          if (_compressedSize != null)
             _SizeResult(
               name: _name ?? '',
               originalSize: _originalSize!,
               compressedSize: _compressedSize!,
               elapsed: _elapsed,
-              backend: _resultBackend,
+              backend: _encoderName,
               compact: true,
             ),
-          ],
           if (_error != null) ...[
             const SizedBox(height: 12),
             _ErrorBox(message: _error!),
@@ -454,10 +482,6 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
     );
   }
 }
-
-// ===========================================================================
-// 复用小部件
-// ===========================================================================
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
@@ -518,7 +542,6 @@ class _SizeResult extends StatelessWidget {
     final ratio = originalSize == 0 ? 0.0 : saved / originalSize;
     final isSmaller = saved > 0;
     final color = isSmaller ? Colors.green : Colors.orange;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

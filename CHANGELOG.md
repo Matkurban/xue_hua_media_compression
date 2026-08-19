@@ -1,3 +1,29 @@
+## [2.0.0] - 2026-08-20
+
+### Breaking / 破坏性变更
+
+- Rewrote the plugin as a **federated** package (no Web). Rust, Cargokit and
+  `flutter_rust_bridge` are gone. Each OS uses its own hardware pipeline.
+  改为联合插件（不含 Web），移除 Rust / Cargokit / FRB；各端走各自硬编管线。
+- All 1.x method names are removed (`initialize`, `compressWith`,
+  `compressFile`, `videoBackendName`, `ImageOptions.speed`, …). Callers must
+  migrate to the session API.
+  1.x 方法名全部删除，需改用会话 API。
+- Android `minSdk` is **23**. Video output is always **MP4 without audio**.
+  Android 最低 API 23。视频始终输出无音轨 MP4。
+
+### Added / 新增
+
+- `XueHuaMediaCompression.image` / `.video` with `queryCapabilities()` and
+  `compress(...)` returning `CompressionSession` (`progress` stream, `result`,
+  `cancel`, `dispose`). Progress is pushed from native EventChannels.
+  会话式 API：进度由原生产推，可取消。
+- Per-platform packages: `_android` (Media3 Transformer + ImageDecoder),
+  `_darwin` (ImageIO + AVAssetWriter), `_windows` (WIC + MediaTranscoder),
+  `_linux` (libvips + FFmpeg VAAPI).
+- Structured `MediaCompressionException` codes (`unsupported`,
+  `hardwareUnavailable`, `cancelled`, …).
+
 ## [1.4.0] - 2026-08-13
 
 ### Changed / 变更

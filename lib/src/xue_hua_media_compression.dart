@@ -1,166 +1,160 @@
-import 'dart:typed_data';
+import 'package:xue_hua_media_compression_platform_interface/xue_hua_media_compression_platform_interface.dart';
 
-import 'options.dart';
-import 'rust/api/media.dart' as rust;
-import 'rust/api/traits.dart';
-import 'rust/frb_generated.dart';
-
-import 'dart:developer';
-
-/// flutter_rust_bridge 只能导出扁平的自由函数（如 `rustCompressImage`），
-/// 这里把它们包装成符合插件命名规范的命名空间：
-///   - `XueHuaMediaCompression.initialize()`            初始化
-///   - `XueHuaMediaCompression.image.compress(...)`     图片压缩
-///   - `XueHuaMediaCompression.video.compress(...)`     视频压缩
+/// 雪花媒体压缩插件入口。
 ///
-/// 用法：
-/// ```dart
-/// await XueHuaMediaCompression.initialize();
-/// final out = await XueHuaMediaCompression.image.compress(
-///   input: bytes,
-///   format: ImageFormat.avif,
-///   quality: 70,
-/// );
-class XueHuaMediaCompression {
-  XueHuaMediaCompression._();
-
-  static bool _initialized = false;
-
-  /// 图片相关压缩方法的命名空间。
-  static const XueHuaImageApi image = XueHuaImageApi._();
-
-  /// 视频相关压缩方法的命名空间。
-  static const XueHuaVideoApi video = XueHuaVideoApi._();
-
-  /// 初始化插件（加载 Rust 动态库并执行 Rust 侧 init）。
+/// Entry point for the XueHua media compression plugin.
+///
+/// 应用只依赖本门面。不支持 Web。
+/// Apps depend on this facade only. Web is not supported.
+abstract final class XueHuaMediaCompression {
+  /// 图片压缩入口。
   ///
-  /// 幂等：重复调用只会初始化一次。
-  static Future<void> initialize() async {
-    if (_initialized) return;
-    try {
-      if (!RustLib.instance.initialized) {
-        await RustLib.init();
-      }
-    } catch (e, s) {
-      log(
-        e.toString(),
-        error: e,
-        stackTrace: s,
-        name: 'XueHuaMediaCompression.initialize',
-      );
-    }
-    _initialized = true;
-  }
+  /// Still-image compression entry point.
+  static const XueHuaImageCompression image = XueHuaImageCompression();
 
-  /// 当前平台所使用的视频硬件编码后端名称（诊断用）。
-  static Future<String> videoBackendName() => rust.rustVideoBackendName();
+  /// 视频压缩入口。
+  ///
+  /// Video compression entry point.
+  static const XueHuaVideoCompression video = XueHuaVideoCompression();
 }
 
-/// 图片压缩命名空间：`XueHuaMediaCompression.image.xxx`。
-class XueHuaImageApi {
-  const XueHuaImageApi._();
-
-  /// 内存到内存压缩图片。
+/// 图片压缩 API。
+///
+/// Still-image compression API.
+final class XueHuaImageCompression {
+  /// 由 [XueHuaMediaCompression.image] 使用。
   ///
-  /// - [input] 原始图片字节。
-  /// - [format] 目标输出格式。
-  /// - [quality] 0-100，有损格式有效。
-  /// - [maxDimension] 等比缩放的最大边长，null 表示不缩放。
-  /// - [speed] AVIF/HEIC 编码速度；WebP method 档位；PNG→PNG oxipng 档位（1-10，越大越快）。
-  Future<Uint8List> compress({
-    required Uint8List input,
-    ImageFormat format = CompressionDefaults.imageFormat,
-    int quality = CompressionDefaults.imageQuality,
-    int? maxDimension,
-    int? speed,
-  }) {
-    final opts = facadeImageOptions(
-      format: format,
-      quality: quality,
-      maxDimension: maxDimension,
-      speed: speed,
-    );
-    return rust.rustCompressImage(input: input, opts: opts);
+  /// Used by [XueHuaMediaCompression.image].
+  const XueHuaImageCompression();
+
+  /// 查询当前平台能解码 / 编码的图片格式。
+  ///
+  /// Queries which image formats this platform can decode / encode.
+  ///
+  /// **接收 / Receives**
+  /// 无参数。探测发生在调用当下的设备与系统版本。
+  /// No parameters. Detection uses the current device and OS version.
+  ///
+  /// **返回 / Returns**
+  /// [ImageCompressionCapabilities]：`inputFormats` 为可解码集合，`outputFormats` 为可写出集合。
+  /// [ImageCompressionCapabilities] with decode (`inputFormats`) and encode (`outputFormats`) sets.
+  ///
+  /// **抛出 / Throws**
+  /// [MediaCompressionException] 当平台探测失败。
+  /// [MediaCompressionException] if probing fails.
+  Future<ImageCompressionCapabilities> queryCapabilities() {
+    return MediaCompressionPlatform.instance.queryImageCapabilities();
   }
 
-  /// 直接用一个 [ImageOptions] 压缩。
-  Future<Uint8List> compressWith({
-    required Uint8List input,
-    required ImageOptions options,
+  /// 压缩一张静帧图片。
+  ///
+  /// Compresses a still image.
+  ///
+  /// **接收 / Receives**
+  /// 从 [source] 读取原始图像，按 [options] 编码后写入 [destination]。
+  /// Reads the image from [source], encodes it using [options], writes to [destination].
+  ///
+  /// **参数 / Parameters**
+  /// - [source]: 内存字节或路径 / Android `content://`。
+  ///   In-memory bytes, or a filesystem path / Android `content://` URI.
+  /// - [destination]: `bytes()` 返回内存；`path()` 写文件并创建缺失的父目录。
+  ///   `bytes()` returns memory; `path()` writes a file (parent dirs created).
+  /// - [options]: 输出格式、质量 1–100、可选最大边长。默认 JPEG / quality 80 / 不缩放。
+  ///   Output format, quality 1–100, optional max edge. Defaults: JPEG, 80, no scale.
+  ///
+  /// **返回 / Returns**
+  /// 立即返回 [CompressionSession]。`await session.result` 得到 [ImageCompressResult]；
+  /// `session.progress` 为 0.0–1.0，由原生产推。
+  /// Returns a [CompressionSession] immediately. Await `session.result`; listen to `session.progress`.
+  ///
+  /// **抛出 / Throws**
+  /// - [ArgumentError]: 空路径、空字节、quality 不在 1–100、`maxDimension <= 0`。
+  /// - [MediaCompressionException.cancelled]: 调用了 [CompressionSession.cancel]。
+  /// - [MediaCompressionException.unsupported]: 当前平台不能写出 [ImageCompressOptions.format]。
+  /// - [MediaCompressionException.decode] / [encode] / [io] / [notFound]
+  ///
+  /// **平台 / Platforms**
+  /// 编码能力见 README 矩阵。`quality` 对 PNG 忽略。`maxDimension` 在编码前立即生效。
+  /// See the README matrix. `quality` is ignored for PNG. `maxDimension` applies before encode.
+  CompressionSession<ImageCompressResult> compress({
+    required MediaSource source,
+    required MediaDestination destination,
+    ImageCompressOptions options = const ImageCompressOptions(),
   }) {
-    return rust.rustCompressImage(input: input, opts: options);
-  }
-
-  /// 文件到文件压缩，返回输出文件字节数。
-  Future<int> compressFile({
-    required String inputPath,
-    required String outputPath,
-    ImageFormat format = CompressionDefaults.imageFormat,
-    int quality = CompressionDefaults.imageQuality,
-    int? maxDimension,
-    int? speed,
-  }) async {
-    final opts = facadeImageOptions(
-      format: format,
-      quality: quality,
-      maxDimension: maxDimension,
-      speed: speed,
+    return MediaCompressionPlatform.instance.compressImage(
+      source: source,
+      destination: destination,
+      options: options,
     );
-    final bytes = await rust.rustCompressImageFile(
-      inputPath: inputPath,
-      outputPath: outputPath,
-      opts: opts,
-    );
-    return bytes.toInt();
   }
 }
 
-/// 视频压缩命名空间：`XueHuaMediaCompression.video.xxx`。
-class XueHuaVideoApi {
-  const XueHuaVideoApi._();
-
-  /// 文件到文件压缩视频，使用平台原生硬件编码并封装为 MP4。
+/// 视频压缩 API。输出始终为 MP4，不保留音轨。
+///
+/// Video compression API. Output is always MP4 without an audio track.
+final class XueHuaVideoCompression {
+  /// 由 [XueHuaMediaCompression.video] 使用。
   ///
-  /// - [inputPath] 源视频路径。
-  /// - [outputPath] 输出 .mp4 路径。
-  /// - [codec] 目标编码（H.264 / H.265）。
-  /// - [bitrate] 目标平均码率（bps）。
-  /// - [fps] 目标帧率，null 表示沿用源帧率。
-  /// - [maxDimension] 等比缩放最大边长。
-  /// - [keyframeInterval] GOP（帧）。
-  Future<VideoResult> compress({
-    required String inputPath,
-    required String outputPath,
-    VideoCodec codec = CompressionDefaults.videoCodec,
-    int bitrate = CompressionDefaults.videoBitrate,
-    int? fps,
-    int? maxDimension,
-    int? keyframeInterval,
-  }) {
-    final opts = facadeVideoOptions(
-      codec: codec,
-      bitrate: bitrate,
-      fps: fps,
-      maxDimension: maxDimension,
-      keyframeInterval: keyframeInterval,
-    );
-    return rust.rustCompressVideo(
-      inputPath: inputPath,
-      outputPath: outputPath,
-      opts: opts,
-    );
+  /// Used by [XueHuaMediaCompression.video].
+  const XueHuaVideoCompression();
+
+  /// 查询当前平台的硬件视频编码能力。
+  ///
+  /// Queries hardware video-encode capabilities of this platform.
+  ///
+  /// **接收 / Receives**
+  /// 无参数。
+  /// No parameters.
+  ///
+  /// **返回 / Returns**
+  /// [VideoCompressionCapabilities]：`encoderName` 无硬编时为 null；`codecs` 为可硬编集合；
+  /// `acceptsContentUri` 仅 Android 为 true。
+  /// [VideoCompressionCapabilities] with encoder name, codec set, and whether `content://` is accepted.
+  ///
+  /// **抛出 / Throws**
+  /// [MediaCompressionException] 当探测失败。
+  Future<VideoCompressionCapabilities> queryCapabilities() {
+    return MediaCompressionPlatform.instance.queryVideoCapabilities();
   }
 
-  /// 直接用一个 [VideoOptions] 压缩。
-  Future<VideoResult> compressWith({
+  /// 压缩一段视频为 MP4（无音轨）。
+  ///
+  /// Compresses a video to MP4 (no audio track).
+  ///
+  /// **接收 / Receives**
+  /// 从 [inputPath] 读取源视频，按 [options] 硬编后写入 [outputPath]。
+  /// Reads the source from [inputPath], hardware-encodes with [options], writes [outputPath].
+  ///
+  /// **参数 / Parameters**
+  /// - [inputPath]: 本地可读路径，或 Android `content://`。`file://` 会在 Dart 侧规范化。
+  ///   A readable local path, or Android `content://`. `file://` is normalized in Dart.
+  /// - [outputPath]: 目标 `.mp4` 路径。父目录由原生创建。
+  ///   Destination `.mp4` path. Native code creates parent directories.
+  /// - [options]: 编码、码率、可选帧率 / 最大边长 / GOP。默认 H.264 / 2 Mbps。
+  ///   Codec, bitrate, optional fps / max edge / GOP. Defaults: H.264, 2 Mbps.
+  ///
+  /// **返回 / Returns**
+  /// 立即返回 [CompressionSession]。`await session.result` 得到 [VideoCompressResult]。
+  /// Returns a [CompressionSession] immediately. Await `session.result` for [VideoCompressResult].
+  ///
+  /// **抛出 / Throws**
+  /// - [ArgumentError]: 空路径、bitrate / fps / maxDimension / keyframeInterval 非法。
+  /// - [MediaCompressionException.cancelled]
+  /// - [MediaCompressionException.unsupported] / [hardwareUnavailable]
+  /// - [MediaCompressionException.decode] / [encode] / [mux] / [io] / [notFound]
+  ///
+  /// **平台 / Platforms**
+  /// 各端硬编管线见 README。本次 compress 的码率 / 缩放立即生效。不支持 Web。
+  /// See the README for per-platform pipelines. Bitrate / scale apply for this compress. No Web.
+  CompressionSession<VideoCompressResult> compress({
     required String inputPath,
     required String outputPath,
-    required VideoOptions options,
+    VideoCompressOptions options = const VideoCompressOptions(),
   }) {
-    return rust.rustCompressVideo(
+    return MediaCompressionPlatform.instance.compressVideo(
       inputPath: inputPath,
       outputPath: outputPath,
-      opts: options,
+      options: options,
     );
   }
 }

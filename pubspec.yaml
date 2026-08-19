@@ -1,6 +1,6 @@
 name: xue_hua_media_compression
-description: "Cross-platform Flutter FFI plugin for image and video compression powered by Rust."
-version: 1.4.0
+description: "Federated Flutter plugin for image and video compression using platform hardware encoders."
+version: 2.0.0
 homepage: https://github.com/Matkurban/xue_hua_media_compression
 repository: https://github.com/Matkurban/xue_hua_media_compression
 issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
@@ -10,44 +10,52 @@ topics:
   - compression
   - image
   - video
-  - ffi
   - plugin
+
+publish_to: none
 
 environment:
   sdk: ^3.12.2
-  flutter: '>=3.3.0'
+  flutter: '>=3.16.0'
+
+workspace:
+  - example
+  - xue_hua_media_compression_platform_interface
+  - xue_hua_media_compression_android
+  - xue_hua_media_compression_darwin
+  - xue_hua_media_compression_windows
+  - xue_hua_media_compression_linux
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_rust_bridge: 2.12.0
-  freezed_annotation: ^3.1.0
-  plugin_platform_interface: ^2.0.2
+  xue_hua_media_compression_platform_interface:
+    path: xue_hua_media_compression_platform_interface
+  xue_hua_media_compression_android:
+    path: xue_hua_media_compression_android
+  xue_hua_media_compression_darwin:
+    path: xue_hua_media_compression_darwin
+  xue_hua_media_compression_windows:
+    path: xue_hua_media_compression_windows
+  xue_hua_media_compression_linux:
+    path: xue_hua_media_compression_linux
 
 dev_dependencies:
-  ffi: ^2.1.3
-  ffigen: ^20.1.1
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  integration_test:
-    sdk: flutter
-  freezed: ^3.2.5
-  build_runner: ^2.15.0
-
+  plugin_platform_interface: ^2.1.8
 
 flutter:
   plugin:
     platforms:
       android:
-        ffiPlugin: true
-        package: com.flutter_rust_bridge.xue_hua_media_compression
-        pluginClass: XueHuaMediaCompressionPlugin
+        default_package: xue_hua_media_compression_android
       ios:
-        ffiPlugin: true
-      linux:
-        ffiPlugin: true
+        default_package: xue_hua_media_compression_darwin
       macos:
-        ffiPlugin: true
+        default_package: xue_hua_media_compression_darwin
       windows:
-        ffiPlugin: true
+        default_package: xue_hua_media_compression_windows
+      linux:
+        default_package: xue_hua_media_compression_linux

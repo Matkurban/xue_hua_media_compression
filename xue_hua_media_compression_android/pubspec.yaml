@@ -1,0 +1,28 @@
+name: xue_hua_media_compression_android
+description: Android implementation of xue_hua_media_compression.
+version: 2.0.0
+homepage: https://github.com/Matkurban/xue_hua_media_compression
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+  flutter: '>=3.16.0'
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  xue_hua_media_compression_platform_interface:
+    path: ../xue_hua_media_compression_platform_interface
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    implements: xue_hua_media_compression
+    platforms:
+      android:
+        package: com.xuehua.xue_hua_media_compression
+        pluginClass: XueHuaMediaCompressionPlugin

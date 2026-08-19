@@ -1,0 +1,11 @@
+export 'src/capabilities.dart';
+export 'src/compression_session.dart';
+export 'src/image_format.dart';
+export 'src/media_compression_exception.dart';
+export 'src/media_compression_platform.dart';
+export 'src/media_destination.dart';
+export 'src/media_source.dart';
+export 'src/method_channel_media_compression.dart';
+export 'src/options.dart';
+export 'src/results.dart';
+export 'src/video_codec.dart';

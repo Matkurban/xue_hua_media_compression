@@ -1,22 +1,23 @@
 PODS:
   - FlutterMacOS (1.0.0)
-  - xue_hua_media_compression (0.0.1):
+  - xue_hua_media_compression_darwin (2.0.0):
+    - Flutter
     - FlutterMacOS
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - xue_hua_media_compression (from `Flutter/ephemeral/.symlinks/plugins/xue_hua_media_compression/macos`)
+  - xue_hua_media_compression_darwin (from `Flutter/ephemeral/.symlinks/plugins/xue_hua_media_compression_darwin/darwin`)
 
 EXTERNAL SOURCES:
   FlutterMacOS:
     :path: Flutter/ephemeral
-  xue_hua_media_compression:
-    :path: Flutter/ephemeral/.symlinks/plugins/xue_hua_media_compression/macos
+  xue_hua_media_compression_darwin:
+    :path: Flutter/ephemeral/.symlinks/plugins/xue_hua_media_compression_darwin/darwin
 
 SPEC CHECKSUMS:
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  xue_hua_media_compression: f1f8cd142b63e47cb39c2f2b70cfb35e8b067f39
+  xue_hua_media_compression_darwin: 628356a083ce98e0bedddd9b5afe77692a80f462
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 
-COCOAPODS: 1.16.2
+COCOAPODS: 1.17.0
