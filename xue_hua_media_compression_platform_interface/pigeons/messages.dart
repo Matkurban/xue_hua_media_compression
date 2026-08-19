@@ -10,7 +10,7 @@ import 'package:pigeon/pigeon.dart';
       package: 'com.xuehua.xue_hua_media_compression',
     ),
     swiftOut:
-        '../xue_hua_media_compression_darwin/darwin/Classes/Messages.g.swift',
+        '../xue_hua_media_compression_darwin/darwin/xue_hua_media_compression_darwin/Sources/xue_hua_media_compression_darwin/Messages.g.swift',
     cppHeaderOut: '../xue_hua_media_compression_windows/windows/messages.g.h',
     cppSourceOut: '../xue_hua_media_compression_windows/windows/messages.g.cpp',
     cppOptions: CppOptions(namespace: 'xue_hua_media_compression'),

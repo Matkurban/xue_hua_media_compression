@@ -34,6 +34,71 @@ void main() {
     expect(result.width, greaterThan(0));
   });
 
+  test('video queryCapabilities reports VideoToolbox on Darwin', () async {
+    if (!(Platform.isIOS || Platform.isMacOS)) {
+      return;
+    }
+    final caps = await XueHuaMediaCompression.video.queryCapabilities();
+    expect(caps.encoderName, 'VideoToolbox');
+    expect(caps.codecs, contains(VideoCodec.h264));
+  });
+
+  test('video compress round-trip keeps storage size without audio', () async {
+    final data = await rootBundle.load('integration_test/fixtures/sample.mp4');
+    final tmp = Directory.systemTemp.createTempSync('xue_video_');
+    addTearDown(() {
+      if (tmp.existsSync()) {
+        tmp.deleteSync(recursive: true);
+      }
+    });
+    final input = File('${tmp.path}/in.mp4')
+      ..writeAsBytesSync(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+    final output = '${tmp.path}/out.mp4';
+    final session = XueHuaMediaCompression.video.compress(
+      inputPath: input.path,
+      outputPath: output,
+      options: const VideoCompressOptions(bitrate: 400000),
+    );
+    final result = await session.result;
+    await session.dispose();
+    expect(File(output).existsSync(), isTrue);
+    expect(result.sizeBytes, greaterThan(0));
+    expect(result.width, 64);
+    expect(result.height, 64);
+    if (Platform.isIOS || Platform.isMacOS) {
+      expect(result.encoderName, 'VideoToolbox');
+      expect(result.codec, VideoCodec.h264);
+    }
+  });
+
+  test('video compress maxDimension uses even display size', () async {
+    final data = await rootBundle.load('integration_test/fixtures/sample.mp4');
+    final tmp = Directory.systemTemp.createTempSync('xue_video_scale_');
+    addTearDown(() {
+      if (tmp.existsSync()) {
+        tmp.deleteSync(recursive: true);
+      }
+    });
+    final input = File('${tmp.path}/in.mp4')
+      ..writeAsBytesSync(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+    final output = '${tmp.path}/out.mp4';
+    final session = XueHuaMediaCompression.video.compress(
+      inputPath: input.path,
+      outputPath: output,
+      options: const VideoCompressOptions(bitrate: 400000, maxDimension: 32),
+    );
+    final result = await session.result;
+    await session.dispose();
+    expect(result.width, 32);
+    expect(result.height, 32);
+    expect(result.width.isEven, isTrue);
+    expect(result.height.isEven, isTrue);
+  });
+
   test(
     'video compress missing input surfaces MediaCompressionException',
     () async {

@@ -11,9 +11,9 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
 Object? _extractReplyValueOrThrow(
-  List<Object?>? replyList,
-  String channelName, {
-  required bool isNullValid,
+    List<Object?>? replyList,
+    String channelName, {
+    required bool isNullValid,
 }) {
   if (replyList == null) {
     throw PlatformException(
@@ -47,9 +47,8 @@ bool _deepEquals(Object? a, Object? b) {
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed.every(
-          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
-        );
+        a.indexed
+            .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
   }
   if (a is Map && b is Map) {
     if (a.length != b.length) {
@@ -98,11 +97,16 @@ int _deepHash(Object? value) {
   return value.hashCode;
 }
 
+
 /// 输入位置：0 = 内存字节，1 = 路径 / URI。
 ///
 /// Source kind: 0 = in-memory bytes, 1 = filesystem path / URI.
 class SourceMsg {
-  SourceMsg({required this.kind, this.bytes, this.path});
+  SourceMsg({
+    required this.kind,
+    this.bytes,
+    this.path,
+  });
 
   int kind;
 
@@ -111,12 +115,15 @@ class SourceMsg {
   String? path;
 
   List<Object?> _toList() {
-    return <Object?>[kind, bytes, path];
+    return <Object?>[
+      kind,
+      bytes,
+      path,
+    ];
   }
 
   Object encode() {
-    return _toList();
-  }
+    return _toList();  }
 
   static SourceMsg decode(Object result) {
     result as List<Object?>;
@@ -136,9 +143,7 @@ class SourceMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(kind, other.kind) &&
-        _deepEquals(bytes, other.bytes) &&
-        _deepEquals(path, other.path);
+    return _deepEquals(kind, other.kind) && _deepEquals(bytes, other.bytes) && _deepEquals(path, other.path);
   }
 
   @override
@@ -155,23 +160,31 @@ class SourceMsg {
 ///
 /// Destination kind: 0 = in-memory bytes, 1 = filesystem path.
 class DestinationMsg {
-  DestinationMsg({required this.kind, this.path});
+  DestinationMsg({
+    required this.kind,
+    this.path,
+  });
 
   int kind;
 
   String? path;
 
   List<Object?> _toList() {
-    return <Object?>[kind, path];
+    return <Object?>[
+      kind,
+      path,
+    ];
   }
 
   Object encode() {
-    return _toList();
-  }
+    return _toList();  }
 
   static DestinationMsg decode(Object result) {
     result as List<Object?>;
-    return DestinationMsg(kind: result[0]! as int, path: result[1] as String?);
+    return DestinationMsg(
+      kind: result[0]! as int,
+      path: result[1] as String?,
+    );
   }
 
   @override
@@ -210,12 +223,15 @@ class ImageOptionsMsg {
   int? maxDimension;
 
   List<Object?> _toList() {
-    return <Object?>[format, quality, maxDimension];
+    return <Object?>[
+      format,
+      quality,
+      maxDimension,
+    ];
   }
 
   Object encode() {
-    return _toList();
-  }
+    return _toList();  }
 
   static ImageOptionsMsg decode(Object result) {
     result as List<Object?>;
@@ -235,9 +251,7 @@ class ImageOptionsMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(format, other.format) &&
-        _deepEquals(quality, other.quality) &&
-        _deepEquals(maxDimension, other.maxDimension);
+    return _deepEquals(format, other.format) && _deepEquals(quality, other.quality) && _deepEquals(maxDimension, other.maxDimension);
   }
 
   @override
@@ -270,12 +284,17 @@ class VideoOptionsMsg {
   int? keyframeInterval;
 
   List<Object?> _toList() {
-    return <Object?>[codec, bitrate, fps, maxDimension, keyframeInterval];
+    return <Object?>[
+      codec,
+      bitrate,
+      fps,
+      maxDimension,
+      keyframeInterval,
+    ];
   }
 
   Object encode() {
-    return _toList();
-  }
+    return _toList();  }
 
   static VideoOptionsMsg decode(Object result) {
     result as List<Object?>;
@@ -297,11 +316,7 @@ class VideoOptionsMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(codec, other.codec) &&
-        _deepEquals(bitrate, other.bitrate) &&
-        _deepEquals(fps, other.fps) &&
-        _deepEquals(maxDimension, other.maxDimension) &&
-        _deepEquals(keyframeInterval, other.keyframeInterval);
+    return _deepEquals(codec, other.codec) && _deepEquals(bitrate, other.bitrate) && _deepEquals(fps, other.fps) && _deepEquals(maxDimension, other.maxDimension) && _deepEquals(keyframeInterval, other.keyframeInterval);
   }
 
   @override
@@ -325,12 +340,14 @@ class ImageCapabilitiesMsg {
   List<String> outputFormats;
 
   List<Object?> _toList() {
-    return <Object?>[inputFormats, outputFormats];
+    return <Object?>[
+      inputFormats,
+      outputFormats,
+    ];
   }
 
   Object encode() {
-    return _toList();
-  }
+    return _toList();  }
 
   static ImageCapabilitiesMsg decode(Object result) {
     result as List<Object?>;
@@ -349,8 +366,7 @@ class ImageCapabilitiesMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(inputFormats, other.inputFormats) &&
-        _deepEquals(outputFormats, other.outputFormats);
+    return _deepEquals(inputFormats, other.inputFormats) && _deepEquals(outputFormats, other.outputFormats);
   }
 
   @override
@@ -377,12 +393,15 @@ class VideoCapabilitiesMsg {
   bool acceptsContentUri;
 
   List<Object?> _toList() {
-    return <Object?>[encoderName, codecs, acceptsContentUri];
+    return <Object?>[
+      encoderName,
+      codecs,
+      acceptsContentUri,
+    ];
   }
 
   Object encode() {
-    return _toList();
-  }
+    return _toList();  }
 
   static VideoCapabilitiesMsg decode(Object result) {
     result as List<Object?>;
@@ -402,9 +421,7 @@ class VideoCapabilitiesMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(encoderName, other.encoderName) &&
-        _deepEquals(codecs, other.codecs) &&
-        _deepEquals(acceptsContentUri, other.acceptsContentUri);
+    return _deepEquals(encoderName, other.encoderName) && _deepEquals(codecs, other.codecs) && _deepEquals(acceptsContentUri, other.acceptsContentUri);
   }
 
   @override
@@ -417,6 +434,7 @@ class VideoCapabilitiesMsg {
   }
 }
 
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -424,22 +442,22 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    } else if (value is SourceMsg) {
+    }    else if (value is SourceMsg) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
-    } else if (value is DestinationMsg) {
+    }    else if (value is DestinationMsg) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    } else if (value is ImageOptionsMsg) {
+    }    else if (value is ImageOptionsMsg) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    } else if (value is VideoOptionsMsg) {
+    }    else if (value is VideoOptionsMsg) {
       buffer.putUint8(132);
       writeValue(buffer, value.encode());
-    } else if (value is ImageCapabilitiesMsg) {
+    }    else if (value is ImageCapabilitiesMsg) {
       buffer.putUint8(133);
       writeValue(buffer, value.encode());
-    } else if (value is VideoCapabilitiesMsg) {
+    }    else if (value is VideoCapabilitiesMsg) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
     } else {
@@ -472,13 +490,9 @@ class MediaCompressionHostApi {
   /// Constructor for [MediaCompressionHostApi]. The [binaryMessenger] named argument is
   /// available for dependency injection. If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  MediaCompressionHostApi({
-    BinaryMessenger? binaryMessenger,
-    String messageChannelSuffix = '',
-  }) : pigeonVar_binaryMessenger = binaryMessenger,
-       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
-           ? '.$messageChannelSuffix'
-           : '';
+  MediaCompressionHostApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+      : pigeonVar_binaryMessenger = binaryMessenger,
+        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -486,8 +500,7 @@ class MediaCompressionHostApi {
   final String pigeonVar_messageChannelSuffix;
 
   Future<int> createJob() async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.createJob$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.createJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -497,16 +510,16 @@ class MediaCompressionHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: false,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
     return pigeonVar_replyValue! as int;
   }
 
   Future<ImageCapabilitiesMsg> queryImageCapabilities() async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.queryImageCapabilities$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.queryImageCapabilities$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -516,41 +529,34 @@ class MediaCompressionHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: false,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
     return pigeonVar_replyValue! as ImageCapabilitiesMsg;
   }
 
-  Future<void> startImageCompress(
-    int id,
-    SourceMsg source,
-    DestinationMsg destination,
-    ImageOptionsMsg options,
-  ) async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.startImageCompress$pigeonVar_messageChannelSuffix';
+  Future<void> startImageCompress(int id, SourceMsg source, DestinationMsg destination, ImageOptionsMsg options) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.startImageCompress$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[id, source, destination, options],
-    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[id, source, destination, options]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: true,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
   }
 
   Future<VideoCapabilitiesMsg> queryVideoCapabilities() async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.queryVideoCapabilities$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.queryVideoCapabilities$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -560,75 +566,65 @@ class MediaCompressionHostApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: false,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
     return pigeonVar_replyValue! as VideoCapabilitiesMsg;
   }
 
-  Future<void> startVideoCompress(
-    int id,
-    String inputPath,
-    String outputPath,
-    VideoOptionsMsg options,
-  ) async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.startVideoCompress$pigeonVar_messageChannelSuffix';
+  Future<void> startVideoCompress(int id, String inputPath, String outputPath, VideoOptionsMsg options) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.startVideoCompress$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[id, inputPath, outputPath, options],
-    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[id, inputPath, outputPath, options]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: true,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
   }
 
   Future<void> cancelJob(int id) async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.cancelJob$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.cancelJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[id],
-    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[id]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: true,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
   }
 
   Future<void> disposeJob(int id) async {
-    final pigeonVar_channelName =
-        'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.disposeJob$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName = 'dev.flutter.pigeon.xue_hua_media_compression_platform_interface.MediaCompressionHostApi.disposeJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[id],
-    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[id]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-      pigeonVar_replyList,
-      pigeonVar_channelName,
-      isNullValid: true,
-    );
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
   }
 }
