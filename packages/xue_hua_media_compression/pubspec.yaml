@@ -12,7 +12,6 @@ topics:
   - video
   - plugin
 
-publish_to: none
 resolution: workspace
 
 environment:
