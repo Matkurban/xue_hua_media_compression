@@ -4,9 +4,11 @@ import CoreVideo
 import Foundation
 import VideoToolbox
 
-/// VideoToolbox NV12 pipeline via AVAssetReader / AVAssetWriter. Audio is dropped.
+/// VideoToolbox NV12 pipeline via AVAssetReader / AVAssetWriter.
+/// Audio is kept (AAC passthrough or transcode) unless `keepAudio` is false.
 ///
-/// VideoToolbox NV12 管线（AVAssetReader / AVAssetWriter），不保留音轨。
+/// VideoToolbox NV12 管线（AVAssetReader / AVAssetWriter）。
+/// 默认保留音轨（AAC 透传或转码），`keepAudio` 为 false 时丢弃。
 final class VideoCompressor {
   private static let encoderName = "VideoToolbox"
   private static let nv12Formats: [OSType] = [
@@ -19,7 +21,20 @@ final class VideoCompressor {
   private let outputURL: URL
   private let encodeQueue = DispatchQueue(
     label: "com.xuehua.media_compression.video", qos: .userInitiated)
-  private var cancelled = false
+  private let stateLock = NSLock()
+  private var _cancelled = false
+  private var cancelled: Bool {
+    get {
+      stateLock.lock()
+      defer { stateLock.unlock() }
+      return _cancelled
+    }
+    set {
+      stateLock.lock()
+      defer { stateLock.unlock() }
+      _cancelled = newValue
+    }
+  }
   private var reader: AVAssetReader?
   private var writer: AVAssetWriter?
 
@@ -91,7 +106,7 @@ final class VideoCompressor {
       throw PigeonError(code: "decode", message: "No video track", details: nil)
     }
     let codec = try resolveCodec()
-    let compose = needsComposition
+    let compose = needsComposition(for: videoTrack)
     let outSize = outputSize(for: videoTrack, compose: compose)
     let reader = try AVAssetReader(asset: asset)
     let readerOutput = try attachReaderOutput(
@@ -106,6 +121,11 @@ final class VideoCompressor {
       throw PigeonError(code: "encode", message: "Cannot attach writer input", details: nil)
     }
     writer.add(writerInput)
+
+    var audio: (output: AVAssetReaderOutput, input: AVAssetWriterInput)?
+    if options.keepAudio, let audioTrack = asset.tracks(withMediaType: .audio).first {
+      audio = try attachAudio(reader: reader, writer: writer, track: audioTrack)
+    }
 
     guard reader.startReading() else {
       throw PigeonError(
@@ -125,15 +145,90 @@ final class VideoCompressor {
     pump(
       reader: reader,
       writer: writer,
-      readerOutput: readerOutput,
-      writerInput: writerInput,
+      videoOutput: readerOutput,
+      videoInput: writerInput,
+      audioOutput: audio?.output,
+      audioInput: audio?.input,
       duration: CMTimeGetSeconds(asset.duration),
       width: outSize.width,
       height: outSize.height)
   }
 
-  private var needsComposition: Bool {
-    (options.maxDimension ?? 0) > 0 || (options.fps ?? 0) > 0
+  /// 仅在确实需要缩小尺寸或降帧率时才走 VideoComposition 重绘路径，
+  /// 否则用轻量 TrackOutput 透传像素，节省 GPU/CPU。
+  ///
+  /// Only use the VideoComposition re-render path when an actual downscale
+  /// or frame-rate reduction is required; otherwise the lightweight
+  /// TrackOutput path is enough.
+  private func needsComposition(for track: AVAssetTrack) -> Bool {
+    if let maxDimension = options.maxDimension, maxDimension > 0 {
+      let display = Self.displaySize(of: track)
+      if max(display.width, display.height) > CGFloat(maxDimension) {
+        return true
+      }
+    }
+    if let fps = options.fps, fps > 0 {
+      let sourceRate = track.nominalFrameRate
+      if sourceRate <= 0 || Float(fps) < sourceRate {
+        return true
+      }
+    }
+    return false
+  }
+
+  /// 源音轨已是 AAC 时直接透传，否则解码为 PCM 再编码为 AAC。
+  ///
+  /// Passes AAC audio through untouched; otherwise decodes to PCM and
+  /// re-encodes to AAC.
+  private func attachAudio(
+    reader: AVAssetReader,
+    writer: AVAssetWriter,
+    track: AVAssetTrack
+  ) throws -> (output: AVAssetReaderOutput, input: AVAssetWriterInput) {
+    let formats = (track.formatDescriptions as? [CMFormatDescription]) ?? []
+    let isAAC = formats.contains {
+      CMFormatDescriptionGetMediaSubType($0) == kAudioFormatMPEG4AAC
+    }
+
+    let output: AVAssetReaderTrackOutput
+    let input: AVAssetWriterInput
+    if isAAC {
+      output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+      input = AVAssetWriterInput(
+        mediaType: .audio, outputSettings: nil, sourceFormatHint: formats.first)
+    } else {
+      output = AVAssetReaderTrackOutput(
+        track: track,
+        outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM])
+      var channels = 2
+      var sampleRate = 44_100.0
+      if let format = formats.first,
+        let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee
+      {
+        if asbd.mChannelsPerFrame > 0 {
+          channels = min(2, Int(asbd.mChannelsPerFrame))
+        }
+        if asbd.mSampleRate > 0 {
+          sampleRate = min(48_000, max(8_000, asbd.mSampleRate))
+        }
+      }
+      input = AVAssetWriterInput(
+        mediaType: .audio,
+        outputSettings: [
+          AVFormatIDKey: kAudioFormatMPEG4AAC,
+          AVNumberOfChannelsKey: channels,
+          AVSampleRateKey: sampleRate,
+          AVEncoderBitRateKey: 128_000,
+        ])
+    }
+    output.alwaysCopiesSampleData = false
+    input.expectsMediaDataInRealTime = false
+    guard reader.canAdd(output), writer.canAdd(input) else {
+      throw PigeonError(code: "encode", message: "Cannot attach audio track", details: nil)
+    }
+    reader.add(output)
+    writer.add(input)
+    return (output, input)
   }
 
   private func resolveCodec() throws -> AVVideoCodecType {
@@ -259,58 +354,87 @@ final class VideoCompressor {
   private func pump(
     reader: AVAssetReader,
     writer: AVAssetWriter,
-    readerOutput: AVAssetReaderOutput,
-    writerInput: AVAssetWriterInput,
+    videoOutput: AVAssetReaderOutput,
+    videoInput: AVAssetWriterInput,
+    audioOutput: AVAssetReaderOutput?,
+    audioInput: AVAssetWriterInput?,
     duration: Double,
     width: Int,
     height: Int
   ) {
-    writerInput.requestMediaDataWhenReady(on: encodeQueue) { [weak self] in
-      guard let self else { return }
-      while writerInput.isReadyForMoreMediaData {
-        let keepGoing: Bool = autoreleasepool {
-          if self.cancelled {
-            writerInput.markAsFinished()
-            writer.cancelWriting()
-            reader.cancelReading()
-            self.events.sendError(code: "cancelled", message: "Cancelled")
-            return false
-          }
-          guard reader.status == .reading, let sample = readerOutput.copyNextSampleBuffer() else {
-            writerInput.markAsFinished()
-            if reader.status == .failed {
-              writer.cancelWriting()
-              self.events.sendError(
-                code: "decode",
-                message: reader.error?.localizedDescription ?? "AVAssetReader failed",
-                details: reader.error.map { "\($0)" })
-              return false
-            }
-            writer.finishWriting {
-              self.finish(writer: writer, width: width, height: height)
-            }
-            return false
-          }
-          let pts = CMSampleBufferGetPresentationTimeStamp(sample)
-          if duration > 0 {
-            self.events.sendProgress(min(1, CMTimeGetSeconds(pts) / duration))
-          }
-          if !writerInput.append(sample) {
-            writerInput.markAsFinished()
-            writer.cancelWriting()
-            reader.cancelReading()
-            self.events.sendError(
-              code: "encode",
-              message: writer.error?.localizedDescription ?? "append failed",
-              details: writer.error.map { "\($0)" })
-            return false
-          }
-          return true
-        }
-        if !keepGoing {
-          return
+    // Both request callbacks run on the serial encodeQueue, so the shared
+    // completion counter and failure flag need no extra synchronization.
+    var remainingTracks = 1 + (audioInput != nil ? 1 : 0)
+    var failed = false
+
+    func fail(code: String, message: String, details: String?) {
+      if failed { return }
+      failed = true
+      videoInput.markAsFinished()
+      audioInput?.markAsFinished()
+      writer.cancelWriting()
+      reader.cancelReading()
+      self.events.sendError(code: code, message: message, details: details)
+    }
+
+    func finishTrack(_ input: AVAssetWriterInput) {
+      input.markAsFinished()
+      remainingTracks -= 1
+      if remainingTracks == 0 && !failed {
+        writer.finishWriting {
+          self.finish(writer: writer, width: width, height: height)
         }
       }
+    }
+
+    func pumpTrack(
+      output: AVAssetReaderOutput,
+      input: AVAssetWriterInput,
+      reportsProgress: Bool
+    ) {
+      input.requestMediaDataWhenReady(on: encodeQueue) { [weak self] in
+        guard let self else { return }
+        while input.isReadyForMoreMediaData {
+          let keepGoing: Bool = autoreleasepool {
+            if failed { return false }
+            if self.cancelled {
+              fail(code: "cancelled", message: "Cancelled", details: nil)
+              return false
+            }
+            guard reader.status == .reading, let sample = output.copyNextSampleBuffer() else {
+              if reader.status == .failed {
+                fail(
+                  code: "decode",
+                  message: reader.error?.localizedDescription ?? "AVAssetReader failed",
+                  details: reader.error.map { "\($0)" })
+                return false
+              }
+              finishTrack(input)
+              return false
+            }
+            if reportsProgress && duration > 0 {
+              let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+              self.events.sendProgress(min(1, CMTimeGetSeconds(pts) / duration))
+            }
+            if !input.append(sample) {
+              fail(
+                code: "encode",
+                message: writer.error?.localizedDescription ?? "append failed",
+                details: writer.error.map { "\($0)" })
+              return false
+            }
+            return true
+          }
+          if !keepGoing {
+            return
+          }
+        }
+      }
+    }
+
+    pumpTrack(output: videoOutput, input: videoInput, reportsProgress: true)
+    if let audioOutput, let audioInput {
+      pumpTrack(output: audioOutput, input: audioInput, reportsProgress: false)
     }
   }
 

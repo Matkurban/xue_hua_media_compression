@@ -4,10 +4,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
+import android.graphics.Matrix
 import android.media.MediaCodecList
+import android.net.Uri
 import android.os.Build
 import android.util.Size
+import androidx.exifinterface.media.ExifInterface
 import androidx.heifwriter.HeifWriter
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -45,9 +49,13 @@ internal object ImageCompressor {
     val bitmap = decode(context, source, options.maxDimension?.toInt())
     try {
       val quality = options.quality.toInt().coerceIn(1, 100)
+      val keepMetadata = options.keepMetadata && metadataWritable(format)
       return when (destination.kind) {
         0L -> {
-          val bytes = encodeToBytes(bitmap, format, quality)
+          var bytes = encodeToBytes(bitmap, format, quality)
+          if (keepMetadata) {
+            bytes = withMetadata(context, source, bytes, format)
+          }
           mapOf(
               "bytes" to bytes,
               "sizeBytes" to bytes.size.toLong(),
@@ -61,6 +69,13 @@ internal object ImageCompressor {
               destination.path
                   ?: throw FlutterError("io", "Missing destination path", null)
           writeFile(bitmap, format, quality, path)
+          if (keepMetadata) {
+            try {
+              copyMetadata(context, source, path)
+            } catch (_: Exception) {
+              // Metadata copy is best-effort; the compressed pixels stand.
+            }
+          }
           val size = File(path).length()
           mapOf(
               "outputPath" to path,
@@ -190,7 +205,66 @@ internal object ImageCompressor {
             }
           }
         } ?: throw FlutterError("decode", "BitmapFactory returned null", null)
-    return scaleIfNeeded(bitmap, maxDimension)
+    // BitmapFactory ignores EXIF orientation (unlike ImageDecoder on 28+),
+    // so bake it here after downscaling to work on the smaller bitmap.
+    return applyExifOrientation(context, source, scaleIfNeeded(bitmap, maxDimension))
+  }
+
+  private fun applyExifOrientation(
+      context: Context,
+      source: SourceMsg,
+      bitmap: Bitmap,
+  ): Bitmap {
+    val orientation =
+        try {
+          openExif(context, source)
+              ?.getAttributeInt(
+                  ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        } catch (_: Exception) {
+          null
+        } ?: return bitmap
+    val matrix = Matrix()
+    when (orientation) {
+      ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+      ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+      ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+      ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+      ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+      ExifInterface.ORIENTATION_TRANSPOSE -> {
+        matrix.postRotate(90f)
+        matrix.postScale(-1f, 1f)
+      }
+      ExifInterface.ORIENTATION_TRANSVERSE -> {
+        matrix.postRotate(270f)
+        matrix.postScale(-1f, 1f)
+      }
+      else -> return bitmap
+    }
+    val rotated =
+        try {
+          Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } catch (_: OutOfMemoryError) {
+          return bitmap
+        }
+    if (rotated !== bitmap) {
+      bitmap.recycle()
+    }
+    return rotated
+  }
+
+  private fun openExif(context: Context, source: SourceMsg): ExifInterface? {
+    return when (source.kind) {
+      0L -> source.bytes?.let { ExifInterface(ByteArrayInputStream(it)) }
+      1L -> {
+        val path = source.path ?: return null
+        if (path.startsWith("content://")) {
+          context.contentResolver.openInputStream(Uri.parse(path))?.use { ExifInterface(it) }
+        } else {
+          ExifInterface(path)
+        }
+      }
+      else -> null
+    }
   }
 
   private fun scaleIfNeeded(bitmap: Bitmap, maxDimension: Int?): Bitmap {
@@ -282,6 +356,86 @@ internal object ImageCompressor {
 
   private fun qualityFor(format: String, quality: Int): Int {
     return if (format == "png") 100 else quality
+  }
+
+  // ExifInterface 仅支持对 JPEG/PNG/WebP 写元数据；HEIC 只读。
+  private fun metadataWritable(format: String): Boolean {
+    return format == "jpeg" || format == "png" || format == "webp"
+  }
+
+  private val exifTagsToCopy =
+      arrayOf(
+          ExifInterface.TAG_APERTURE_VALUE,
+          ExifInterface.TAG_BRIGHTNESS_VALUE,
+          ExifInterface.TAG_DATETIME,
+          ExifInterface.TAG_DATETIME_DIGITIZED,
+          ExifInterface.TAG_DATETIME_ORIGINAL,
+          ExifInterface.TAG_EXPOSURE_BIAS_VALUE,
+          ExifInterface.TAG_EXPOSURE_TIME,
+          ExifInterface.TAG_FLASH,
+          ExifInterface.TAG_F_NUMBER,
+          ExifInterface.TAG_FOCAL_LENGTH,
+          ExifInterface.TAG_GPS_ALTITUDE,
+          ExifInterface.TAG_GPS_ALTITUDE_REF,
+          ExifInterface.TAG_GPS_DATESTAMP,
+          ExifInterface.TAG_GPS_LATITUDE,
+          ExifInterface.TAG_GPS_LATITUDE_REF,
+          ExifInterface.TAG_GPS_LONGITUDE,
+          ExifInterface.TAG_GPS_LONGITUDE_REF,
+          ExifInterface.TAG_GPS_PROCESSING_METHOD,
+          ExifInterface.TAG_GPS_TIMESTAMP,
+          ExifInterface.TAG_IMAGE_DESCRIPTION,
+          ExifInterface.TAG_LENS_MAKE,
+          ExifInterface.TAG_LENS_MODEL,
+          ExifInterface.TAG_MAKE,
+          ExifInterface.TAG_METERING_MODE,
+          ExifInterface.TAG_MODEL,
+          ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+          ExifInterface.TAG_SCENE_TYPE,
+          ExifInterface.TAG_SHUTTER_SPEED_VALUE,
+          ExifInterface.TAG_SOFTWARE,
+          ExifInterface.TAG_SUBJECT_DISTANCE,
+          ExifInterface.TAG_USER_COMMENT,
+          ExifInterface.TAG_WHITE_BALANCE,
+      )
+
+  // 将源图 EXIF 拷贝到已编码文件；方向已烘焙进像素，因此写回 NORMAL。
+  //
+  // Copies source EXIF onto the encoded file; orientation is baked into
+  // the pixels, so NORMAL is written back.
+  private fun copyMetadata(context: Context, source: SourceMsg, destPath: String) {
+    val srcExif = openExif(context, source) ?: return
+    val destExif = ExifInterface(destPath)
+    for (tag in exifTagsToCopy) {
+      srcExif.getAttribute(tag)?.let { destExif.setAttribute(tag, it) }
+    }
+    destExif.setAttribute(
+        ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+    destExif.saveAttributes()
+  }
+
+  private fun withMetadata(
+      context: Context,
+      source: SourceMsg,
+      encoded: ByteArray,
+      format: String,
+  ): ByteArray {
+    val suffix =
+        when (format) {
+          "png" -> ".png"
+          "webp" -> ".webp"
+          else -> ".jpg"
+        }
+    val tmp = File.createTempFile("xh_meta_", suffix)
+    return try {
+      tmp.writeBytes(encoded)
+      copyMetadata(context, source, tmp.absolutePath)
+      tmp.readBytes()
+    } catch (_: Exception) {
+      encoded
+    } finally {
+      tmp.delete()
+    }
   }
 
   fun hasHardwareVideoEncoder(mime: String): Boolean {

@@ -178,12 +178,13 @@ G_DECLARE_FINAL_TYPE(XhMcImageOptionsMsg, xh_mc_image_options_msg, XH_MC, IMAGE_
  * format: field in this object.
  * quality: field in this object.
  * max_dimension: field in this object.
+ * keep_metadata: field in this object.
  *
  * Creates a new #ImageOptionsMsg object.
  *
  * Returns: a new #XhMcImageOptionsMsg
  */
-XhMcImageOptionsMsg* xh_mc_image_options_msg_new(const gchar* format, int64_t quality, int64_t* max_dimension);
+XhMcImageOptionsMsg* xh_mc_image_options_msg_new(const gchar* format, int64_t quality, int64_t* max_dimension, gboolean keep_metadata);
 
 /**
  * xh_mc_image_options_msg_get_format
@@ -214,6 +215,16 @@ int64_t xh_mc_image_options_msg_get_quality(XhMcImageOptionsMsg* object);
  * Returns: the field value.
  */
 int64_t* xh_mc_image_options_msg_get_max_dimension(XhMcImageOptionsMsg* object);
+
+/**
+ * xh_mc_image_options_msg_get_keep_metadata
+ * @object: a #XhMcImageOptionsMsg.
+ *
+ * Gets the value of the keepMetadata field of @object.
+ *
+ * Returns: the field value.
+ */
+gboolean xh_mc_image_options_msg_get_keep_metadata(XhMcImageOptionsMsg* object);
 
 /**
  * xh_mc_image_options_msg_equals:
@@ -260,12 +271,13 @@ G_DECLARE_FINAL_TYPE(XhMcVideoOptionsMsg, xh_mc_video_options_msg, XH_MC, VIDEO_
  * fps: field in this object.
  * max_dimension: field in this object.
  * keyframe_interval: field in this object.
+ * keep_audio: field in this object.
  *
  * Creates a new #VideoOptionsMsg object.
  *
  * Returns: a new #XhMcVideoOptionsMsg
  */
-XhMcVideoOptionsMsg* xh_mc_video_options_msg_new(const gchar* codec, int64_t bitrate, int64_t* fps, int64_t* max_dimension, int64_t* keyframe_interval);
+XhMcVideoOptionsMsg* xh_mc_video_options_msg_new(const gchar* codec, int64_t bitrate, int64_t* fps, int64_t* max_dimension, int64_t* keyframe_interval, gboolean keep_audio);
 
 /**
  * xh_mc_video_options_msg_get_codec
@@ -316,6 +328,16 @@ int64_t* xh_mc_video_options_msg_get_max_dimension(XhMcVideoOptionsMsg* object);
  * Returns: the field value.
  */
 int64_t* xh_mc_video_options_msg_get_keyframe_interval(XhMcVideoOptionsMsg* object);
+
+/**
+ * xh_mc_video_options_msg_get_keep_audio
+ * @object: a #XhMcVideoOptionsMsg.
+ *
+ * Gets the value of the keepAudio field of @object.
+ *
+ * Returns: the field value.
+ */
+gboolean xh_mc_video_options_msg_get_keep_audio(XhMcVideoOptionsMsg* object);
 
 /**
  * xh_mc_video_options_msg_equals:

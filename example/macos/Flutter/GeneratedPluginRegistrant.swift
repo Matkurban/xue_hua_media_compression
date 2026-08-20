@@ -5,10 +5,10 @@
 import FlutterMacOS
 import Foundation
 
-import file_selector_macos
+import xue_hua_file_operations
 import xue_hua_media_compression_darwin
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  FileSelectorPlugin.register(with: registry.registrar(forPlugin: "FileSelectorPlugin"))
+  XueHuaFileOperationsPlugin.register(with: registry.registrar(forPlugin: "XueHuaFileOperationsPlugin"))
   XueHuaMediaCompressionPlugin.register(with: registry.registrar(forPlugin: "XueHuaMediaCompressionPlugin"))
 }

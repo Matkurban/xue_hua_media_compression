@@ -60,4 +60,5 @@ dependencies {
     implementation("androidx.media3:media3-effect:$media3")
     implementation("androidx.media3:media3-common:$media3")
     implementation("androidx.heifwriter:heifwriter:1.1.0")
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 }

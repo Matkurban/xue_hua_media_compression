@@ -147,13 +147,15 @@ class ImageOptionsMsg {
   // Constructs an object setting all non-nullable fields.
   explicit ImageOptionsMsg(
     const std::string& format,
-    int64_t quality);
+    int64_t quality,
+    bool keep_metadata);
 
   // Constructs an object setting all fields.
   explicit ImageOptionsMsg(
     const std::string& format,
     int64_t quality,
-    const int64_t* max_dimension);
+    const int64_t* max_dimension,
+    bool keep_metadata);
 
   const std::string& format() const;
   void set_format(std::string_view value_arg);
@@ -164,6 +166,9 @@ class ImageOptionsMsg {
   const int64_t* max_dimension() const;
   void set_max_dimension(const int64_t* value_arg);
   void set_max_dimension(int64_t value_arg);
+
+  bool keep_metadata() const;
+  void set_keep_metadata(bool value_arg);
 
   bool operator==(const ImageOptionsMsg& other) const;
   bool operator!=(const ImageOptionsMsg& other) const;
@@ -179,6 +184,7 @@ class ImageOptionsMsg {
   std::string format_;
   int64_t quality_;
   std::optional<int64_t> max_dimension_;
+  bool keep_metadata_;
 };
 
 
@@ -188,7 +194,8 @@ class VideoOptionsMsg {
   // Constructs an object setting all non-nullable fields.
   explicit VideoOptionsMsg(
     const std::string& codec,
-    int64_t bitrate);
+    int64_t bitrate,
+    bool keep_audio);
 
   // Constructs an object setting all fields.
   explicit VideoOptionsMsg(
@@ -196,7 +203,8 @@ class VideoOptionsMsg {
     int64_t bitrate,
     const int64_t* fps,
     const int64_t* max_dimension,
-    const int64_t* keyframe_interval);
+    const int64_t* keyframe_interval,
+    bool keep_audio);
 
   const std::string& codec() const;
   void set_codec(std::string_view value_arg);
@@ -216,6 +224,9 @@ class VideoOptionsMsg {
   void set_keyframe_interval(const int64_t* value_arg);
   void set_keyframe_interval(int64_t value_arg);
 
+  bool keep_audio() const;
+  void set_keep_audio(bool value_arg);
+
   bool operator==(const VideoOptionsMsg& other) const;
   bool operator!=(const VideoOptionsMsg& other) const;
   /// Returns a hash code value for the object. This method is supported for the benefit of hash tables.
@@ -232,6 +243,7 @@ class VideoOptionsMsg {
   std::optional<int64_t> fps_;
   std::optional<int64_t> max_dimension_;
   std::optional<int64_t> keyframe_interval_;
+  bool keep_audio_;
 };
 
 

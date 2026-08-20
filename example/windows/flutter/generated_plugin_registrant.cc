@@ -6,12 +6,12 @@
 
 #include "generated_plugin_registrant.h"
 
-#include <file_selector_windows/file_selector_windows.h>
+#include <xue_hua_file_operations/xue_hua_file_operations_plugin_c_api.h>
 #include <xue_hua_media_compression_windows/xue_hua_media_compression_windows_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
-  FileSelectorWindowsRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("FileSelectorWindows"));
+  XueHuaFileOperationsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("XueHuaFileOperationsPluginCApi"));
   XueHuaMediaCompressionWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("XueHuaMediaCompressionWindowsPlugin"));
 }

@@ -59,8 +59,10 @@ final class XueHuaImageCompression {
   ///   In-memory bytes, or a filesystem path / Android `content://` URI.
   /// - [destination]: `bytes()` 返回内存；`path()` 写文件并创建缺失的父目录。
   ///   `bytes()` returns memory; `path()` writes a file (parent dirs created).
-  /// - [options]: 输出格式、质量 1–100、可选最大边长。默认 JPEG / quality 80 / 不缩放。
-  ///   Output format, quality 1–100, optional max edge. Defaults: JPEG, 80, no scale.
+  /// - [options]: 输出格式、质量 1–100、可选最大边长、可选保留 EXIF 元数据。
+  ///   默认 JPEG / quality 80 / 不缩放 / 不保留元数据。
+  ///   Output format, quality 1–100, optional max edge, optional EXIF
+  ///   preservation. Defaults: JPEG, 80, no scale, metadata stripped.
   ///
   /// **返回 / Returns**
   /// 立即返回 [CompressionSession]。`await session.result` 得到 [ImageCompressResult]；
@@ -89,9 +91,12 @@ final class XueHuaImageCompression {
   }
 }
 
-/// 视频压缩 API。输出始终为 MP4，不保留音轨。
+/// 视频压缩 API。输出始终为 MP4；默认保留音轨（AAC 透传或转码），
+/// 可通过 [VideoCompressOptions.keepAudio] 关闭。
 ///
-/// Video compression API. Output is always MP4 without an audio track.
+/// Video compression API. Output is always MP4; the audio track is kept by
+/// default (AAC passthrough or transcode) and can be disabled via
+/// [VideoCompressOptions.keepAudio].
 final class XueHuaVideoCompression {
   /// 由 [XueHuaMediaCompression.video] 使用。
   ///
@@ -117,9 +122,10 @@ final class XueHuaVideoCompression {
     return MediaCompressionPlatform.instance.queryVideoCapabilities();
   }
 
-  /// 压缩一段视频为 MP4（无音轨）。
+  /// 压缩一段视频为 MP4（默认保留音轨，可用 keepAudio 关闭）。
   ///
-  /// Compresses a video to MP4 (no audio track).
+  /// Compresses a video to MP4 (audio kept by default, disable with
+  /// keepAudio).
   ///
   /// **接收 / Receives**
   /// 从 [inputPath] 读取源视频，按 [options] 硬编后写入 [outputPath]。
@@ -130,8 +136,10 @@ final class XueHuaVideoCompression {
   ///   A readable local path, or Android `content://`. `file://` is normalized in Dart.
   /// - [outputPath]: 目标 `.mp4` 路径。父目录由原生创建。
   ///   Destination `.mp4` path. Native code creates parent directories.
-  /// - [options]: 编码、码率、可选帧率 / 最大边长 / GOP。默认 H.264 / 2 Mbps。
-  ///   Codec, bitrate, optional fps / max edge / GOP. Defaults: H.264, 2 Mbps.
+  /// - [options]: 编码、码率、可选帧率 / 最大边长 / GOP / 音轨保留。
+  ///   默认 H.264 / 2 Mbps / 保留音轨。
+  ///   Codec, bitrate, optional fps / max edge / GOP / audio retention.
+  ///   Defaults: H.264, 2 Mbps, audio kept.
   ///
   /// **返回 / Returns**
   /// 立即返回 [CompressionSession]。`await session.result` 得到 [VideoCompressResult]。

@@ -283,6 +283,7 @@ struct ImageOptionsMsg: Hashable, CustomStringConvertible {
   var format: String
   var quality: Int64
   var maxDimension: Int64? = nil
+  var keepMetadata: Bool
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -290,11 +291,13 @@ struct ImageOptionsMsg: Hashable, CustomStringConvertible {
     let format = pigeonVar_list[0] as! String
     let quality = pigeonVar_list[1] as! Int64
     let maxDimension: Int64? = nilOrValue(pigeonVar_list[2])
+    let keepMetadata = pigeonVar_list[3] as! Bool
 
     return ImageOptionsMsg(
       format: format,
       quality: quality,
-      maxDimension: maxDimension
+      maxDimension: maxDimension,
+      keepMetadata: keepMetadata
     )
   }
   func toList() -> [Any?] {
@@ -302,13 +305,14 @@ struct ImageOptionsMsg: Hashable, CustomStringConvertible {
       format,
       quality,
       maxDimension,
+      keepMetadata,
     ]
   }
   static func == (lhs: ImageOptionsMsg, rhs: ImageOptionsMsg) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.format, rhs.format) && MessagesPigeonInternal.deepEquals(lhs.quality, rhs.quality) && MessagesPigeonInternal.deepEquals(lhs.maxDimension, rhs.maxDimension)
+    return MessagesPigeonInternal.deepEquals(lhs.format, rhs.format) && MessagesPigeonInternal.deepEquals(lhs.quality, rhs.quality) && MessagesPigeonInternal.deepEquals(lhs.maxDimension, rhs.maxDimension) && MessagesPigeonInternal.deepEquals(lhs.keepMetadata, rhs.keepMetadata)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -316,10 +320,11 @@ struct ImageOptionsMsg: Hashable, CustomStringConvertible {
     MessagesPigeonInternal.deepHash(value: format, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: quality, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: maxDimension, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: keepMetadata, hasher: &hasher)
   }
 
   public var description: String {
-    return "ImageOptionsMsg(format: \(String(describing: format)), quality: \(String(describing: quality)), maxDimension: \(String(describing: maxDimension)))"
+    return "ImageOptionsMsg(format: \(String(describing: format)), quality: \(String(describing: quality)), maxDimension: \(String(describing: maxDimension)), keepMetadata: \(String(describing: keepMetadata)))"
   }
 }
 
@@ -330,6 +335,7 @@ struct VideoOptionsMsg: Hashable, CustomStringConvertible {
   var fps: Int64? = nil
   var maxDimension: Int64? = nil
   var keyframeInterval: Int64? = nil
+  var keepAudio: Bool
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
@@ -339,13 +345,15 @@ struct VideoOptionsMsg: Hashable, CustomStringConvertible {
     let fps: Int64? = nilOrValue(pigeonVar_list[2])
     let maxDimension: Int64? = nilOrValue(pigeonVar_list[3])
     let keyframeInterval: Int64? = nilOrValue(pigeonVar_list[4])
+    let keepAudio = pigeonVar_list[5] as! Bool
 
     return VideoOptionsMsg(
       codec: codec,
       bitrate: bitrate,
       fps: fps,
       maxDimension: maxDimension,
-      keyframeInterval: keyframeInterval
+      keyframeInterval: keyframeInterval,
+      keepAudio: keepAudio
     )
   }
   func toList() -> [Any?] {
@@ -355,13 +363,14 @@ struct VideoOptionsMsg: Hashable, CustomStringConvertible {
       fps,
       maxDimension,
       keyframeInterval,
+      keepAudio,
     ]
   }
   static func == (lhs: VideoOptionsMsg, rhs: VideoOptionsMsg) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.codec, rhs.codec) && MessagesPigeonInternal.deepEquals(lhs.bitrate, rhs.bitrate) && MessagesPigeonInternal.deepEquals(lhs.fps, rhs.fps) && MessagesPigeonInternal.deepEquals(lhs.maxDimension, rhs.maxDimension) && MessagesPigeonInternal.deepEquals(lhs.keyframeInterval, rhs.keyframeInterval)
+    return MessagesPigeonInternal.deepEquals(lhs.codec, rhs.codec) && MessagesPigeonInternal.deepEquals(lhs.bitrate, rhs.bitrate) && MessagesPigeonInternal.deepEquals(lhs.fps, rhs.fps) && MessagesPigeonInternal.deepEquals(lhs.maxDimension, rhs.maxDimension) && MessagesPigeonInternal.deepEquals(lhs.keyframeInterval, rhs.keyframeInterval) && MessagesPigeonInternal.deepEquals(lhs.keepAudio, rhs.keepAudio)
   }
 
   func hash(into hasher: inout Hasher) {
@@ -371,10 +380,11 @@ struct VideoOptionsMsg: Hashable, CustomStringConvertible {
     MessagesPigeonInternal.deepHash(value: fps, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: maxDimension, hasher: &hasher)
     MessagesPigeonInternal.deepHash(value: keyframeInterval, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: keepAudio, hasher: &hasher)
   }
 
   public var description: String {
-    return "VideoOptionsMsg(codec: \(String(describing: codec)), bitrate: \(String(describing: bitrate)), fps: \(String(describing: fps)), maxDimension: \(String(describing: maxDimension)), keyframeInterval: \(String(describing: keyframeInterval)))"
+    return "VideoOptionsMsg(codec: \(String(describing: codec)), bitrate: \(String(describing: bitrate)), fps: \(String(describing: fps)), maxDimension: \(String(describing: maxDimension)), keyframeInterval: \(String(describing: keyframeInterval)), keepAudio: \(String(describing: keepAudio)))"
   }
 }
 

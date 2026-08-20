@@ -16,10 +16,15 @@ final class ImageCompressOptions {
   ///   1–100, applied immediately for lossy formats; ignored for PNG. Default 80.
   /// - [maxDimension]: 最长边像素；null 表示不缩放。必须 > 0。
   ///   Max edge in pixels; null means no scale. Must be > 0 when set.
+  /// - [keepMetadata]: 是否保留 EXIF 元数据（GPS、拍摄信息等），默认 false。
+  ///   HEIC 输出在 Android 上不支持元数据保留。
+  ///   Whether to preserve EXIF metadata (GPS, capture info, ...), default
+  ///   false. HEIC output on Android does not support metadata preservation.
   const ImageCompressOptions({
     this.format = ImageFormat.jpeg,
     this.quality = 80,
     this.maxDimension,
+    this.keepMetadata = false,
   });
 
   /// 目标输出格式。
@@ -36,6 +41,13 @@ final class ImageCompressOptions {
   ///
   /// Max edge length in pixels for proportional downscale. Null means no scale.
   final int? maxDimension;
+
+  /// 是否保留 EXIF 元数据。默认 false（隐私优先）。
+  /// Windows/Linux 暂不支持，忽略此参数。
+  ///
+  /// Whether to preserve EXIF metadata. Default false (privacy-first).
+  /// Ignored on Windows/Linux for now.
+  final bool keepMetadata;
 }
 
 /// 视频压缩参数。可变旋钮只放在本对象中。
@@ -57,12 +69,16 @@ final class VideoCompressOptions {
   ///   Max edge in pixels; null means no scale. Must be > 0 when set.
   /// - [keyframeInterval]: GOP（帧）；null 使用平台默认。必须 > 0。
   ///   GOP size in frames; null uses the platform default. Must be > 0 when set.
+  /// - [keepAudio]: 是否保留音轨（透传或转码为 AAC），默认 true。
+  ///   Whether to keep the audio track (passthrough or transcode to AAC),
+  ///   default true.
   const VideoCompressOptions({
     this.codec = VideoCodec.h264,
     this.bitrate = 2000000,
     this.fps,
     this.maxDimension,
     this.keyframeInterval,
+    this.keepAudio = true,
   });
 
   /// 目标编码。
@@ -89,4 +105,11 @@ final class VideoCompressOptions {
   ///
   /// Keyframe interval in frames. Null uses the platform default.
   final int? keyframeInterval;
+
+  /// 是否保留音轨。默认 true。
+  /// Windows/Linux 暂不支持，忽略此参数。
+  ///
+  /// Whether to keep the audio track. Default true.
+  /// Ignored on Windows/Linux for now.
+  final bool keepAudio;
 }

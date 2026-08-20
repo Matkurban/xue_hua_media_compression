@@ -526,17 +526,21 @@ size_t PigeonInternalDeepHash(const DestinationMsg& v) {
 
 ImageOptionsMsg::ImageOptionsMsg(
   const std::string& format,
-  int64_t quality)
+  int64_t quality,
+  bool keep_metadata)
  : format_(format),
-    quality_(quality) {}
+    quality_(quality),
+    keep_metadata_(keep_metadata) {}
 
 ImageOptionsMsg::ImageOptionsMsg(
   const std::string& format,
   int64_t quality,
-  const int64_t* max_dimension)
+  const int64_t* max_dimension,
+  bool keep_metadata)
  : format_(format),
     quality_(quality),
-    max_dimension_(max_dimension ? std::optional<int64_t>(*max_dimension) : std::nullopt) {}
+    max_dimension_(max_dimension ? std::optional<int64_t>(*max_dimension) : std::nullopt),
+    keep_metadata_(keep_metadata) {}
 
 const std::string& ImageOptionsMsg::format() const {
   return format_;
@@ -569,19 +573,30 @@ void ImageOptionsMsg::set_max_dimension(int64_t value_arg) {
 }
 
 
+bool ImageOptionsMsg::keep_metadata() const {
+  return keep_metadata_;
+}
+
+void ImageOptionsMsg::set_keep_metadata(bool value_arg) {
+  keep_metadata_ = value_arg;
+}
+
+
 EncodableList ImageOptionsMsg::ToEncodableList() const {
   EncodableList list;
-  list.reserve(3);
+  list.reserve(4);
   list.push_back(EncodableValue(format_));
   list.push_back(EncodableValue(quality_));
   list.push_back(max_dimension_ ? EncodableValue(*max_dimension_) : EncodableValue());
+  list.push_back(EncodableValue(keep_metadata_));
   return list;
 }
 
 ImageOptionsMsg ImageOptionsMsg::FromEncodableList(const EncodableList& list) {
   ImageOptionsMsg decoded(
     std::get<std::string>(list[0]),
-    std::get<int64_t>(list[1]));
+    std::get<int64_t>(list[1]),
+    std::get<bool>(list[3]));
   auto& encodable_max_dimension = list[2];
   if (!encodable_max_dimension.IsNull()) {
     decoded.set_max_dimension(std::get<int64_t>(encodable_max_dimension));
@@ -590,7 +605,7 @@ ImageOptionsMsg ImageOptionsMsg::FromEncodableList(const EncodableList& list) {
 }
 
 bool ImageOptionsMsg::operator==(const ImageOptionsMsg& other) const {
-  return PigeonInternalDeepEquals(format_, other.format_) && PigeonInternalDeepEquals(quality_, other.quality_) && PigeonInternalDeepEquals(max_dimension_, other.max_dimension_);
+  return PigeonInternalDeepEquals(format_, other.format_) && PigeonInternalDeepEquals(quality_, other.quality_) && PigeonInternalDeepEquals(max_dimension_, other.max_dimension_) && PigeonInternalDeepEquals(keep_metadata_, other.keep_metadata_);
 }
 
 bool ImageOptionsMsg::operator!=(const ImageOptionsMsg& other) const {
@@ -602,6 +617,7 @@ size_t ImageOptionsMsg::Hash() const {
   result = result * 31 + PigeonInternalDeepHash(format_);
   result = result * 31 + PigeonInternalDeepHash(quality_);
   result = result * 31 + PigeonInternalDeepHash(max_dimension_);
+  result = result * 31 + PigeonInternalDeepHash(keep_metadata_);
   return result;
 }
 
@@ -620,6 +636,8 @@ std::ostream& operator<<(
   else {
     os << "null";
   }
+  os << ", keep_metadata: ";
+  os << PigeonInternalToString(obj.keep_metadata_);
   os << ")";
   return os;
 }
@@ -632,21 +650,25 @@ size_t PigeonInternalDeepHash(const ImageOptionsMsg& v) {
 
 VideoOptionsMsg::VideoOptionsMsg(
   const std::string& codec,
-  int64_t bitrate)
+  int64_t bitrate,
+  bool keep_audio)
  : codec_(codec),
-    bitrate_(bitrate) {}
+    bitrate_(bitrate),
+    keep_audio_(keep_audio) {}
 
 VideoOptionsMsg::VideoOptionsMsg(
   const std::string& codec,
   int64_t bitrate,
   const int64_t* fps,
   const int64_t* max_dimension,
-  const int64_t* keyframe_interval)
+  const int64_t* keyframe_interval,
+  bool keep_audio)
  : codec_(codec),
     bitrate_(bitrate),
     fps_(fps ? std::optional<int64_t>(*fps) : std::nullopt),
     max_dimension_(max_dimension ? std::optional<int64_t>(*max_dimension) : std::nullopt),
-    keyframe_interval_(keyframe_interval ? std::optional<int64_t>(*keyframe_interval) : std::nullopt) {}
+    keyframe_interval_(keyframe_interval ? std::optional<int64_t>(*keyframe_interval) : std::nullopt),
+    keep_audio_(keep_audio) {}
 
 const std::string& VideoOptionsMsg::codec() const {
   return codec_;
@@ -705,21 +727,32 @@ void VideoOptionsMsg::set_keyframe_interval(int64_t value_arg) {
 }
 
 
+bool VideoOptionsMsg::keep_audio() const {
+  return keep_audio_;
+}
+
+void VideoOptionsMsg::set_keep_audio(bool value_arg) {
+  keep_audio_ = value_arg;
+}
+
+
 EncodableList VideoOptionsMsg::ToEncodableList() const {
   EncodableList list;
-  list.reserve(5);
+  list.reserve(6);
   list.push_back(EncodableValue(codec_));
   list.push_back(EncodableValue(bitrate_));
   list.push_back(fps_ ? EncodableValue(*fps_) : EncodableValue());
   list.push_back(max_dimension_ ? EncodableValue(*max_dimension_) : EncodableValue());
   list.push_back(keyframe_interval_ ? EncodableValue(*keyframe_interval_) : EncodableValue());
+  list.push_back(EncodableValue(keep_audio_));
   return list;
 }
 
 VideoOptionsMsg VideoOptionsMsg::FromEncodableList(const EncodableList& list) {
   VideoOptionsMsg decoded(
     std::get<std::string>(list[0]),
-    std::get<int64_t>(list[1]));
+    std::get<int64_t>(list[1]),
+    std::get<bool>(list[5]));
   auto& encodable_fps = list[2];
   if (!encodable_fps.IsNull()) {
     decoded.set_fps(std::get<int64_t>(encodable_fps));
@@ -736,7 +769,7 @@ VideoOptionsMsg VideoOptionsMsg::FromEncodableList(const EncodableList& list) {
 }
 
 bool VideoOptionsMsg::operator==(const VideoOptionsMsg& other) const {
-  return PigeonInternalDeepEquals(codec_, other.codec_) && PigeonInternalDeepEquals(bitrate_, other.bitrate_) && PigeonInternalDeepEquals(fps_, other.fps_) && PigeonInternalDeepEquals(max_dimension_, other.max_dimension_) && PigeonInternalDeepEquals(keyframe_interval_, other.keyframe_interval_);
+  return PigeonInternalDeepEquals(codec_, other.codec_) && PigeonInternalDeepEquals(bitrate_, other.bitrate_) && PigeonInternalDeepEquals(fps_, other.fps_) && PigeonInternalDeepEquals(max_dimension_, other.max_dimension_) && PigeonInternalDeepEquals(keyframe_interval_, other.keyframe_interval_) && PigeonInternalDeepEquals(keep_audio_, other.keep_audio_);
 }
 
 bool VideoOptionsMsg::operator!=(const VideoOptionsMsg& other) const {
@@ -750,6 +783,7 @@ size_t VideoOptionsMsg::Hash() const {
   result = result * 31 + PigeonInternalDeepHash(fps_);
   result = result * 31 + PigeonInternalDeepHash(max_dimension_);
   result = result * 31 + PigeonInternalDeepHash(keyframe_interval_);
+  result = result * 31 + PigeonInternalDeepHash(keep_audio_);
   return result;
 }
 
@@ -782,6 +816,8 @@ std::ostream& operator<<(
   else {
     os << "null";
   }
+  os << ", keep_audio: ";
+  os << PigeonInternalToString(obj.keep_audio_);
   os << ")";
   return os;
 }

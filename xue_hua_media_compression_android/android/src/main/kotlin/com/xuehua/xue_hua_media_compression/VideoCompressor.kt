@@ -79,7 +79,7 @@ internal class VideoCompressor(
 
     val edited =
         EditedMediaItem.Builder(MediaItem.fromUri(uri))
-            .setRemoveAudio(true)
+            .setRemoveAudio(!options.keepAudio)
             .apply {
               options.fps?.toInt()?.let { setFrameRate(it) }
               if (videoEffects.isNotEmpty()) {
@@ -91,6 +91,18 @@ internal class VideoCompressor(
     val encoderSettings =
         VideoEncoderSettings.Builder()
             .setBitrate(options.bitrate.toInt().coerceAtLeast(1))
+            .apply {
+              val gopFrames = options.keyframeInterval?.toInt()
+              if (gopFrames != null && gopFrames > 0) {
+                // API 以帧为单位表达 GOP，Media3 需要秒：优先用请求的 fps 换算，
+                // 未指定时按 30fps 估算。
+                // The public API expresses GOP in frames while Media3 wants
+                // seconds: convert using the requested fps, assuming 30 fps
+                // when unspecified.
+                val fps = options.fps?.toInt()?.takeIf { it > 0 } ?: 30
+                setiFrameIntervalSeconds(gopFrames.toFloat() / fps)
+              }
+            }
             .build()
 
     val built =
@@ -146,9 +158,19 @@ internal class VideoCompressor(
                   }
                 })
             .build()
-    transformer = built
-    pollProgress(built)
-    built.start(edited, outputPath)
+    // Transformer 绑定 Looper（此处为主 Looper），start 必须回到该线程；
+    // 前面的探测已在后台线程完成。
+    // Transformer is bound to a Looper (main here), so start must run there;
+    // all probing above already happened on a background thread.
+    mainHandler.post {
+      if (cancelled.get()) {
+        events.sendError("cancelled", "Cancelled", null)
+        return@post
+      }
+      transformer = built
+      pollProgress(built)
+      built.start(edited, outputPath)
+    }
   }
 
   fun cancel() {

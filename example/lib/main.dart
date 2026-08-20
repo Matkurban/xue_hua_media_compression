@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:xue_hua_file_operations/xue_hua_file_operations.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
 Future<void> main() async {
@@ -33,6 +33,21 @@ String formatBytes(int bytes) {
     unit++;
   }
   return '${size.toStringAsFixed(unit == 0 ? 0 : 2)} ${units[unit]}';
+}
+
+Future<({String path, String name})?> _pickMediaFile({
+  required FileType type,
+  required String dialogTitle,
+}) async {
+  final file = await XueHuaFileOperations.instance.pickFile(
+    type: type,
+    dialogTitle: dialogTitle,
+  );
+  final path = file?.path;
+  if (file == null || path == null || path.isEmpty) {
+    return null;
+  }
+  return (path: path, name: file.name);
 }
 
 class HomePage extends StatelessWidget {
@@ -108,28 +123,18 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
       _progress = 0;
     });
     try {
-      const typeGroup = XTypeGroup(
-        label: 'images',
-        extensions: [
-          'jpg',
-          'jpeg',
-          'png',
-          'webp',
-          'gif',
-          'heic',
-          'heif',
-          'avif',
-        ],
+      final picked = await _pickMediaFile(
+        type: FileType.image,
+        dialogTitle: '选择图片',
       );
-      final file = await openFile(acceptedTypeGroups: [typeGroup]);
-      if (file == null) {
+      if (picked == null) {
         setState(() => _busy = false);
         return;
       }
       final tmp =
           '${Directory.systemTemp.path}/xh_img_out_${DateTime.now().millisecondsSinceEpoch}${_ext(_format)}';
       final session = XueHuaMediaCompression.image.compress(
-        source: MediaSource.path(file.path),
+        source: MediaSource.path(picked.path),
         destination: MediaDestination.path(tmp),
         options: ImageCompressOptions(
           format: _format,
@@ -148,10 +153,10 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
       _session = null;
       if (!mounted) return;
       setState(() {
-        _name = file.name;
-        _originalPath = file.path;
+        _name = picked.name;
+        _originalPath = picked.path;
         _compressedPath = result.outputPath;
-        _originalSize = awaitSizeSync(file.path);
+        _originalSize = awaitSizeSync(picked.path);
         _compressedSize = result.sizeBytes;
         _elapsed = sw.elapsed;
         _progress = 1;
@@ -337,24 +342,23 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
       _compressedSize = null;
     });
     try {
-      const typeGroup = XTypeGroup(
-        label: 'videos',
-        extensions: ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm'],
+      final picked = await _pickMediaFile(
+        type: FileType.video,
+        dialogTitle: '选择视频',
       );
-      final file = await openFile(acceptedTypeGroups: [typeGroup]);
-      if (file == null) {
+      if (picked == null) {
         setState(() => _busy = false);
         return;
       }
       final output =
           '${Directory.systemTemp.path}/xh_compressed_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      final originalSize = await File(file.path).length();
+      final originalSize = await File(picked.path).length();
       setState(() {
-        _name = file.name;
+        _name = picked.name;
         _originalSize = originalSize;
       });
       final session = XueHuaMediaCompression.video.compress(
-        inputPath: file.path,
+        inputPath: picked.path,
         outputPath: output,
         options: VideoCompressOptions(
           codec: _codec,

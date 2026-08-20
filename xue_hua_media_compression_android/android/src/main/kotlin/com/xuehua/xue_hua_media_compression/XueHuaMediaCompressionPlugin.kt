@@ -105,17 +105,28 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
           Result.failure(FlutterError("invalidState", "Job $id already started", null)))
     }
     job.started = true
-    try {
-      val compressor = VideoCompressor(context, job.events)
-      job.video = compressor
-      compressor.start(inputPath, outputPath, options)
-      callback(Result.success(Unit))
-    } catch (error: FlutterError) {
-      callback(Result.failure(error))
-    } catch (error: Exception) {
-      callback(
-          Result.failure(
-              FlutterError("encode", error.message ?: "Video start failed", error.toString())))
+    callback(Result.success(Unit))
+    // 探测（MediaMetadataRetriever、MediaCodecList 扫描）在后台执行，
+    // 避免大文件启动时阻塞平台主线程。
+    // Probing (MediaMetadataRetriever, MediaCodecList scan) runs off the
+    // platform main thread to avoid jank on large inputs.
+    executor.execute {
+      try {
+        if (job.cancelled) {
+          job.events.sendError("cancelled", "Cancelled", null)
+          return@execute
+        }
+        val compressor = VideoCompressor(context, job.events)
+        job.video = compressor
+        compressor.start(inputPath, outputPath, options)
+        if (job.cancelled) {
+          compressor.cancel()
+        }
+      } catch (error: FlutterError) {
+        job.events.sendError(error.code, error.message ?: error.code, error.details?.toString())
+      } catch (error: Exception) {
+        job.events.sendError("encode", error.message ?: "Video start failed", error.toString())
+      }
     }
   }
 

@@ -46,11 +46,13 @@ class ImageOptionsMsg {
     required this.format,
     required this.quality,
     this.maxDimension,
+    required this.keepMetadata,
   });
 
   String format;
   int quality;
   int? maxDimension;
+  bool keepMetadata;
 }
 
 class VideoOptionsMsg {
@@ -60,6 +62,7 @@ class VideoOptionsMsg {
     this.fps,
     this.maxDimension,
     this.keyframeInterval,
+    required this.keepAudio,
   });
 
   String codec;
@@ -67,6 +70,7 @@ class VideoOptionsMsg {
   int? fps;
   int? maxDimension;
   int? keyframeInterval;
+  bool keepAudio;
 }
 
 class ImageCapabilitiesMsg {

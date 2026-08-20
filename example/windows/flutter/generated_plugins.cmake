@@ -3,7 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  file_selector_windows
+  xue_hua_file_operations
   xue_hua_media_compression_windows
 )
 

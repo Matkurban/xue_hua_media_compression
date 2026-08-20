@@ -34,6 +34,28 @@ void main() {
     expect(result.width, greaterThan(0));
   });
 
+  test('image compress with keepMetadata succeeds', () async {
+    final bytes = await rootBundle.load('integration_test/fixtures/sample.jpg');
+    final input = bytes.buffer.asUint8List(
+      bytes.offsetInBytes,
+      bytes.lengthInBytes,
+    );
+    final session = XueHuaMediaCompression.image.compress(
+      source: MediaSource.bytes(input),
+      destination: MediaDestination.bytes(),
+      options: const ImageCompressOptions(
+        format: ImageFormat.jpeg,
+        quality: 80,
+        keepMetadata: true,
+      ),
+    );
+    final result = await session.result;
+    await session.dispose();
+    expect(result.bytes, isNotNull);
+    expect(result.bytes!.length, greaterThan(0));
+    expect(result.width, greaterThan(0));
+  });
+
   test('video queryCapabilities reports VideoToolbox on Darwin', () async {
     if (!(Platform.isIOS || Platform.isMacOS)) {
       return;
@@ -97,6 +119,34 @@ void main() {
     expect(result.height, 32);
     expect(result.width.isEven, isTrue);
     expect(result.height.isEven, isTrue);
+  });
+
+  test('video compress with keepAudio false and keyframeInterval', () async {
+    final data = await rootBundle.load('integration_test/fixtures/sample.mp4');
+    final tmp = Directory.systemTemp.createTempSync('xue_video_opts_');
+    addTearDown(() {
+      if (tmp.existsSync()) {
+        tmp.deleteSync(recursive: true);
+      }
+    });
+    final input = File('${tmp.path}/in.mp4')
+      ..writeAsBytesSync(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+    final output = '${tmp.path}/out.mp4';
+    final session = XueHuaMediaCompression.video.compress(
+      inputPath: input.path,
+      outputPath: output,
+      options: const VideoCompressOptions(
+        bitrate: 400000,
+        keepAudio: false,
+        keyframeInterval: 30,
+      ),
+    );
+    final result = await session.result;
+    await session.dispose();
+    expect(File(output).existsSync(), isTrue);
+    expect(result.sizeBytes, greaterThan(0));
   });
 
   test(

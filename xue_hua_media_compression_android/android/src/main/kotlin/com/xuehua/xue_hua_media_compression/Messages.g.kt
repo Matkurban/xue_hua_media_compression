@@ -295,7 +295,8 @@ data class DestinationMsg (
 data class ImageOptionsMsg (
   val format: String,
   val quality: Long,
-  val maxDimension: Long? = null
+  val maxDimension: Long? = null,
+  val keepMetadata: Boolean
 )
  {
   companion object {
@@ -303,7 +304,8 @@ data class ImageOptionsMsg (
       val format = pigeonVar_list[0] as String
       val quality = pigeonVar_list[1] as Long
       val maxDimension = pigeonVar_list[2] as Long?
-      return ImageOptionsMsg(format, quality, maxDimension)
+      val keepMetadata = pigeonVar_list[3] as Boolean
+      return ImageOptionsMsg(format, quality, maxDimension, keepMetadata)
     }
   }
   fun toList(): List<Any?> {
@@ -311,6 +313,7 @@ data class ImageOptionsMsg (
       format,
       quality,
       maxDimension,
+      keepMetadata,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -321,7 +324,7 @@ data class ImageOptionsMsg (
       return true
     }
     val other = other as ImageOptionsMsg
-    return MessagesPigeonUtils.deepEquals(this.format, other.format) && MessagesPigeonUtils.deepEquals(this.quality, other.quality) && MessagesPigeonUtils.deepEquals(this.maxDimension, other.maxDimension)
+    return MessagesPigeonUtils.deepEquals(this.format, other.format) && MessagesPigeonUtils.deepEquals(this.quality, other.quality) && MessagesPigeonUtils.deepEquals(this.maxDimension, other.maxDimension) && MessagesPigeonUtils.deepEquals(this.keepMetadata, other.keepMetadata)
   }
 
   override fun hashCode(): Int {
@@ -329,10 +332,11 @@ data class ImageOptionsMsg (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.format)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.quality)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.maxDimension)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.keepMetadata)
     return result
   }
   override fun toString(): String {
-    return "ImageOptionsMsg(format=$format, quality=$quality, maxDimension=$maxDimension)"
+    return "ImageOptionsMsg(format=$format, quality=$quality, maxDimension=$maxDimension, keepMetadata=$keepMetadata)"
   }
 }
 
@@ -342,7 +346,8 @@ data class VideoOptionsMsg (
   val bitrate: Long,
   val fps: Long? = null,
   val maxDimension: Long? = null,
-  val keyframeInterval: Long? = null
+  val keyframeInterval: Long? = null,
+  val keepAudio: Boolean
 )
  {
   companion object {
@@ -352,7 +357,8 @@ data class VideoOptionsMsg (
       val fps = pigeonVar_list[2] as Long?
       val maxDimension = pigeonVar_list[3] as Long?
       val keyframeInterval = pigeonVar_list[4] as Long?
-      return VideoOptionsMsg(codec, bitrate, fps, maxDimension, keyframeInterval)
+      val keepAudio = pigeonVar_list[5] as Boolean
+      return VideoOptionsMsg(codec, bitrate, fps, maxDimension, keyframeInterval, keepAudio)
     }
   }
   fun toList(): List<Any?> {
@@ -362,6 +368,7 @@ data class VideoOptionsMsg (
       fps,
       maxDimension,
       keyframeInterval,
+      keepAudio,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -372,7 +379,7 @@ data class VideoOptionsMsg (
       return true
     }
     val other = other as VideoOptionsMsg
-    return MessagesPigeonUtils.deepEquals(this.codec, other.codec) && MessagesPigeonUtils.deepEquals(this.bitrate, other.bitrate) && MessagesPigeonUtils.deepEquals(this.fps, other.fps) && MessagesPigeonUtils.deepEquals(this.maxDimension, other.maxDimension) && MessagesPigeonUtils.deepEquals(this.keyframeInterval, other.keyframeInterval)
+    return MessagesPigeonUtils.deepEquals(this.codec, other.codec) && MessagesPigeonUtils.deepEquals(this.bitrate, other.bitrate) && MessagesPigeonUtils.deepEquals(this.fps, other.fps) && MessagesPigeonUtils.deepEquals(this.maxDimension, other.maxDimension) && MessagesPigeonUtils.deepEquals(this.keyframeInterval, other.keyframeInterval) && MessagesPigeonUtils.deepEquals(this.keepAudio, other.keepAudio)
   }
 
   override fun hashCode(): Int {
@@ -382,10 +389,11 @@ data class VideoOptionsMsg (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.fps)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.maxDimension)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.keyframeInterval)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.keepAudio)
     return result
   }
   override fun toString(): String {
-    return "VideoOptionsMsg(codec=$codec, bitrate=$bitrate, fps=$fps, maxDimension=$maxDimension, keyframeInterval=$keyframeInterval)"
+    return "VideoOptionsMsg(codec=$codec, bitrate=$bitrate, fps=$fps, maxDimension=$maxDimension, keyframeInterval=$keyframeInterval, keepAudio=$keepAudio)"
   }
 }
 

@@ -40,14 +40,16 @@ enum ImageCompressor {
     }
 
     let cgSource = try makeSource(source)
-    guard let original = CGImageSourceCreateImageAtIndex(cgSource, 0, nil) else {
-      throw PigeonError(code: "decode", message: "CGImageSource returned no frame", details: nil)
-    }
-    let image = scaleIfNeeded(original, maxDimension: options.maxDimension.map { Int($0) })
+    let image = try decode(cgSource, maxDimension: options.maxDimension.map { Int($0) })
     let quality = Double(options.quality) / 100.0
-    let destProperties: [CFString: Any] = [
+    var destProperties: [CFString: Any] = [
       kCGImageDestinationLossyCompressionQuality: quality
     ]
+    if options.keepMetadata {
+      for (key, value) in metadataProperties(from: cgSource) {
+        destProperties[key] = value
+      }
+    }
 
     switch destination.kind {
     case 0:
@@ -134,28 +136,66 @@ enum ImageCompressor {
     }
   }
 
-  private static func scaleIfNeeded(_ image: CGImage, maxDimension: Int?) -> CGImage {
-    guard let maxDimension, maxDimension > 0 else { return image }
-    let longest = max(image.width, image.height)
-    if longest <= maxDimension { return image }
-    let scale = CGFloat(maxDimension) / CGFloat(longest)
-    let width = max(1, Int(CGFloat(image.width) * scale))
-    let height = max(1, Int(CGFloat(image.height) * scale))
-    guard let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB),
-      let context = CGContext(
-        data: nil,
-        width: width,
-        height: height,
-        bitsPerComponent: 8,
-        bytesPerRow: 0,
-        space: colorSpace,
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-    else {
+  /// 用 ImageIO 缩略图 API 一步完成降采样解码与 EXIF 方向烘焙，
+  /// 避免「全量解码 + CGContext 缩放」的高内存高耗时路径。
+  ///
+  /// Decodes via the ImageIO thumbnail API so downsampling and EXIF
+  /// orientation baking happen in one pass, avoiding the expensive
+  /// full-decode + CGContext rescale path.
+  private static func decode(_ source: CGImageSource, maxDimension: Int?) throws -> CGImage {
+    let requested = maxDimension.flatMap { $0 > 0 ? $0 : nil }
+    let maxPixel = requested ?? longestEdge(of: source)
+    let thumbnailOptions: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceShouldCacheImmediately: true,
+      kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+    ]
+    if let image = CGImageSourceCreateThumbnailAtIndex(
+      source, 0, thumbnailOptions as CFDictionary)
+    {
       return image
     }
-    context.interpolationQuality = .high
-    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-    return context.makeImage() ?? image
+    guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+      throw PigeonError(code: "decode", message: "CGImageSource returned no frame", details: nil)
+    }
+    return image
+  }
+
+  private static func longestEdge(of source: CGImageSource) -> Int {
+    guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+      let width = props[kCGImagePropertyPixelWidth] as? Int,
+      let height = props[kCGImagePropertyPixelHeight] as? Int,
+      width > 0, height > 0
+    else {
+      // Unknown size: a generous cap keeps the thumbnail API at full size.
+      return 1 << 16
+    }
+    return max(width, height)
+  }
+
+  /// 拷贝源图元数据；方向已烘焙进像素，因此剔除 orientation 与过期尺寸字段。
+  ///
+  /// Copies source metadata; orientation is baked into pixels, so the
+  /// orientation tag and stale dimension fields are stripped.
+  private static func metadataProperties(from source: CGImageSource) -> [CFString: Any] {
+    guard var props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+    else {
+      return [:]
+    }
+    props.removeValue(forKey: kCGImagePropertyOrientation)
+    props.removeValue(forKey: kCGImagePropertyPixelWidth)
+    props.removeValue(forKey: kCGImagePropertyPixelHeight)
+    if var tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+      tiff.removeValue(forKey: kCGImagePropertyTIFFOrientation)
+      props[kCGImagePropertyTIFFDictionary] = tiff
+    }
+    if var exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+      exif.removeValue(forKey: kCGImagePropertyExifPixelXDimension)
+      exif.removeValue(forKey: kCGImagePropertyExifPixelYDimension)
+      props[kCGImagePropertyExifDictionary] = exif
+    }
+    return props
   }
 
   private static func destinationUTI(_ format: String) -> CFString? {

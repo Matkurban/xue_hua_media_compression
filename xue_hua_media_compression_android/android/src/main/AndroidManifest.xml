@@ -1,1 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- heifwriter declares minSdk 28; HEIC encode is gated behind an API 28+
+         runtime check in ImageCompressor, so the merge override is safe. -->
+    <uses-sdk tools:overrideLibrary="androidx.heifwriter" />
+</manifest>

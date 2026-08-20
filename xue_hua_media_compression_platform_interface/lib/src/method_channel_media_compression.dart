@@ -70,6 +70,7 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
             format: options.format.wireName,
             quality: options.quality,
             maxDimension: options.maxDimension,
+            keepMetadata: options.keepMetadata,
           ),
         );
       },
@@ -118,6 +119,7 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
             fps: options.fps,
             maxDimension: options.maxDimension,
             keyframeInterval: options.keyframeInterval,
+            keepAudio: options.keepAudio,
           ),
         );
       },

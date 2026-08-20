@@ -557,6 +557,7 @@ struct _XhMcImageOptionsMsg {
   gchar* format;
   int64_t quality;
   int64_t* max_dimension;
+  gboolean keep_metadata;
 };
 
 G_DEFINE_TYPE(XhMcImageOptionsMsg, xh_mc_image_options_msg, G_TYPE_OBJECT)
@@ -575,7 +576,7 @@ static void xh_mc_image_options_msg_class_init(XhMcImageOptionsMsgClass* klass) 
   G_OBJECT_CLASS(klass)->dispose = xh_mc_image_options_msg_dispose;
 }
 
-XhMcImageOptionsMsg* xh_mc_image_options_msg_new(const gchar* format, int64_t quality, int64_t* max_dimension) {
+XhMcImageOptionsMsg* xh_mc_image_options_msg_new(const gchar* format, int64_t quality, int64_t* max_dimension, gboolean keep_metadata) {
   XhMcImageOptionsMsg* self = XH_MC_IMAGE_OPTIONS_MSG(g_object_new(xh_mc_image_options_msg_get_type(), nullptr));
   self->format = g_strdup(format);
   self->quality = quality;
@@ -586,6 +587,7 @@ XhMcImageOptionsMsg* xh_mc_image_options_msg_new(const gchar* format, int64_t qu
   else {
     self->max_dimension = nullptr;
   }
+  self->keep_metadata = keep_metadata;
   return self;
 }
 
@@ -604,11 +606,17 @@ int64_t* xh_mc_image_options_msg_get_max_dimension(XhMcImageOptionsMsg* self) {
   return self->max_dimension;
 }
 
+gboolean xh_mc_image_options_msg_get_keep_metadata(XhMcImageOptionsMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_OPTIONS_MSG(self), FALSE);
+  return self->keep_metadata;
+}
+
 static FlValue* xh_mc_image_options_msg_to_list(XhMcImageOptionsMsg* self) {
   FlValue* values = fl_value_new_list();
   fl_value_append_take(values, fl_value_new_string(self->format));
   fl_value_append_take(values, fl_value_new_int(self->quality));
   fl_value_append_take(values, self->max_dimension != nullptr ? fl_value_new_int(*self->max_dimension) : fl_value_new_null());
+  fl_value_append_take(values, fl_value_new_bool(self->keep_metadata));
   return values;
 }
 
@@ -624,7 +632,9 @@ static XhMcImageOptionsMsg* xh_mc_image_options_msg_new_from_list(FlValue* value
     max_dimension_value = fl_value_get_int(value2);
     max_dimension = &max_dimension_value;
   }
-  return xh_mc_image_options_msg_new(format, quality, max_dimension);
+  FlValue* value3 = fl_value_get_list_value(values, 3);
+  gboolean keep_metadata = fl_value_get_bool(value3);
+  return xh_mc_image_options_msg_new(format, quality, max_dimension, keep_metadata);
 }
 
 gboolean xh_mc_image_options_msg_equals(XhMcImageOptionsMsg* a, XhMcImageOptionsMsg* b) {
@@ -646,6 +656,9 @@ gboolean xh_mc_image_options_msg_equals(XhMcImageOptionsMsg* a, XhMcImageOptions
   if (a->max_dimension != nullptr && *a->max_dimension != *b->max_dimension) {
     return FALSE;
   }
+  if (a->keep_metadata != b->keep_metadata) {
+    return FALSE;
+  }
   return TRUE;
 }
 
@@ -655,6 +668,7 @@ guint xh_mc_image_options_msg_hash(XhMcImageOptionsMsg* self) {
   result = result * 31 + (self->format != nullptr ? g_str_hash(self->format) : 0);
   result = result * 31 + static_cast<guint>(self->quality);
   result = result * 31 + (self->max_dimension != nullptr ? static_cast<guint>(*self->max_dimension) : 0);
+  result = result * 31 + static_cast<guint>(self->keep_metadata);
   return result;
 }
 
@@ -677,6 +691,8 @@ gchar* xh_mc_image_options_msg_to_string(XhMcImageOptionsMsg* self) {
   else {
     g_string_append(str, "null");
   }
+  g_string_append(str, ", keep_metadata: ");
+  g_string_append(str, self->keep_metadata ? "true" : "false");
   g_string_append(str, ")");
   return g_string_free(str, FALSE);
 }
@@ -689,6 +705,7 @@ struct _XhMcVideoOptionsMsg {
   int64_t* fps;
   int64_t* max_dimension;
   int64_t* keyframe_interval;
+  gboolean keep_audio;
 };
 
 G_DEFINE_TYPE(XhMcVideoOptionsMsg, xh_mc_video_options_msg, G_TYPE_OBJECT)
@@ -709,7 +726,7 @@ static void xh_mc_video_options_msg_class_init(XhMcVideoOptionsMsgClass* klass) 
   G_OBJECT_CLASS(klass)->dispose = xh_mc_video_options_msg_dispose;
 }
 
-XhMcVideoOptionsMsg* xh_mc_video_options_msg_new(const gchar* codec, int64_t bitrate, int64_t* fps, int64_t* max_dimension, int64_t* keyframe_interval) {
+XhMcVideoOptionsMsg* xh_mc_video_options_msg_new(const gchar* codec, int64_t bitrate, int64_t* fps, int64_t* max_dimension, int64_t* keyframe_interval, gboolean keep_audio) {
   XhMcVideoOptionsMsg* self = XH_MC_VIDEO_OPTIONS_MSG(g_object_new(xh_mc_video_options_msg_get_type(), nullptr));
   self->codec = g_strdup(codec);
   self->bitrate = bitrate;
@@ -734,6 +751,7 @@ XhMcVideoOptionsMsg* xh_mc_video_options_msg_new(const gchar* codec, int64_t bit
   else {
     self->keyframe_interval = nullptr;
   }
+  self->keep_audio = keep_audio;
   return self;
 }
 
@@ -762,6 +780,11 @@ int64_t* xh_mc_video_options_msg_get_keyframe_interval(XhMcVideoOptionsMsg* self
   return self->keyframe_interval;
 }
 
+gboolean xh_mc_video_options_msg_get_keep_audio(XhMcVideoOptionsMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_OPTIONS_MSG(self), FALSE);
+  return self->keep_audio;
+}
+
 static FlValue* xh_mc_video_options_msg_to_list(XhMcVideoOptionsMsg* self) {
   FlValue* values = fl_value_new_list();
   fl_value_append_take(values, fl_value_new_string(self->codec));
@@ -769,6 +792,7 @@ static FlValue* xh_mc_video_options_msg_to_list(XhMcVideoOptionsMsg* self) {
   fl_value_append_take(values, self->fps != nullptr ? fl_value_new_int(*self->fps) : fl_value_new_null());
   fl_value_append_take(values, self->max_dimension != nullptr ? fl_value_new_int(*self->max_dimension) : fl_value_new_null());
   fl_value_append_take(values, self->keyframe_interval != nullptr ? fl_value_new_int(*self->keyframe_interval) : fl_value_new_null());
+  fl_value_append_take(values, fl_value_new_bool(self->keep_audio));
   return values;
 }
 
@@ -798,7 +822,9 @@ static XhMcVideoOptionsMsg* xh_mc_video_options_msg_new_from_list(FlValue* value
     keyframe_interval_value = fl_value_get_int(value4);
     keyframe_interval = &keyframe_interval_value;
   }
-  return xh_mc_video_options_msg_new(codec, bitrate, fps, max_dimension, keyframe_interval);
+  FlValue* value5 = fl_value_get_list_value(values, 5);
+  gboolean keep_audio = fl_value_get_bool(value5);
+  return xh_mc_video_options_msg_new(codec, bitrate, fps, max_dimension, keyframe_interval, keep_audio);
 }
 
 gboolean xh_mc_video_options_msg_equals(XhMcVideoOptionsMsg* a, XhMcVideoOptionsMsg* b) {
@@ -832,6 +858,9 @@ gboolean xh_mc_video_options_msg_equals(XhMcVideoOptionsMsg* a, XhMcVideoOptions
   if (a->keyframe_interval != nullptr && *a->keyframe_interval != *b->keyframe_interval) {
     return FALSE;
   }
+  if (a->keep_audio != b->keep_audio) {
+    return FALSE;
+  }
   return TRUE;
 }
 
@@ -843,6 +872,7 @@ guint xh_mc_video_options_msg_hash(XhMcVideoOptionsMsg* self) {
   result = result * 31 + (self->fps != nullptr ? static_cast<guint>(*self->fps) : 0);
   result = result * 31 + (self->max_dimension != nullptr ? static_cast<guint>(*self->max_dimension) : 0);
   result = result * 31 + (self->keyframe_interval != nullptr ? static_cast<guint>(*self->keyframe_interval) : 0);
+  result = result * 31 + static_cast<guint>(self->keep_audio);
   return result;
 }
 
@@ -879,6 +909,8 @@ gchar* xh_mc_video_options_msg_to_string(XhMcVideoOptionsMsg* self) {
   else {
     g_string_append(str, "null");
   }
+  g_string_append(str, ", keep_audio: ");
+  g_string_append(str, self->keep_audio ? "true" : "false");
   g_string_append(str, ")");
   return g_string_free(str, FALSE);
 }

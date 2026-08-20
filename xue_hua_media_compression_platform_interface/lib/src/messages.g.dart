@@ -214,6 +214,7 @@ class ImageOptionsMsg {
     required this.format,
     required this.quality,
     this.maxDimension,
+    required this.keepMetadata,
   });
 
   String format;
@@ -222,11 +223,14 @@ class ImageOptionsMsg {
 
   int? maxDimension;
 
+  bool keepMetadata;
+
   List<Object?> _toList() {
     return <Object?>[
       format,
       quality,
       maxDimension,
+      keepMetadata,
     ];
   }
 
@@ -239,6 +243,7 @@ class ImageOptionsMsg {
       format: result[0]! as String,
       quality: result[1]! as int,
       maxDimension: result[2] as int?,
+      keepMetadata: result[3]! as bool,
     );
   }
 
@@ -251,7 +256,7 @@ class ImageOptionsMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(format, other.format) && _deepEquals(quality, other.quality) && _deepEquals(maxDimension, other.maxDimension);
+    return _deepEquals(format, other.format) && _deepEquals(quality, other.quality) && _deepEquals(maxDimension, other.maxDimension) && _deepEquals(keepMetadata, other.keepMetadata);
   }
 
   @override
@@ -260,7 +265,7 @@ class ImageOptionsMsg {
 
   @override
   String toString() {
-    return 'ImageOptionsMsg(format: $format, quality: $quality, maxDimension: $maxDimension)';
+    return 'ImageOptionsMsg(format: $format, quality: $quality, maxDimension: $maxDimension, keepMetadata: $keepMetadata)';
   }
 }
 
@@ -271,6 +276,7 @@ class VideoOptionsMsg {
     this.fps,
     this.maxDimension,
     this.keyframeInterval,
+    required this.keepAudio,
   });
 
   String codec;
@@ -283,6 +289,8 @@ class VideoOptionsMsg {
 
   int? keyframeInterval;
 
+  bool keepAudio;
+
   List<Object?> _toList() {
     return <Object?>[
       codec,
@@ -290,6 +298,7 @@ class VideoOptionsMsg {
       fps,
       maxDimension,
       keyframeInterval,
+      keepAudio,
     ];
   }
 
@@ -304,6 +313,7 @@ class VideoOptionsMsg {
       fps: result[2] as int?,
       maxDimension: result[3] as int?,
       keyframeInterval: result[4] as int?,
+      keepAudio: result[5]! as bool,
     );
   }
 
@@ -316,7 +326,7 @@ class VideoOptionsMsg {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(codec, other.codec) && _deepEquals(bitrate, other.bitrate) && _deepEquals(fps, other.fps) && _deepEquals(maxDimension, other.maxDimension) && _deepEquals(keyframeInterval, other.keyframeInterval);
+    return _deepEquals(codec, other.codec) && _deepEquals(bitrate, other.bitrate) && _deepEquals(fps, other.fps) && _deepEquals(maxDimension, other.maxDimension) && _deepEquals(keyframeInterval, other.keyframeInterval) && _deepEquals(keepAudio, other.keepAudio);
   }
 
   @override
@@ -325,7 +335,7 @@ class VideoOptionsMsg {
 
   @override
   String toString() {
-    return 'VideoOptionsMsg(codec: $codec, bitrate: $bitrate, fps: $fps, maxDimension: $maxDimension, keyframeInterval: $keyframeInterval)';
+    return 'VideoOptionsMsg(codec: $codec, bitrate: $bitrate, fps: $fps, maxDimension: $maxDimension, keyframeInterval: $keyframeInterval, keepAudio: $keepAudio)';
   }
 }
 
