@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**Version:** 2.0.0 · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
+**Version:** 2.0.1 · [中文文档](README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
 Federated Flutter plugin for **image and video compression**. Each OS uses its
 native hardware pipeline. **Web is not supported.**
@@ -23,8 +23,8 @@ Missing capability → `MediaCompressionException.unsupported` or
 
 | | |
 |---|---|
-| Flutter | ≥ 3.16 |
-| Dart | ≥ 3.12.2 |
+| Flutter | ≥ 3.44.0 |
+| Dart | ≥ 3.12.0 |
 | Android | minSdk 23, Media3 Transformer |
 | iOS / macOS | iOS 12 / macOS 10.15 |
 | Windows | Windows 10+, C++/WinRT |

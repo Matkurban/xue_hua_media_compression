@@ -1,3 +1,10 @@
+## [2.0.1] - 2026-08-21
+
+### Fixed / 修复
+
+- Documented Flutter requirement is now **≥ 3.44.0** (was 3.16); Dart **≥ 3.12.0**.
+  README 环境要求改为 Flutter ≥ 3.44.0、Dart ≥ 3.12.0。
+
 ## [2.0.0] - 2026-08-20
 
 ### Breaking / 破坏性变更

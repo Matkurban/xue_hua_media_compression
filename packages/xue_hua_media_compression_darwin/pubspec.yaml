@@ -1,6 +1,6 @@
 name: xue_hua_media_compression_darwin
 description: iOS and macOS implementation of xue_hua_media_compression.
-version: 2.0.0
+version: 2.0.1
 homepage: https://github.com/Matkurban/xue_hua_media_compression
 repository: https://github.com/Matkurban/xue_hua_media_compression
 issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
