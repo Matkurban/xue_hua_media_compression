@@ -1,61 +1,46 @@
-name: xue_hua_media_compression
-description: "Federated Flutter plugin for image and video compression using platform hardware encoders."
-version: 2.0.0
-homepage: https://github.com/Matkurban/xue_hua_media_compression
-repository: https://github.com/Matkurban/xue_hua_media_compression
-issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
-documentation: https://github.com/Matkurban/xue_hua_media_compression/blob/main/README.md
-
-topics:
-  - compression
-  - image
-  - video
-  - plugin
-
+# xue_hua_media_compression monorepo workspace root.
+# xue_hua_media_compression 联合插件（Federated Plugin）单仓工作区根配置。
+name: xue_hua_media_compression_workspace
+description: "Workspace for the xue_hua_media_compression federated plugin. / xue_hua_media_compression 联合媒体压缩插件工作区。"
 publish_to: none
 
 environment:
   sdk: ^3.12.0
-  flutter: '>=3.44.0'
 
 workspace:
-  - example
-  - xue_hua_media_compression_platform_interface
-  - xue_hua_media_compression_android
-  - xue_hua_media_compression_darwin
-  - xue_hua_media_compression_windows
-  - xue_hua_media_compression_linux
-
-dependencies:
-  flutter:
-    sdk: flutter
-  xue_hua_media_compression_platform_interface:
-    path: xue_hua_media_compression_platform_interface
-  xue_hua_media_compression_android:
-    path: xue_hua_media_compression_android
-  xue_hua_media_compression_darwin:
-    path: xue_hua_media_compression_darwin
-  xue_hua_media_compression_windows:
-    path: xue_hua_media_compression_windows
-  xue_hua_media_compression_linux:
-    path: xue_hua_media_compression_linux
+  - packages/xue_hua_media_compression
+  - packages/xue_hua_media_compression/example
+  - packages/xue_hua_media_compression_platform_interface
+  - packages/xue_hua_media_compression_android
+  - packages/xue_hua_media_compression_darwin
+  - packages/xue_hua_media_compression_windows
+  - packages/xue_hua_media_compression_linux
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^6.0.0
-  plugin_platform_interface: ^2.1.8
+  melos: ^8.3.0
 
-flutter:
-  plugin:
-    platforms:
-      android:
-        default_package: xue_hua_media_compression_android
-      ios:
-        default_package: xue_hua_media_compression_darwin
-      macos:
-        default_package: xue_hua_media_compression_darwin
-      windows:
-        default_package: xue_hua_media_compression_windows
-      linux:
-        default_package: xue_hua_media_compression_linux
+# Melos 7+ reads its configuration from this pubspec.
+# Melos 7 及以上版本从本 pubspec 读取配置。
+melos:
+  scripts:
+    analyze:
+      description: "Run static analysis in every package. / 对所有包运行静态分析。"
+      exec:
+        command: dart analyze .
+        concurrency: 4
+
+    test:
+      description: "Run unit tests in packages that have a test/ dir. / 对包含 test/ 目录的包运行单元测试。"
+      exec:
+        command: flutter test
+        concurrency: 1
+      packageFilters:
+        dirExists: test
+
+    pigeon:
+      description: "Regenerate Pigeon bindings for all platforms. / 重新生成所有平台的 Pigeon 绑定代码。"
+      exec:
+        command: dart run pigeon --input pigeons/messages.dart
+        concurrency: 1
+      packageFilters:
+        scope: xue_hua_media_compression_platform_interface

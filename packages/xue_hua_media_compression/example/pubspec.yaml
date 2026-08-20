@@ -19,7 +19,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.12.2
+  sdk: ^3.12.0
   flutter: ">=3.44.0"
 
 resolution: workspace
@@ -34,13 +34,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  xue_hua_media_compression:
-    # When depending on this package from a real application you should use:
-    #   xue_hua_media_compression: ^x.y.z
-    # See https://dart.dev/tools/pub/dependencies#version-constraints
-    # The example app is bundled with the plugin so we use a path dependency on
-    # the parent directory to use the current plugin's version.
-    path: ../
+  xue_hua_media_compression: ^2.0.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

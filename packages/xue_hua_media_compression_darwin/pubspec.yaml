@@ -2,19 +2,19 @@ name: xue_hua_media_compression_darwin
 description: iOS and macOS implementation of xue_hua_media_compression.
 version: 2.0.0
 homepage: https://github.com/Matkurban/xue_hua_media_compression
+repository: https://github.com/Matkurban/xue_hua_media_compression
+issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
 publish_to: none
+resolution: workspace
 
 environment:
-  sdk: ^3.12.2
+  sdk: ^3.12.0
   flutter: '>=3.44.0'
-
-resolution: workspace
 
 dependencies:
   flutter:
     sdk: flutter
-  xue_hua_media_compression_platform_interface:
-    path: ../xue_hua_media_compression_platform_interface
+  xue_hua_media_compression_platform_interface: ^2.0.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
