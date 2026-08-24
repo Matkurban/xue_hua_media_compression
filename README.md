@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**Version:** 2.0.1 · [中文文档](README.zh-CN.md) · [Changelog](packages/xue_hua_media_compression/CHANGELOG.md)
+**Version:** 2.0.2 · [中文文档](README.zh-CN.md) · [Changelog](packages/xue_hua_media_compression/CHANGELOG.md)
 
 Federated Flutter plugin for **image and video compression**. Each OS uses its
 native hardware pipeline. **Web is not supported.**

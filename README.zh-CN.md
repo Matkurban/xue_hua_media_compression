@@ -1,6 +1,6 @@
 # xue_hua_media_compression
 
-**版本：** 2.0.1 · [English](README.md) · [Changelog](packages/xue_hua_media_compression/CHANGELOG.md)
+**版本：** 2.0.2 · [English](README.md) · [Changelog](packages/xue_hua_media_compression/CHANGELOG.md)
 
 联合 Flutter 插件，提供**图片与视频压缩**。各端使用系统硬编管线。**不支持 Web**。
 

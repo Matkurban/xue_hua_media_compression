@@ -1,4 +1,4 @@
-#include "include/xue_hua_media_compression_windows/xue_hua_media_compression_windows_plugin_c_api.h"
+#include "xue_hua_media_compression_windows/xue_hua_media_compression_windows_plugin_c_api.h"
 
 #include <flutter/plugin_registrar_windows.h>
 
