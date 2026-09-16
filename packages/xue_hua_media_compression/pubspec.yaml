@@ -24,7 +24,7 @@ dependencies:
   xue_hua_media_compression_platform_interface: ^2.0.2
   xue_hua_media_compression_android: ^2.0.2
   xue_hua_media_compression_darwin: ^2.0.2
-  xue_hua_media_compression_windows: ^2.0.0
+  xue_hua_media_compression_windows: ^2.0.3
   xue_hua_media_compression_linux: ^2.0.2
 
 dev_dependencies:
