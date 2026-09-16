@@ -1,6 +1,6 @@
 name: xue_hua_media_compression
 description: "Federated Flutter plugin for image and video compression using platform hardware encoders."
-version: 2.0.3
+version: 2.0.4
 homepage: https://github.com/Matkurban/xue_hua_media_compression
 repository: https://github.com/Matkurban/xue_hua_media_compression
 issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
@@ -21,8 +21,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  xue_hua_media_compression_platform_interface: ^2.0.0
-  xue_hua_media_compression_android: ^2.0.0
+  xue_hua_media_compression_platform_interface: ^2.0.2
+  xue_hua_media_compression_android: ^2.0.2
   xue_hua_media_compression_darwin: ^2.0.0
   xue_hua_media_compression_windows: ^2.0.0
   xue_hua_media_compression_linux: ^2.0.0
