@@ -1,4 +1,6 @@
-# Changelog
+## 2.0.2
+
+- update package version
 
 ## 2.0.1
 

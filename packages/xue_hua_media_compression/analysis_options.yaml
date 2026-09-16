@@ -14,3 +14,4 @@ analyzer:
     - '**/*.g.cc'
     - 'example/build/**'
     - 'test_driver/**'
+    - build/**
