@@ -1,5 +1,5 @@
 group = "com.xuehua.xue_hua_media_compression"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 buildscript {
     val kotlinVersion = "2.3.20"
@@ -24,8 +24,6 @@ allprojects {
 plugins {
     id("com.android.library")
 }
-
-apply(plugin = "kotlin-android")
 
 android {
     namespace = "com.xuehua.xue_hua_media_compression"
@@ -55,10 +53,9 @@ kotlin {
 }
 
 dependencies {
-    val media3 = "1.11.0"
-    implementation("androidx.media3:media3-transformer:$media3")
-    implementation("androidx.media3:media3-effect:$media3")
-    implementation("androidx.media3:media3-common:$media3")
+    implementation("androidx.media3:media3-transformer:1.11.1")
+    implementation("androidx.media3:media3-effect:1.11.1")
+    implementation("androidx.media3:media3-common:1.11.1")
     implementation("androidx.heifwriter:heifwriter:1.1.0")
-    implementation("androidx.exifinterface:exifinterface:1.4.1")
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
 }
