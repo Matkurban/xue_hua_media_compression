@@ -1,6 +1,6 @@
 name: xue_hua_media_compression_windows
 description: Windows implementation of xue_hua_media_compression.
-version: 2.0.2
+version: 2.0.3
 homepage: https://github.com/Matkurban/xue_hua_media_compression
 repository: https://github.com/Matkurban/xue_hua_media_compression
 issue_tracker: https://github.com/Matkurban/xue_hua_media_compression/issues
@@ -13,7 +13,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  xue_hua_media_compression_platform_interface: ^2.0.0
+  xue_hua_media_compression_platform_interface: ^2.0.2
 
 dev_dependencies:
   flutter_lints: ^6.0.0
