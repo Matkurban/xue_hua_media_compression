@@ -1,3 +1,21 @@
+## [2.0.5] - 2026-09-21
+
+### Added / 新增
+
+- **Package skills / 随包分发 Agent Skills** — Ship `xue-hua-media-compression-image`
+  and `xue-hua-media-compression-video` under `skills/`. Consumers install them
+  with `dart run skills@ get`.
+  在 `skills/` 下提供图片与视频两条 skill；依赖方执行 `dart run skills@ get` 即可安装。
+
+### Fixed / 修复
+
+- **README matches the 2.x API / README 与源码对齐** — Document `keepAudio`
+  (default `true`, ignored on Windows/Linux), correct install constraint
+  `^2.0.5`, session usage (`queryCapabilities`, `progress`, `result`,
+  `dispose`), and the Chinese Windows requirements row.
+  文档改为默认保留音轨（Windows/Linux 忽略 `keepAudio`），安装约束 `^2.0.5`，
+  补全会话用法与中文 Windows 环境行。
+
 ## [2.0.2] - 2026-08-24
 
 ### Fixed / 修复
