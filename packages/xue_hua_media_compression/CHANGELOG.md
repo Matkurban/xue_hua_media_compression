@@ -1,3 +1,10 @@
+## [2.0.6] - 2026-10-08
+
+### Changed / 变更
+
+- **Android toolchain / Android 构建工具链** — Require `xue_hua_media_compression_android` 2.0.3. The Android implementation and the example use Android Gradle Plugin 9.1.0, Gradle 9.3.1, and Kotlin 2.4.0. The example compiles against Android SDK 37.
+  依赖 `xue_hua_media_compression_android` 2.0.3。Android 实现与示例使用 Android Gradle Plugin 9.1.0、Gradle 9.3.1、Kotlin 2.4.0；示例 `compileSdk` 为 37。
+
 ## [2.0.5] - 2026-09-21
 
 ### Added / 新增

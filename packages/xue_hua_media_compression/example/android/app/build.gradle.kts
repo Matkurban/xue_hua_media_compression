@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.xue_hua_media_compression_example"
-    compileSdk = flutter.compileSdkVersion
+    // compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
