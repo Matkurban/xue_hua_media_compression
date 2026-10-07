@@ -36,7 +36,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.0.5
+  xue_hua_media_compression: ^2.0.6
 ```
 
 ```dart

@@ -41,7 +41,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.0.5
+  xue_hua_media_compression: ^2.0.6
 ```
 
 ```dart
