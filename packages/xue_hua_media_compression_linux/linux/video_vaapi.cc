@@ -163,15 +163,45 @@ void compress_video_vaapi(
   g_free(dir);
 
   AVFormatContext* output_fmt = nullptr;
-  avformat_alloc_output_context2(&output_fmt, nullptr, "mp4",
-                                 output_path.c_str());
+  bool header_written = false;
+  auto fail_output = [&](const char* c, const char* m) {
+    if (output_fmt) {
+      if (!(output_fmt->oformat->flags & AVFMT_NOFILE)) {
+        avio_closep(&output_fmt->pb);
+      }
+      avformat_free_context(output_fmt);
+      output_fmt = nullptr;
+    }
+    avcodec_free_context(&enc_ctx);
+    avcodec_free_context(&dec_ctx);
+    avformat_close_input(&input_fmt);
+    av_buffer_unref(&hw_device);
+    on_error(c, m);
+  };
+  if (avformat_alloc_output_context2(&output_fmt, nullptr, "mp4",
+                                     output_path.c_str()) < 0 ||
+      output_fmt == nullptr) {
+    fail_output("encode", "Unable to allocate output context");
+    return;
+  }
   AVStream* out_stream = avformat_new_stream(output_fmt, nullptr);
-  avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
+  if (out_stream == nullptr ||
+      avcodec_parameters_from_context(out_stream->codecpar, enc_ctx) < 0) {
+    fail_output("encode", "Unable to create output stream");
+    return;
+  }
   out_stream->time_base = enc_ctx->time_base;
   if (!(output_fmt->oformat->flags & AVFMT_NOFILE)) {
-    avio_open(&output_fmt->pb, output_path.c_str(), AVIO_FLAG_WRITE);
+    if (avio_open(&output_fmt->pb, output_path.c_str(), AVIO_FLAG_WRITE) < 0) {
+      fail_output("io", "Unable to open output file");
+      return;
+    }
   }
-  avformat_write_header(output_fmt, nullptr);
+  if (avformat_write_header(output_fmt, nullptr) < 0) {
+    fail_output("encode", "Failed to write output header");
+    return;
+  }
+  header_written = true;
 
   AVFilterGraph* graph = avfilter_graph_alloc();
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
@@ -200,12 +230,7 @@ void compress_video_vaapi(
   }
   if (avfilter_graph_config(graph, nullptr) < 0) {
     avfilter_graph_free(&graph);
-    avformat_free_context(output_fmt);
-    avcodec_free_context(&enc_ctx);
-    avcodec_free_context(&dec_ctx);
-    avformat_close_input(&input_fmt);
-    av_buffer_unref(&hw_device);
-    on_error("encode", "Failed to configure VAAPI filter graph");
+    fail_output("encode", "Failed to configure VAAPI filter graph");
     return;
   }
 
@@ -227,16 +252,11 @@ void compress_video_vaapi(
     av_frame_free(&filt);
     av_packet_free(&enc_pkt);
     avfilter_graph_free(&graph);
-    if (output_fmt) {
-      av_write_trailer(output_fmt);
-      if (!(output_fmt->oformat->flags & AVFMT_NOFILE)) avio_closep(&output_fmt->pb);
-      avformat_free_context(output_fmt);
+    if (output_fmt && header_written) {
+      // Best effort: the operation already failed, so a trailer error is moot.
+      (void)av_write_trailer(output_fmt);
     }
-    avcodec_free_context(&enc_ctx);
-    avcodec_free_context(&dec_ctx);
-    avformat_close_input(&input_fmt);
-    av_buffer_unref(&hw_device);
-    on_error(c, m);
+    fail_output(c, m);
   };
 
   while (av_read_frame(input_fmt, packet) >= 0) {
@@ -276,7 +296,11 @@ void compress_video_vaapi(
           if (duration > 0 && enc_pkt->pts > 0) {
             on_progress(std::min(1.0, enc_pkt->pts / static_cast<double>(duration)));
           }
-          av_interleaved_write_frame(output_fmt, enc_pkt);
+          if (av_interleaved_write_frame(output_fmt, enc_pkt) < 0) {
+            av_packet_unref(enc_pkt);
+            fail("io", "Failed to write video packet");
+            return;
+          }
           av_packet_unref(enc_pkt);
         }
       }
@@ -287,12 +311,23 @@ void compress_video_vaapi(
   while (avcodec_receive_packet(enc_ctx, enc_pkt) == 0) {
     av_packet_rescale_ts(enc_pkt, enc_ctx->time_base, out_stream->time_base);
     enc_pkt->stream_index = 0;
-    av_interleaved_write_frame(output_fmt, enc_pkt);
+    if (av_interleaved_write_frame(output_fmt, enc_pkt) < 0) {
+      av_packet_unref(enc_pkt);
+      fail("io", "Failed to write video packet");
+      return;
+    }
     av_packet_unref(enc_pkt);
   }
-  av_write_trailer(output_fmt);
+  header_written = false;
+  if (av_write_trailer(output_fmt) < 0) {
+    fail("io", "Failed to write output trailer");
+    return;
+  }
   if (!(output_fmt->oformat->flags & AVFMT_NOFILE)) {
-    avio_closep(&output_fmt->pb);
+    if (avio_closep(&output_fmt->pb) < 0) {
+      fail("io", "Failed to close output file");
+      return;
+    }
   }
 
   GStatBuf st = {};
