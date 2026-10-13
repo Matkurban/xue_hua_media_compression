@@ -1,3 +1,9 @@
+## [2.0.7] - 2026-10-13
+
+### Fixed / 修复
+
+- Require `xue_hua_media_compression_linux ^2.0.3`, which fixes the Linux compile error (`-Wunused-result` in `video_vaapi.cc`) / 依赖 linux 2.0.3，修复 Linux 编译错误。
+
 ## [2.0.6] - 2026-10-08
 
 ### Changed / 变更
