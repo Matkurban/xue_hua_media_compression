@@ -1,8 +1,17 @@
+## [2.1.0] - 2026-10-13
+
+### Changed / 变更
+
+- Require `xue_hua_media_compression_linux ^2.1.0`: Linux video compression now uses
+  GStreamer (hardware encoders with automatic software fallback), honours `keepAudio`,
+  and needs new system packages (see README).
+  依赖 linux ^2.1.0：Linux 视频改用 GStreamer（硬编优先，自动软编回退），支持 `keepAudio`，系统依赖有变化（见 README）。
+
 ## [2.0.7] - 2026-10-13
 
 ### Fixed / 修复
 
-- Require `xue_hua_media_compression_linux ^2.0.3`, which fixes the Linux compile error (`-Wunused-result` in `video_vaapi.cc`) / 依赖 linux 2.0.3，修复 Linux 编译错误。
+- Require `xue_hua_media_compression_linux ^2.0.3`, which fixes the Linux compile error (`-Wunused-result`) / 依赖 linux 2.0.3，修复 Linux 编译错误。
 
 ## [2.0.6] - 2026-10-08
 

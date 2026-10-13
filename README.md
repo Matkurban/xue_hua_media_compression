@@ -13,11 +13,11 @@ native hardware pipeline. **Web is not supported.**
 | WebP encode                  | yes                | no            | if WIC present    | if libvips webp |
 | HEIC encode                  | API 28+            | yes           | if HEIF extension | no              |
 | AVIF / GIF encode            | no                 | no            | no                | no              |
-| H.264 / H.265 MP4            | Media3 Transformer | AVAssetWriter | MediaTranscoder   | FFmpeg VAAPI    |
+| H.264 / H.265 MP4            | Media3 Transformer | AVAssetWriter | MediaTranscoder   | GStreamer HW/SW |
 | `content://` input           | yes                | no            | no                | no              |
 
 Video output is always MP4. `VideoCompressOptions.keepAudio` defaults to
-`true` (AAC passthrough or transcode). Windows and Linux ignore `keepAudio`.
+`true` (AAC passthrough or transcode). Windows ignores `keepAudio`; Linux re-encodes audio to AAC.
 
 Call `queryCapabilities()` at runtime and use `outputFormats` / `codecs`.
 Missing capability → `MediaCompressionException.unsupported` or
@@ -35,13 +35,13 @@ supported platform.
 | Android     | minSdk 23, Media3 Transformer                                                 |
 | iOS / macOS | iOS 12 / macOS 10.15                                                          |
 | Windows     | Windows 10+, C++/WinRT                                                        |
-| Linux       | `libvips-dev`, `libavcodec-dev`, `libavfilter-dev`, `libva-dev`, VAAPI driver |
+| Linux       | `libvips-dev`, `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`, GStreamer base/good/bad/ugly plugins |
 
 ## Install
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.0.6
+  xue_hua_media_compression: ^2.1.0
 ```
 
 ```dart

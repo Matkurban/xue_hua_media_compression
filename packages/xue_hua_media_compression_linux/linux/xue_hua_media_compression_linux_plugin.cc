@@ -14,7 +14,7 @@
 
 #include "image_vips.h"
 #include "messages.g.h"
-#include "video_vaapi.h"
+#include "video_gst.h"
 
 #define XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(obj)                        \
   (G_TYPE_CHECK_INSTANCE_CAST((obj),                                       \
@@ -213,7 +213,7 @@ static void handle_start_image(
 static XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse*
 handle_query_video(gpointer) {
   return xh_mc_media_compression_host_api_query_video_capabilities_response_new(
-      query_video_capabilities_vaapi());
+      query_video_capabilities_gst());
 }
 
 static void handle_start_video(
@@ -240,7 +240,7 @@ static void handle_start_video(
   std::string out = output_path;
   EventStream* events = job->events.get();
   std::thread([job, in, out, options, events]() {
-    compress_video_vaapi(
+    compress_video_gst(
         in, out, options, &job->cancelled,
         [events](double value) {
           PostToMain([events, value]() {

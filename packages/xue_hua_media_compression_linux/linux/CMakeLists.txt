@@ -9,16 +9,15 @@ list(APPEND PLUGIN_SOURCES
   "image_vips.h"
   "messages.g.cc"
   "messages.g.h"
-  "video_vaapi.cc"
-  "video_vaapi.h"
+  "video_gst.cc"
+  "video_gst.h"
   "xue_hua_media_compression_linux_plugin.cc"
 )
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(VIPS REQUIRED IMPORTED_TARGET vips)
-pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
-  libavcodec libavformat libavutil libavfilter)
-pkg_check_modules(LIBVA REQUIRED IMPORTED_TARGET libva libva-drm)
+pkg_check_modules(GST REQUIRED IMPORTED_TARGET
+  gstreamer-1.0 gstreamer-pbutils-1.0 gstreamer-video-1.0)
 
 add_library(${PLUGIN_NAME} SHARED
   ${PLUGIN_SOURCES}
@@ -34,8 +33,7 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter)
 target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GTK)
 target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::VIPS)
-target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::LIBAV)
-target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::LIBVA)
+target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GST)
 
 set(xue_hua_media_compression_linux_bundled_libraries
   ""
