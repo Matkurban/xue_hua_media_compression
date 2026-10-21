@@ -2,7 +2,7 @@
 
 [中文文档](README.zh-CN.md)
 
-Federated Flutter plugin for **image and video compression**. Each OS uses its
+Flutter plugin for **image and video compression**. Each OS uses its
 native hardware pipeline. **Web is not supported.**
 
 ## Platform matrix
@@ -41,7 +41,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.1.0
+  xue_hua_media_compression: ^2.2.0
 ```
 
 ```dart
@@ -139,6 +139,16 @@ the dependency, install them into your coding agent:
 dart run skills@ get
 # or non-interactive:
 dart run skills@ get --all
+```
+
+## Development
+
+From the package root:
+
+```bash
+flutter analyze
+flutter test
+dart run pigeon --input pigeons/messages.dart
 ```
 
 ## License
