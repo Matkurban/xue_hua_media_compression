@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../integration_test/darwin_media.dart';
+import '../integration_test/plugin_binary.dart';
 import '../integration_test/windows_media.dart';
 
 void main() {
@@ -90,6 +91,35 @@ void main() {
         dir.deleteSync(recursive: true);
       }
     }
+  });
+
+  test('plugin scan ignores the app kernel blob', () {
+    const app =
+        '/work/xue_hua_media_compression/example/build/macos/Build/Products/Debug/xue_hua_media_compression_example.app';
+    expect(
+      isDarwinPluginMachO(
+        '$app/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/kernel_blob.bin',
+      ),
+      isFalse,
+    );
+    expect(
+      isDarwinPluginMachO(
+        '$app/Contents/Frameworks/xue_hua_media_compression.framework/Versions/A/Resources/Info.plist',
+      ),
+      isFalse,
+    );
+    expect(
+      isDarwinPluginMachO(
+        '$app/Contents/Frameworks/xue_hua_media_compression.framework/Versions/A/xue_hua_media_compression',
+      ),
+      isTrue,
+    );
+    expect(
+      isDarwinPluginMachO(
+        '$app/Contents/Frameworks/libxue_hua_media_compression.dylib',
+      ),
+      isTrue,
+    );
   });
 }
 

@@ -11,6 +11,7 @@ import 'package:xue_hua_media_compression_example/main.dart';
 
 import 'darwin_media.dart';
 import 'facade_seam.dart';
+import 'plugin_binary.dart';
 import 'windows_media.dart';
 
 const _timeout = Timeout(Duration(minutes: 5));
@@ -789,10 +790,7 @@ Future<List<File>> _pluginBinaries() async {
       recursive: true,
       followLinks: false,
     )) {
-      if (entity is! File || !_isNativeBinary(entity.path)) {
-        continue;
-      }
-      if (entity.path.contains('xue_hua_media_compression')) {
+      if (entity is File && isDarwinPluginMachO(entity.path)) {
         pluginFiles.add(entity);
       }
     }
@@ -800,17 +798,10 @@ Future<List<File>> _pluginBinaries() async {
   if (pluginFiles.isNotEmpty) {
     return pluginFiles;
   }
-  if (executable.existsSync()) {
+  // iOS links the plugin into the app executable. macOS ships a framework;
+  // scanning the runner or App.framework would see Dart kernel text.
+  if (Platform.isIOS && executable.existsSync()) {
     return <File>[executable];
   }
   return pluginFiles;
-}
-
-bool _isNativeBinary(String path) {
-  final lower = path.toLowerCase();
-  return !lower.endsWith('.plist') &&
-      !lower.endsWith('.h') &&
-      !lower.endsWith('.modulemap') &&
-      !lower.endsWith('.swiftmodule') &&
-      !lower.endsWith('.strings');
 }
