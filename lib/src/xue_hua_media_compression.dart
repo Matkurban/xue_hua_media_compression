@@ -109,18 +109,20 @@ final class XueHuaVideoCompression {
   /// Used by [XueHuaMediaCompression.video].
   const XueHuaVideoCompression();
 
-  /// 查询当前平台的硬件视频编码能力。
+  /// 查询当前平台的视频编码能力。
   ///
-  /// Queries hardware video-encode capabilities of this platform.
+  /// Queries video-encode capabilities of this platform.
   ///
   /// **接收 / Receives**
   /// 无参数。
   /// No parameters.
   ///
   /// **返回 / Returns**
-  /// [VideoCompressionCapabilities]：`encoderName` 无硬编时为 null；`codecs` 为可硬编集合；
+  /// [VideoCompressionCapabilities]：`encoderName` 无硬编时为 null；`codecs` 含可用硬编和软编；
   /// `acceptsContentUri` 仅 Android 为 true。
-  /// [VideoCompressionCapabilities] with encoder name, codec set, and whether `content://` is accepted.
+  /// [VideoCompressionCapabilities] with the hardware encoder name (null when
+  /// only software is available), the encodable codec set, and whether
+  /// `content://` is accepted.
   ///
   /// **抛出 / Throws**
   /// [MediaCompressionException] 当探测失败。

@@ -37,9 +37,8 @@ method, field, enum value, and error code.
 * `bitrate` is **bits per second**, default `2000000`. Do not pass kbps/Mbps
   numbers without converting (`2` Mbps → `2000000`).
 * `keepAudio` defaults to `true` (AAC passthrough or transcode). Set `false` to
-  drop audio. Windows ignores `keepAudio`. Linux re-encodes the track to AAC
-  and throws `unsupported` when the source has audio but no AAC encoder is
-  installed.
+  drop audio. Windows and Linux re-encode the track to AAC and throw
+  `unsupported` when the source has audio but no AAC encoder is installed.
 * `fps`, `maxDimension`, and `keyframeInterval` are optional. When set, each
   must be `> 0`. `null` keeps the source FPS / no scale / platform GOP default.
 * `file://` is normalized in Dart. `content://` is Android-only
@@ -104,8 +103,8 @@ final session = XueHuaMediaCompression.video.compress(
 );
 ```
 
-Windows ignores `keepAudio`. Linux applies it: the track is re-encoded to AAC,
-or compress fails with `unsupported` when no AAC encoder is installed.
+Windows and Linux re-encode the track to AAC, or compress fails with
+`unsupported` when the source has audio and no AAC encoder is installed.
 
 ### Empty path throws before native work
 

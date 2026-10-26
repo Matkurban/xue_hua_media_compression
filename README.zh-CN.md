@@ -12,10 +12,10 @@ Flutter 插件，提供**图片与视频压缩**。各端使用系统硬编管�
 | WebP 编码              | 是                  | 否             | 有 WIC 才支持     | libvips 含 webp 才支持 |
 | HEIC 编码              | API 28+            | 是             | 有 HEIF 扩展才支持 | 否                  |
 | AVIF / GIF 编码        | 否                  | 否             | 否               | 否                  |
-| H.264 / H.265 MP4      | Media3 Transformer | AVAssetWriter | MediaTranscoder | GStreamer HW/SW    |
+| H.264 / H.265 MP4      | Media3 Transformer | AVAssetWriter | Media Foundation | GStreamer HW/SW   |
 | `content://` 输入      | 是                  | 否             | 否               | 否                  |
 
-视频输出始终为 MP4。`VideoCompressOptions.keepAudio` 默认 `true`（AAC 透传或转码）。Windows 忽略 `keepAudio`；Linux 将音频转码为 AAC。
+视频输出始终为 MP4。`VideoCompressOptions.keepAudio` 默认 `true`（AAC 透传或转码）。Windows 与 Linux 都将音频转码为 AAC；源片有音轨但没有 AAC 编码器时抛 `unsupported`。
 
 运行时先调用 `queryCapabilities()`，用 `outputFormats` / `codecs` 填选项。缺能力抛 `MediaCompressionException.unsupported` 或 `hardwareUnavailable`，禁止静默改格式。
 
@@ -29,14 +29,14 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 | Dart        | ≥ 3.12.0                                                                      |
 | Android     | minSdk 23, Media3 Transformer                                                 |
 | iOS / macOS | iOS 12 / macOS 10.15                                                          |
-| Windows     | Windows 10+, C++/WinRT                                                        |
+| Windows     | Windows 10+，Media Foundation（不使用 FFmpeg）                                |
 | Linux       | `libvips-dev`、`libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev` 以及 GStreamer base/good/bad/ugly 插件 |
 
 ## 安装
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.2.1
+  xue_hua_media_compression: ^2.3.0
 ```
 
 ```dart
@@ -147,6 +147,18 @@ xvfb-run -a flutter drive \
   --target=integration_test/linux_driver_test.dart \
   -d linux
 flutter build linux
+```
+
+Windows 图片与视频（WIC + Media Foundation，不用 FFmpeg）。机器需要 Media Foundation 的 H.264 编码器（桌面版 Windows 自带；部分 Server 镜像要装 Media Feature Pack）：
+
+```bash
+cd example
+flutter test integration_test -d windows
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/windows_driver_test.dart \
+  -d windows
+flutter build windows
 ```
 
 确认插件没有链接 FFmpeg：

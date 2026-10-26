@@ -13,11 +13,13 @@ native hardware pipeline. **Web is not supported.**
 | WebP encode                  | yes                | no            | if WIC present    | if libvips webp |
 | HEIC encode                  | API 28+            | yes           | if HEIF extension | no              |
 | AVIF / GIF encode            | no                 | no            | no                | no              |
-| H.264 / H.265 MP4            | Media3 Transformer | AVAssetWriter | MediaTranscoder   | GStreamer HW/SW |
+| H.264 / H.265 MP4            | Media3 Transformer | AVAssetWriter | Media Foundation  | GStreamer HW/SW |
 | `content://` input           | yes                | no            | no                | no              |
 
 Video output is always MP4. `VideoCompressOptions.keepAudio` defaults to
-`true` (AAC passthrough or transcode). Windows ignores `keepAudio`; Linux re-encodes audio to AAC.
+`true` (AAC passthrough or transcode). Windows and Linux re-encode audio to
+AAC and throw `unsupported` when the source has audio but no AAC encoder is
+installed.
 
 Call `queryCapabilities()` at runtime and use `outputFormats` / `codecs`.
 Missing capability → `MediaCompressionException.unsupported` or
@@ -34,14 +36,14 @@ supported platform.
 | Dart        | ≥ 3.12.0                                                                      |
 | Android     | minSdk 23, Media3 Transformer                                                 |
 | iOS / macOS | iOS 12 / macOS 10.15                                                          |
-| Windows     | Windows 10+, C++/WinRT                                                        |
+| Windows     | Windows 10+, Media Foundation (no FFmpeg)                                     |
 | Linux       | `libvips-dev`, `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`, GStreamer base/good/bad/ugly plugins |
 
 ## Install
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.2.1
+  xue_hua_media_compression: ^2.3.0
 ```
 
 ```dart
@@ -164,6 +166,27 @@ xvfb-run -a flutter drive \
   --target=integration_test/linux_driver_test.dart \
   -d linux
 flutter build linux
+```
+
+Windows image and video compression (WIC + Media Foundation, no FFmpeg). The
+machine needs the H.264 Media Foundation encoder (desktop Windows includes it;
+some Server images need the Media Feature Pack):
+
+```bash
+cd example
+flutter test integration_test -d windows
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/windows_driver_test.dart \
+  -d windows
+flutter build windows
+```
+
+Confirm the plugin DLL does not mention FFmpeg:
+
+```powershell
+$dll = Get-ChildItem -Recurse -Filter xue_hua_media_compression_plugin.dll example\build | Select-Object -First 1
+findstr /i /c:"libavcodec" /c:"libavformat" /c:"ffmpeg" /c:"gst-libav" $dll.FullName
 ```
 
 Confirm the plugin does not link FFmpeg:

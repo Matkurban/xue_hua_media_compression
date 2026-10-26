@@ -7,9 +7,10 @@ enum VideoCodec {
   /// H.264 / AVC, muxed into MP4.
   h264,
 
-  /// H.265 / HEVC，封装进 MP4。无硬件编码器时抛 `hardwareUnavailable`。
+  /// H.265 / HEVC，封装进 MP4。没有可用编码器时抛 `hardwareUnavailable`。
   ///
-  /// H.265 / HEVC, muxed into MP4. Throws `hardwareUnavailable` without a HW encoder.
+  /// H.265 / HEVC, muxed into MP4. Throws `hardwareUnavailable` when no encoder
+  /// is installed.
   h265,
 }
 

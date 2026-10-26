@@ -131,9 +131,10 @@ must be `> 0`.
 ### `final bool keepAudio`
 
 Keep the audio track (passthrough or transcode to AAC). Default `true`.
-Ignored on Windows. Linux re-encodes the track to AAC. If the source has
-audio and no AAC encoder (`fdkaacenc` or `voaacenc`) is installed, compress
-fails with `unsupported` instead of dropping the track.
+Windows and Linux re-encode the track to AAC. If the source has audio and no
+AAC encoder is installed (Linux: `fdkaacenc` or `voaacenc`; Windows: a Media
+Foundation AAC encoder), compress fails with `unsupported` instead of dropping
+the track.
 
 ## `VideoCompressResult`
 
@@ -203,7 +204,7 @@ Typical pipelines (runtime `queryCapabilities()` is authoritative):
 
 - Android: Media3 Transformer
 - iOS / macOS: AVAssetWriter
-- Windows: MediaTranscoder
+- Windows: Media Foundation (Source Reader + Sink Writer). No FFmpeg.
 - Linux: GStreamer hardware encoders, with software fallback. Do not install
   gst-libav or FFmpeg for this plugin.
 
