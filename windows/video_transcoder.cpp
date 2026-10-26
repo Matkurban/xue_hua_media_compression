@@ -25,6 +25,11 @@ using Microsoft::WRL::ComPtr;
 namespace xue_hua_media_compression {
 namespace {
 
+// The SDK name is MF_E_UNSUPPORTED_BYTESTREAM_TYPE (0xC00D36C4).
+#ifndef MF_E_UNSUPPORTED_BYTESTREAM_TYPE
+#define MF_E_UNSUPPORTED_BYTESTREAM_TYPE static_cast<HRESULT>(-1072875836)
+#endif
+
 constexpr LONGLONG kHundredNs = 10000000;
 
 struct Fail {
@@ -849,7 +854,7 @@ Fail MapReadError(HRESULT hr, bool audio) {
     return Fail{"cancelled", "Cancelled"};
   }
   if (hr == MF_E_INVALIDMEDIATYPE || hr == MF_E_INVALID_STREAM_DATA ||
-      hr == MF_E_UNSUPPORTED_BYTESTREAM || hr == MF_E_INVALID_FILE_FORMAT) {
+      hr == MF_E_UNSUPPORTED_BYTESTREAM_TYPE || hr == MF_E_INVALID_FILE_FORMAT) {
     return Fail{audio ? "decode" : "decode",
                 HrMessage(audio ? "Unable to decode audio" : "Unable to decode video",
                           hr)};
@@ -980,7 +985,8 @@ void CompressVideoWindows(
     PROPVARIANT duration_var;
     PropVariantInit(&duration_var);
     if (SUCCEEDED(reader->GetPresentationAttribute(
-            MF_SOURCE_READER_MEDIASOURCE, MF_PD_DURATION, &duration_var)) &&
+            static_cast<DWORD>(MF_SOURCE_READER_MEDIASOURCE), MF_PD_DURATION,
+            &duration_var)) &&
         duration_var.vt == VT_UI8) {
       frame.duration = static_cast<LONGLONG>(duration_var.uhVal.QuadPart);
     }
