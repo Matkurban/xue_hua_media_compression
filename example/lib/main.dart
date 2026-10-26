@@ -216,15 +216,20 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
             children: [
               const Text('目标格式: '),
               const SizedBox(width: 8),
-              DropdownButton<ImageFormat>(
-                value: formats.contains(_format) ? _format : formats.first,
-                items: formats
-                    .map((f) => DropdownMenuItem(value: f, child: Text(f.name)))
-                    .toList(),
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() => _format = v ?? ImageFormat.jpeg),
-              ),
+              if (formats.isEmpty)
+                const Text('无')
+              else
+                DropdownButton<ImageFormat>(
+                  value: formats.contains(_format) ? _format : formats.first,
+                  items: formats
+                      .map(
+                        (f) => DropdownMenuItem(value: f, child: Text(f.name)),
+                      )
+                      .toList(),
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() => _format = v ?? ImageFormat.jpeg),
+                ),
             ],
           ),
           if (_format != ImageFormat.png)
@@ -425,15 +430,20 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
             children: [
               const Text('编码: '),
               const SizedBox(width: 8),
-              DropdownButton<VideoCodec>(
-                value: codecs.contains(_codec) ? _codec : codecs.first,
-                items: codecs
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
-                    .toList(),
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() => _codec = v ?? VideoCodec.h264),
-              ),
+              if (codecs.isEmpty)
+                const Text('无')
+              else
+                DropdownButton<VideoCodec>(
+                  value: codecs.contains(_codec) ? _codec : codecs.first,
+                  items: codecs
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c.name)),
+                      )
+                      .toList(),
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() => _codec = v ?? VideoCodec.h264),
+                ),
             ],
           ),
           Row(

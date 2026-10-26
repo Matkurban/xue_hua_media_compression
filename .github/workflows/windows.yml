@@ -1,0 +1,59 @@
+name: Windows
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+      - name: Media Foundation codecs
+        shell: pwsh
+        run: |
+          $enc = Test-Path "$env:WINDIR\System32\mfh264enc.dll"
+          $dec = Test-Path "$env:WINDIR\System32\msmpeg2vdec.dll"
+          Write-Host "mfh264enc.dll=$enc msmpeg2vdec.dll=$dec"
+          if (-not $enc) {
+            try {
+              $feature = Get-WindowsFeature -Name Server-Media-Foundation -ErrorAction SilentlyContinue
+              if ($null -ne $feature -and $feature.InstallState -ne 'Installed') {
+                Install-WindowsFeature -Name Server-Media-Foundation | Out-Host
+              }
+            } catch {
+              Write-Host "Media Foundation feature was not installed: $_"
+            }
+            Write-Host "mfh264enc.dll after feature check:" (Test-Path "$env:WINDIR\System32\mfh264enc.dll")
+          }
+      - name: Flutter version
+        run: flutter --version
+      - name: Package dependencies
+        run: flutter pub get
+      - name: Example dependencies
+        working-directory: example
+        run: flutter pub get
+      - name: Analyze package
+        run: flutter analyze
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+      - name: Unit tests
+        run: flutter test
+      - name: Build Windows
+        working-directory: example
+        run: flutter build windows
+      - name: Integration tests
+        working-directory: example
+        run: flutter test integration_test -d windows

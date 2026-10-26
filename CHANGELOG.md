@@ -1,3 +1,23 @@
+## [2.3.0] - 2026-10-26
+
+### Fixed / 修复
+
+- Windows image errors match the other platforms: a missing file is `notFound`, a file that exists but cannot be decoded is `decode`, and a directory is `io`. Cancelling an image compress deletes the output. Nested destination directories are created. Encode failures remove a partial file. `queryImageCapabilities` lists only WIC codecs that are actually installed, and lossy `quality` applies to WebP and HEIC as well as JPEG.
+  Windows 图片错误与其它平台对齐：文件不存在为 `notFound`，文件在但解不出为 `decode`，目录为 `io`。取消图片压缩会删掉输出。目标路径会创建嵌套父目录。编码失败会删掉半成品。`queryImageCapabilities` 只列出本机已安装的 WIC 编解码器；有损 `quality` 对 WebP、HEIC 和 JPEG 都生效。
+- Windows video no longer reports H.264, H.265, and `encoderName: MediaTranscoder` unconditionally. `codecs` lists Media Foundation encoders that are installed (hardware or software). `encoderName` is `MediaFoundationHW` only when a hardware video encoder is present, otherwise null. Compress results name the encoder that ran (`MediaFoundation:H264`, `MediaFoundationHW:H265`, …).
+  Windows 视频不再无条件报告 H.264、H.265 和 `encoderName: MediaTranscoder`。`codecs` 是本机已安装的 Media Foundation 编码器（硬编或软编）。只有存在硬编时 `encoderName` 才是 `MediaFoundationHW`，否则为 null。压缩结果里的名字是实际编码器（`MediaFoundation:H264`、`MediaFoundationHW:H265` 等）。
+- Windows video honours `keepAudio` (AAC via Media Foundation). When the source has audio and no AAC encoder is installed, `keepAudio: true` throws `unsupported` instead of dropping the track. `keepAudio: false` still writes a silent MP4. `fps`, `maxDimension` (even dimensions), and `keyframeInterval` are applied. Cancel stops the encode and deletes the output. Missing files are `notFound`; corrupt files are `decode`.
+  Windows 视频遵守 `keepAudio`（用 Media Foundation 转成 AAC）。源片有音轨但没有 AAC 编码器时，`keepAudio: true` 抛 `unsupported`，不再静默丢掉音轨。`keepAudio: false` 仍写出无音轨 MP4。`fps`、`maxDimension`（偶数尺寸）和 `keyframeInterval` 会生效。取消会停掉编码并删除输出。文件不存在为 `notFound`，损坏文件为 `decode`。
+- Jobs stay alive until the worker finishes, so `dispose` during an encode no longer frees the event channel out from under the encoder.
+  任务会活到工作线程结束，编码过程中 `dispose` 不再把事件通道从编码器底下拆掉。
+- The example no longer throws when a format or codec list is empty.
+  示例在格式或编码列表为空时不再抛异常。
+
+### Changed / 变更
+
+- Windows video encode stays on Media Foundation (Source Reader + Sink Writer, hardware when present, software otherwise). It does not use FFmpeg, libav, or GStreamer.
+  Windows 视频仍走 Media Foundation（Source Reader + Sink Writer，有硬编用硬编，否则软编）。不使用 FFmpeg、libav 或 GStreamer。
+
 ## [2.2.1] - 2026-10-26
 
 ### Fixed / 修复

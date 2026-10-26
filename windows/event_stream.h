@@ -10,6 +10,7 @@
 #include <flutter/event_stream_handler_functions.h>
 #include <flutter/standard_method_codec.h>
 
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <memory>
@@ -51,7 +52,12 @@ class EventStream {
     channel_.SetStreamHandler(std::move(handler));
   }
 
+  void Close() { alive_.store(false); }
+
   void SendProgress(double value) {
+    if (!alive_.load() || terminal_) {
+      return;
+    }
     if (value < 0) value = 0;
     if (value > 1) value = 1;
     if (!sink_) {
@@ -95,6 +101,10 @@ class EventStream {
   }
 
   void SendTerminal(const flutter::EncodableMap& event) {
+    if (!alive_.load() || terminal_) {
+      return;
+    }
+    terminal_ = true;
     if (sink_) {
       sink_->Success(flutter::EncodableValue(event));
     } else {
@@ -107,6 +117,8 @@ class EventStream {
   std::optional<double> last_progress_;
   std::deque<flutter::EncodableValue> pending_terminal_;
   std::optional<std::chrono::steady_clock::time_point> last_sent_;
+  std::atomic<bool> alive_{true};
+  bool terminal_ = false;
 };
 
 }  // namespace xue_hua_media_compression

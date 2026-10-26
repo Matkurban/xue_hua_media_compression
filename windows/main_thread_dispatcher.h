@@ -20,9 +20,16 @@ class MainThreadDispatcher {
   }
 
   ~MainThreadDispatcher() {
-    if (hwnd_) {
-      DestroyWindow(hwnd_);
+    if (!hwnd_) {
+      return;
     }
+    MSG msg;
+    while (PeekMessageW(&msg, hwnd_, kRunTaskMessage, kRunTaskMessage, PM_REMOVE)) {
+      auto* task = reinterpret_cast<std::function<void()>*>(msg.lParam);
+      delete task;
+    }
+    DestroyWindow(hwnd_);
+    hwnd_ = nullptr;
   }
 
   void Post(std::function<void()> task) const {
@@ -45,7 +52,10 @@ class MainThreadDispatcher {
                                   LPARAM lparam) {
     if (message == kRunTaskMessage) {
       auto* task = reinterpret_cast<std::function<void()>*>(lparam);
-      (*task)();
+      try {
+        (*task)();
+      } catch (...) {
+      }
       delete task;
       return 0;
     }

@@ -35,11 +35,8 @@ apply_standard_settings(${PLUGIN_TARGET})
 
 if(MSVC)
   target_compile_options(${PLUGIN_TARGET} PRIVATE "/utf-8")
-  target_compile_options(${PLUGIN_TARGET} PRIVATE "/await")
-  # VS 18 / MSVC 14.51 treats /await + <experimental/coroutine> as an error.
-  target_compile_definitions(${PLUGIN_TARGET} PRIVATE
-    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 endif()
+target_compile_definitions(${PLUGIN_TARGET} PRIVATE NOMINMAX)
 
 # Resolve the plugin-symlink to the real package path so /I stays under MAX_PATH.
 get_filename_component(PLUGIN_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
@@ -55,8 +52,9 @@ target_include_directories(${PLUGIN_TARGET} PRIVATE
 target_include_directories(${PLUGIN_TARGET} INTERFACE
   "${PLUGIN_SRC_DIR}/include")
 target_link_libraries(${PLUGIN_TARGET} PRIVATE flutter flutter_wrapper_plugin)
+# Media Foundation only. Do not link FFmpeg, libav*, or gst-libav.
 target_link_libraries(${PLUGIN_TARGET} PRIVATE
-  windowscodecs ole32 oleaut32 runtimeobject windowsapp)
+  windowscodecs ole32 oleaut32 mfplat mfreadwrite mfuuid wmcodecdspuuid)
 
 add_library(${PLUGIN_NAME} ALIAS ${PLUGIN_TARGET})
 

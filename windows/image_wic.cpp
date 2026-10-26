@@ -5,8 +5,12 @@
 #include <wrl/client.h>
 
 #include <algorithm>
-#include <fstream>
+#include <cstdint>
+#include <filesystem>
 #include <stdexcept>
+#include <stdio.h>
+#include <system_error>
+#include <vector>
 
 #include "messages.g.h"
 
@@ -36,9 +40,9 @@ std::wstring Utf8ToWideImpl(const std::string& utf8) {
   return wide;
 }
 
-bool EncoderInstalled(IWICImagingFactory* factory, REFGUID format) {
+bool ComponentInstalled(IWICImagingFactory* factory, DWORD kinds, REFGUID format) {
   ComPtr<IEnumUnknown> enumerator;
-  if (FAILED(factory->CreateComponentEnumerator(WICEncoder, WICComponentEnumerateDefault,
+  if (FAILED(factory->CreateComponentEnumerator(kinds, WICComponentEnumerateDefault,
                                                 enumerator.GetAddressOf()))) {
     return false;
   }
@@ -107,7 +111,7 @@ void EncodeToStream(IWICImagingFactory* factory, IWICBitmapSource* source,
   if (FAILED(encoder->CreateNewFrame(frame.GetAddressOf(), props.GetAddressOf()))) {
     throw WicError("encode", "CreateNewFrame failed");
   }
-  if (props && format == GUID_ContainerFormatJpeg) {
+  if (props && format != GUID_ContainerFormatPng) {
     PROPBAG2 option = {};
     option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
     VARIANT value;
@@ -155,20 +159,36 @@ ImageCapabilitiesMsg QueryImageCapabilitiesWic() {
                               IID_PPV_ARGS(factory.GetAddressOf())))) {
     throw FlutterError("encode", "WIC factory unavailable");
   }
-  flutter::EncodableList inputs = {
-      flutter::EncodableValue("jpeg"), flutter::EncodableValue("png"),
-      flutter::EncodableValue("gif"), flutter::EncodableValue("webp"),
-      flutter::EncodableValue("heic"),
+  flutter::EncodableList inputs;
+  const struct {
+    const char* name;
+    GUID format;
+  } decoded[] = {
+      {"jpeg", GUID_ContainerFormatJpeg},
+      {"png", GUID_ContainerFormatPng},
+      {"gif", GUID_ContainerFormatGif},
+      {"webp", GUID_ContainerFormatWebp},
+      {"heic", GUID_ContainerFormatHeif},
   };
-  flutter::EncodableList outputs = {
-      flutter::EncodableValue("jpeg"),
-      flutter::EncodableValue("png"),
-  };
-  if (EncoderInstalled(factory.Get(), GUID_ContainerFormatWebp)) {
-    outputs.push_back(flutter::EncodableValue("webp"));
+  for (const auto& item : decoded) {
+    if (ComponentInstalled(factory.Get(), WICDecoder, item.format)) {
+      inputs.push_back(flutter::EncodableValue(item.name));
+    }
   }
-  if (EncoderInstalled(factory.Get(), GUID_ContainerFormatHeif)) {
-    outputs.push_back(flutter::EncodableValue("heic"));
+  flutter::EncodableList outputs;
+  const struct {
+    const char* name;
+    GUID format;
+  } encoded[] = {
+      {"jpeg", GUID_ContainerFormatJpeg},
+      {"png", GUID_ContainerFormatPng},
+      {"webp", GUID_ContainerFormatWebp},
+      {"heic", GUID_ContainerFormatHeif},
+  };
+  for (const auto& item : encoded) {
+    if (ComponentInstalled(factory.Get(), WICEncoder, item.format)) {
+      outputs.push_back(flutter::EncodableValue(item.name));
+    }
   }
   return ImageCapabilitiesMsg(inputs, outputs);
 }
@@ -208,10 +228,18 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
       throw FlutterError("notFound", "Missing source path");
     }
     const std::wstring path = Utf8ToWideImpl(*source.path());
-    if (FAILED(factory->CreateDecoderFromFilename(
-            path.c_str(), nullptr, GENERIC_READ,
-            WICDecodeMetadataCacheOnDemand, decoder.GetAddressOf()))) {
+    const DWORD attrs = GetFileAttributesW(path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
       throw FlutterError("notFound", "Image not found");
+    }
+    if ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+      throw FlutterError("io", "Image path is a directory");
+    }
+    const HRESULT opened = factory->CreateDecoderFromFilename(
+        path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand,
+        decoder.GetAddressOf());
+    if (FAILED(opened)) {
+      throw FlutterError("decode", "CreateDecoderFromFilename failed");
     }
   }
   ComPtr<IWICBitmapFrameDecode> frame;
@@ -228,7 +256,7 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
   UINT height = 0;
   scaled->GetSize(&width, &height);
 
-  GUID format;
+  GUID format = {};
   try {
     format = FormatGuid(options.format());
   } catch (const WicError& error) {
@@ -245,19 +273,44 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
     GetTempPathW(MAX_PATH, temp_path);
     wchar_t temp_file[MAX_PATH];
     GetTempFileNameW(temp_path, L"xh", 0, temp_file);
-    out_stream->InitializeFromFilename(temp_file, GENERIC_WRITE);
+    if (FAILED(out_stream->InitializeFromFilename(temp_file, GENERIC_WRITE))) {
+      DeleteFileW(temp_file);
+      throw FlutterError("io", "Unable to open a temporary image file");
+    }
     try {
       EncodeToStream(factory.Get(), scaled.Get(), out_stream.Get(), format,
                      static_cast<int>(options.quality()));
     } catch (const WicError& error) {
+      out_stream.Reset();
       DeleteFileW(temp_file);
       throw FlutterError(error.code(), error.what());
     }
     out_stream.Reset();
-    std::ifstream in(temp_file, std::ios::binary);
-    memory.assign(std::istreambuf_iterator<char>(in),
-                  std::istreambuf_iterator<char>());
-    in.close();
+    FILE* file = nullptr;
+    if (_wfopen_s(&file, temp_file, L"rb") != 0 || file == nullptr) {
+      DeleteFileW(temp_file);
+      throw FlutterError("io", "Unable to read the encoded image");
+    }
+    if (_fseeki64(file, 0, SEEK_END) != 0) {
+      fclose(file);
+      DeleteFileW(temp_file);
+      throw FlutterError("io", "Unable to read the encoded image");
+    }
+    const __int64 length = _ftelli64(file);
+    if (length < 0 || _fseeki64(file, 0, SEEK_SET) != 0) {
+      fclose(file);
+      DeleteFileW(temp_file);
+      throw FlutterError("io", "Unable to read the encoded image");
+    }
+    memory.resize(static_cast<size_t>(length));
+    if (length > 0 &&
+        fread(memory.data(), 1, static_cast<size_t>(length), file) !=
+            static_cast<size_t>(length)) {
+      fclose(file);
+      DeleteFileW(temp_file);
+      throw FlutterError("io", "Unable to read the encoded image");
+    }
+    fclose(file);
     DeleteFileW(temp_file);
     return flutter::EncodableMap{
         {flutter::EncodableValue("bytes"), flutter::EncodableValue(memory)},
@@ -276,17 +329,25 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
   }
   output_path = *destination.path();
   const std::wstring wide = Utf8ToWideImpl(output_path);
-  const size_t slash = wide.find_last_of(L"\\/");
-  if (slash != std::wstring::npos) {
-    CreateDirectoryW(wide.substr(0, slash).c_str(), nullptr);
+  const std::filesystem::path parent = std::filesystem::path(wide).parent_path();
+  if (!parent.empty()) {
+    std::error_code mkdir_error;
+    const bool created = std::filesystem::create_directories(parent, mkdir_error);
+    (void)created;
+    if (mkdir_error) {
+      throw FlutterError("io", "Unable to create destination directory");
+    }
   }
   if (FAILED(out_stream->InitializeFromFilename(wide.c_str(), GENERIC_WRITE))) {
+    DeleteFileW(wide.c_str());
     throw FlutterError("io", "Unable to open destination");
   }
   try {
     EncodeToStream(factory.Get(), scaled.Get(), out_stream.Get(), format,
                    static_cast<int>(options.quality()));
   } catch (const WicError& error) {
+    out_stream.Reset();
+    DeleteFileW(wide.c_str());
     throw FlutterError(error.code(), error.what());
   }
   WIN32_FILE_ATTRIBUTE_DATA attrs = {};
@@ -294,7 +355,7 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
   if (GetFileAttributesExW(wide.c_str(), GetFileExInfoStandard, &attrs)) {
     LARGE_INTEGER li;
     li.LowPart = attrs.nFileSizeLow;
-    li.HighPart = attrs.nFileSizeHigh;
+    li.HighPart = static_cast<LONG>(attrs.nFileSizeHigh);
     size = li.QuadPart;
   }
   return flutter::EncodableMap{

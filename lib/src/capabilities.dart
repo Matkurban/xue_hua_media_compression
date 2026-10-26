@@ -24,9 +24,9 @@ final class ImageCompressionCapabilities {
   final Set<ImageFormat> outputFormats;
 }
 
-/// 当前平台的视频硬编能力。
+/// 当前平台的视频编码能力。
 ///
-/// Hardware video-encode capabilities of the current platform.
+/// Video-encode capabilities of the current platform.
 final class VideoCompressionCapabilities {
   /// 创建能力快照。
   ///
@@ -37,14 +37,15 @@ final class VideoCompressionCapabilities {
     required this.acceptsContentUri,
   });
 
-  /// 硬件编码器名称；无法硬编时为 null。
+  /// 硬件编码器名称；没有硬编时为 null。软编仍可出现在 [codecs] 里。
   ///
-  /// Hardware encoder name; null when HW encode is unavailable.
+  /// Hardware encoder name; null when no hardware encoder is available.
+  /// Software encoders still appear in [codecs].
   final String? encoderName;
 
-  /// 当前能硬编的编码集合。
+  /// 当前能编码的集合，包含可用的硬编和软编。
   ///
-  /// Codecs that can be hardware-encoded right now.
+  /// Codecs that can be encoded right now, including software encoders.
   final Set<VideoCodec> codecs;
 
   /// 是否接受 Android `content://` 输入。仅 Android 为 true。

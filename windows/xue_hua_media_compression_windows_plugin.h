@@ -3,13 +3,14 @@
 
 #include <flutter/plugin_registrar_windows.h>
 
+#include <atomic>
 #include <map>
 #include <memory>
+#include <string>
 
 #include "event_stream.h"
 #include "main_thread_dispatcher.h"
 #include "messages.g.h"
-#include "video_transcoder.h"
 
 namespace xue_hua_media_compression {
 
@@ -44,13 +45,21 @@ class XueHuaMediaCompressionWindowsPlugin : public flutter::Plugin,
  private:
   struct Job {
     std::shared_ptr<EventStream> events;
-    std::unique_ptr<VideoJob> video;
+    std::shared_ptr<std::atomic<bool>> cancelled =
+        std::make_shared<std::atomic<bool>>(false);
+    std::atomic<bool> output_opened{false};
+    std::string output_path;
     bool started = false;
   };
 
+  static void DeleteJobOutput(const std::shared_ptr<Job>& job);
+  static void ReleaseOnPlatform(
+      const std::shared_ptr<MainThreadDispatcher>& dispatcher,
+      const std::shared_ptr<Job>& job);
+
   flutter::PluginRegistrarWindows* registrar_;
   std::shared_ptr<MainThreadDispatcher> dispatcher_;
-  std::map<int64_t, std::unique_ptr<Job>> jobs_;
+  std::map<int64_t, std::shared_ptr<Job>> jobs_;
   int64_t next_id_ = 1;
 };
 
