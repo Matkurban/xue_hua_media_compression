@@ -10,6 +10,8 @@
   Darwin 视频取消时会停掉 AVAssetReader / AVAssetWriter 并删除输出；编码过程中 `dispose` 也一样。`cancel` 在置位后立刻返回。`cancelWriting` 在旁路队列上执行，平台线程和媒体回调不会互相死等。会话一定会以 `cancelled` 结束。事件通道会留到工作线程结束。文件不存在为 `notFound`，目录为 `io`，损坏文件为 `decode`。奇数边会收成偶数。`fps`、`maxDimension` 和 `keyframeInterval` 仍然生效。`keepAudio: true` 会把非 AAC 音轨转成 AAC。
 - Progress events are no longer dropped while a listener is attached: the first in-flight value is delivered, and a coalesced update is flushed before completion.
   已有监听者时，进度不再被丢掉：第一笔进行中的进度会送出，完成前会把合并掉的最新进度补发。
+- Shared Darwin sources compile for iOS. `AVVideoEncoderSpecificationKey` is macOS-only, so the hardware encoder specification stays on the macOS writer settings. iOS still probes VideoToolbox and AVAssetWriter uses a hardware encoder when one is present.
+  共享的 Darwin 源码可以在 iOS 上编译。`AVVideoEncoderSpecificationKey` 只在 macOS 上存在，硬编规格因此只写进 macOS 的 writer 设置。iOS 仍探测 VideoToolbox，有硬编时由 AVAssetWriter 使用硬编。
 
 ### Added / 新增
 

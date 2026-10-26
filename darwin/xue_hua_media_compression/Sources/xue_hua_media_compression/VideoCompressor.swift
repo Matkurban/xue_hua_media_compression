@@ -512,18 +512,15 @@ final class VideoCompressor {
       AVVideoCompressionPropertiesKey: compression,
     ]
     if hardware {
+      // AVVideoEncoderSpecificationKey is API_UNAVAILABLE on iOS, so a
+      // runtime #available check still fails the iOS compile. macOS keeps
+      // RequireHardware on the writer. iOS AVAssetWriter already selects a
+      // hardware encoder when the VideoToolbox probe says one exists.
       #if os(macOS)
         settings[AVVideoEncoderSpecificationKey] = [
           kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder as String: true,
           kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder as String: true,
         ]
-      #else
-        if #available(iOS 17.4, *) {
-          settings[AVVideoEncoderSpecificationKey] = [
-            kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder as String: true,
-            kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder as String: true,
-          ]
-        }
       #endif
     }
     return settings
