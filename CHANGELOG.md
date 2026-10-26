@@ -1,3 +1,21 @@
+## [2.3.1] - 2026-10-26
+
+### Fixed / 修复
+
+- Darwin (iOS / macOS) image errors match the other platforms. A missing file is `notFound`, a file that exists but cannot be decoded is `decode`, and a directory is `io`. Cancelling an image compress deletes the output. Encode failures remove a partial file. `queryImageCapabilities` lists HEIC and WebP only when ImageIO can actually encode them. Reported file sizes are the real byte length.
+  Darwin（iOS / macOS）图片错误与其它平台对齐。文件不存在为 `notFound`，文件在但解不出为 `decode`，目录为 `io`。取消图片压缩会删掉输出。编码失败会删掉半成品。`queryImageCapabilities` 只在 ImageIO 真能编码时列出 HEIC 和 WebP。返回的文件大小是实际字节数。
+- Darwin video `encoderName` is `VideoToolboxHW` only when a hardware encoder is present, otherwise null. Software H.264 stays in `codecs`. Compress results name the encoder that ran (`VideoToolbox:H264`, `VideoToolboxHW:H265`, …). Frames smaller than 64px, or a hardware encoder that rejects the frame, fall back to the software encoder instead of failing.
+  Darwin 视频只有存在硬编时 `encoderName` 才是 `VideoToolboxHW`，否则为 null。软编 H.264 仍在 `codecs` 里。压缩结果写的是实际编码器（`VideoToolbox:H264`、`VideoToolboxHW:H265` 等）。边长小于 64，或硬编拒绝该尺寸时，会改走软编而不是失败。
+- Darwin video honours cancel by stopping AVAssetReader / AVAssetWriter and deleting the output, including when `dispose` runs during the encode. The event channel stays alive until the worker finishes. Missing files are `notFound`, directories are `io`, and corrupt files are `decode`. Odd dimensions are scaled to even numbers. `fps`, `maxDimension`, and `keyframeInterval` still apply. `keepAudio: true` transcodes non-AAC audio to AAC.
+  Darwin 视频取消时会停掉 AVAssetReader / AVAssetWriter 并删除输出；编码过程中 `dispose` 也一样。事件通道会留到工作线程结束。文件不存在为 `notFound`，目录为 `io`，损坏文件为 `decode`。奇数边会收成偶数。`fps`、`maxDimension` 和 `keyframeInterval` 仍然生效。`keepAudio: true` 会把非 AAC 音轨转成 AAC。
+- Progress events are no longer dropped while a listener is attached: the first in-flight value is delivered, and a coalesced update is flushed before completion.
+  已有监听者时，进度不再被丢掉：第一笔进行中的进度会送出，完成前会把合并掉的最新进度补发。
+
+### Added / 新增
+
+- `example/integration_test/macos_driver_test.dart` and `ios_driver_test.dart` share one Darwin driver. Fixtures are QuickTime movies and PNGs built in Dart (ImageIO / VideoToolbox inputs). No FFmpeg.
+  `example/integration_test/macos_driver_test.dart` 与 `ios_driver_test.dart` 共用一套 Darwin 驱动测试。夹具是 Dart 生成的 QuickTime 和 PNG（交给 ImageIO / VideoToolbox）。不使用 FFmpeg。
+
 ## [2.3.0] - 2026-10-26
 
 ### Fixed / 修复

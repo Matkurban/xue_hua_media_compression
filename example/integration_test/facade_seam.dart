@@ -53,13 +53,17 @@ void registerFacadeSeamTests() {
     expect(result.width, greaterThan(0));
   });
 
-  test('video queryCapabilities reports VideoToolbox on Darwin', () async {
+  test('video queryCapabilities names hardware only when present', () async {
     if (!(Platform.isIOS || Platform.isMacOS)) {
       return;
     }
     final caps = await XueHuaMediaCompression.video.queryCapabilities();
-    expect(caps.encoderName, 'VideoToolbox');
     expect(caps.codecs, contains(VideoCodec.h264));
+    expect(caps.acceptsContentUri, isFalse);
+    final name = caps.encoderName;
+    if (name != null) {
+      expect(name, 'VideoToolboxHW');
+    }
   });
 
   test('video compress round-trip keeps storage size without audio', () async {
@@ -87,7 +91,10 @@ void registerFacadeSeamTests() {
     expect(result.width, 64);
     expect(result.height, 64);
     if (Platform.isIOS || Platform.isMacOS) {
-      expect(result.encoderName, 'VideoToolbox');
+      expect(
+        result.encoderName,
+        anyOf('VideoToolbox:H264', 'VideoToolboxHW:H264'),
+      );
       expect(result.codec, VideoCodec.h264);
     }
   });

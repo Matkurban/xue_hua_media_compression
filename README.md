@@ -10,7 +10,7 @@ native hardware pipeline. **Web is not supported.**
 |                              | Android            | iOS / macOS   | Windows           | Linux           |
 |------------------------------|--------------------|---------------|-------------------|-----------------|
 | JPEG / PNG                   | yes                | yes           | yes               | yes             |
-| WebP encode                  | yes                | no            | if WIC present    | if libvips webp |
+| WebP encode                  | yes                | if ImageIO    | if WIC present    | if libvips webp |
 | HEIC encode                  | API 28+            | yes           | if HEIF extension | no              |
 | AVIF / GIF encode            | no                 | no            | no                | no              |
 | H.264 / H.265 MP4            | Media3 Transformer | AVAssetWriter | Media Foundation  | GStreamer HW/SW |
@@ -43,7 +43,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.3.0
+  xue_hua_media_compression: ^2.3.1
 ```
 
 ```dart
@@ -180,6 +180,34 @@ flutter drive \
   --target=integration_test/windows_driver_test.dart \
   -d windows
 flutter build windows
+```
+
+macOS and iOS (shared Darwin source: ImageIO + AVFoundation / VideoToolbox, no FFmpeg). Run on an Apple Silicon Mac or an iOS Simulator / device with the example's Flutter SDK:
+
+```bash
+cd example
+flutter test integration_test/macos_driver_test.dart -d macos
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/macos_driver_test.dart \
+  -d macos
+flutter build macos
+
+# iOS simulator or a plugged-in iPhone. `flutter devices` prints the id.
+flutter test integration_test/ios_driver_test.dart -d <device-id>
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/ios_driver_test.dart \
+  -d <device-id>
+```
+
+`queryVideoCapabilities().encoderName` is `VideoToolboxHW` when a hardware encoder exists, and null on the Simulator. Compress results use `VideoToolbox:H264` or `VideoToolboxHW:H264` (and the H265 forms).
+
+Confirm the macOS plugin binary does not mention FFmpeg:
+
+```bash
+BIN=$(find example/build/macos -type f -name xue_hua_media_compression | head -n 1)
+strings "$BIN" | grep -E 'libavcodec|libavformat|libavutil|ffmpeg|gst-libav' && exit 1 || true
 ```
 
 Confirm the plugin DLL does not mention FFmpeg:

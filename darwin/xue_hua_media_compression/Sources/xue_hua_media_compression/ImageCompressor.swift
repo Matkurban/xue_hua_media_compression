@@ -1,25 +1,33 @@
 #if os(iOS)
   import Flutter
-  import MobileCoreServices
 #elseif os(macOS)
   import FlutterMacOS
-  import CoreServices
 #endif
 import Foundation
 import ImageIO
 
 enum ImageCompressor {
   static func queryCapabilities() -> ImageCapabilitiesMsg {
-    let identifiers = (CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? []
-    var inputs = ["jpeg", "png", "gif", "heic"]
+    var inputs = ["jpeg", "png", "gif"]
+    if canDecode("public.heic") || canDecode("public.heif") { inputs.append("heic") }
     if canDecode("org.webmproject.webp") { inputs.append("webp") }
     if canDecode("public.avif") { inputs.append("avif") }
 
-    var outputs = ["jpeg", "png", "heic"]
-    if identifiers.contains(where: { $0 == "org.webmproject.webp" }) {
-      outputs.append("webp")
-    }
+    var outputs = ["jpeg", "png"]
+    if canEncode("public.heic") || canEncode("public.heif") { outputs.append("heic") }
+    if canEncode("org.webmproject.webp") { outputs.append("webp") }
     return ImageCapabilitiesMsg(inputFormats: inputs, outputFormats: outputs)
+  }
+
+  static func removeFile(at path: String) {
+    guard !path.isEmpty else { return }
+    let resolved = filesystemPath(path)
+    var isDirectory = ObjCBool(false)
+    guard FileManager.default.fileExists(atPath: resolved, isDirectory: &isDirectory) else {
+      return
+    }
+    if isDirectory.boolValue { return }
+    try? FileManager.default.removeItem(atPath: resolved)
   }
 
   static func compress(
@@ -28,15 +36,11 @@ enum ImageCompressor {
     options: ImageOptionsMsg
   ) throws -> [String: Any?] {
     let format = options.format
-    guard let uti = destinationUTI(format) else {
+    guard let uti = destinationUTI(format), canEncode(uti as String) else {
       throw PigeonError(
         code: "unsupported",
         message: "Darwin cannot encode \(format)",
         details: nil)
-    }
-    if format == "gif" || format == "avif" {
-      throw PigeonError(
-        code: "unsupported", message: "Darwin cannot encode \(format)", details: nil)
     }
 
     let cgSource = try makeSource(source)
@@ -70,26 +74,29 @@ enum ImageCompressor {
         "height": Int64(image.height),
       ]
     case 1:
-      guard let path = destination.path, !path.isEmpty else {
+      guard let rawPath = destination.path, !rawPath.isEmpty else {
         throw PigeonError(code: "io", message: "Missing destination path", details: nil)
       }
-      if path.hasPrefix("content://") {
+      if rawPath.hasPrefix("content://") {
         throw PigeonError(
           code: "unsupported",
           message: "content:// is Android-only",
           details: nil)
       }
+      let path = filesystemPath(rawPath)
       let url = URL(fileURLWithPath: path)
       try FileManager.default.createDirectory(
         at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
       guard let dest = CGImageDestinationCreateWithURL(url as CFURL, uti, 1, nil) else {
+        removeFile(at: path)
         throw PigeonError(code: "encode", message: "CGImageDestinationCreateWithURL failed", details: nil)
       }
       CGImageDestinationAddImage(dest, image, destProperties as CFDictionary)
       guard CGImageDestinationFinalize(dest) else {
+        removeFile(at: path)
         throw PigeonError(code: "encode", message: "CGImageDestinationFinalize failed", details: nil)
       }
-      let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+      let size = byteSize(at: path)
       return [
         "outputPath": path,
         "sizeBytes": size,
@@ -114,19 +121,24 @@ enum ImageCompressor {
       }
       return cgSource
     case 1:
-      guard let path = source.path, !path.isEmpty else {
+      guard let rawPath = source.path, !rawPath.isEmpty else {
         throw PigeonError(code: "notFound", message: "Missing source path", details: nil)
       }
-      if path.hasPrefix("content://") {
+      if rawPath.hasPrefix("content://") {
         throw PigeonError(
           code: "unsupported",
           message: "content:// is Android-only",
           details: nil)
       }
-      let url = URL(fileURLWithPath: path)
-      guard FileManager.default.fileExists(atPath: url.path) else {
+      let path = filesystemPath(rawPath)
+      var isDirectory = ObjCBool(false)
+      guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
         throw PigeonError(code: "notFound", message: "Image not found: \(path)", details: nil)
       }
+      if isDirectory.boolValue {
+        throw PigeonError(code: "io", message: "Image path is a directory: \(path)", details: nil)
+      }
+      let url = URL(fileURLWithPath: path)
       guard let cgSource = CGImageSourceCreateWithURL(url as CFURL, nil) else {
         throw PigeonError(code: "decode", message: "Unable to create image source", details: nil)
       }
@@ -211,5 +223,27 @@ enum ImageCompressor {
   private static func canDecode(_ uti: String) -> Bool {
     let identifiers = (CGImageSourceCopyTypeIdentifiers() as? [String]) ?? []
     return identifiers.contains(uti)
+  }
+
+  private static func canEncode(_ uti: String) -> Bool {
+    let identifiers = (CGImageDestinationCopyTypeIdentifiers() as? [String]) ?? []
+    return identifiers.contains(uti)
+  }
+
+  private static func filesystemPath(_ raw: String) -> String {
+    if raw.hasPrefix("file://"), let url = URL(string: raw), url.isFileURL {
+      return url.path
+    }
+    return raw
+  }
+
+  private static func byteSize(at path: String) -> Int64 {
+    guard
+      let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+      let number = attributes[.size] as? NSNumber
+    else {
+      return 0
+    }
+    return number.int64Value
   }
 }

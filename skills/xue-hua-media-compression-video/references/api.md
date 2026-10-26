@@ -161,8 +161,9 @@ Output size in bytes.
 
 ### `final String encoderName`
 
-Encoder that actually ran (examples from dartdoc: `Media3Transformer`,
-`VideoToolbox`).
+Encoder that actually ran. Darwin examples: `VideoToolbox:H264` (software)
+and `VideoToolboxHW:H265` (hardware). Capability `encoderName` is
+`VideoToolboxHW` or null; it is not the constant `VideoToolbox`.
 
 ### `final VideoCodec codec`
 
@@ -192,8 +193,10 @@ const VideoCompressionCapabilities({
 
 Hardware encoder name. `null` when hardware encode is unavailable. Linux
 returns `GStreamerHW` when a VA or NVENC element is installed, and `null`
-when only software encoders are present. `VideoCompressResult.encoderName`
-names the element that actually ran, for example `GStreamer:x264enc`.
+when only software encoders are present. On iOS and macOS the hardware name
+is `VideoToolboxHW` (null on the iOS Simulator, where only software runs).
+`VideoCompressResult.encoderName` names the encoder that actually ran, for
+example `GStreamer:x264enc` or `VideoToolbox:H264`.
 
 ### `final Set<VideoCodec> codecs`
 
