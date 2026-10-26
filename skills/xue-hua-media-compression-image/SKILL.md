@@ -27,8 +27,8 @@ method, field, enum value, and error code.
   Encoding a format that is not in that set throws `MediaCompressionException.unsupported`.
 * `compress` returns `CompressionSession<ImageCompressResult>` immediately. It
   is not a `Future`.
-* Listen to `session.progress` before awaiting `session.result`. The stream is
-  broadcast and does not replay missed events.
+* Listen to `session.progress` before awaiting `session.result`. A new
+  listener receives the latest progress already produced, then live updates.
 * After `result` completes (success or error), `await session.dispose()`.
 * Build sources with `MediaSource.bytes` / `MediaSource.path` and destinations
   with `MediaDestination.bytes` / `MediaDestination.path`.

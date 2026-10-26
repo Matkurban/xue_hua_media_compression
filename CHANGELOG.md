@@ -1,3 +1,22 @@
+## [2.2.1] - 2026-10-26
+
+### Fixed / 修复
+
+- Linux image load errors: a missing file is `notFound`; a file that exists but cannot be decoded is `decode`.
+  Linux 图片：文件不存在为 `notFound`；文件在但解不出为 `decode`。
+- Cancelling an image compress deletes the output file that native code already wrote.
+  取消图片压缩时删掉原生已经写出的文件。
+- `queryVideoCapabilities().encoderName` is null unless a hardware GStreamer encoder is installed. Software encoders stay in `codecs`, and the compress result still names the element that ran (`GStreamer:x264enc`, …). The example no longer labels a software encoder as hardware.
+  只有安装了 GStreamer 硬编时 `encoderName` 才非空。软编仍出现在 `codecs` 里；压缩结果里的 `encoderName` 仍是实际元件（如 `GStreamer:x264enc`）。示例不再把软编显示成硬编。
+- Linux `keepAudio: true` fails with `unsupported` when the source has audio but no AAC encoder (`fdkaacenc` / `voaacenc`) is installed, instead of dropping the track.
+  源片有音轨但系统没有 AAC 编码器时，`keepAudio: true` 抛 `unsupported`，不再静默丢掉音轨。
+- Jobs stay alive until the worker finishes, so `dispose` during an encode no longer frees the event channel out from under GStreamer. Progress events are no longer dropped while the client is listening.
+  任务会活到工作线程结束，编码过程中 `dispose` 不再把事件通道从 GStreamer 底下拆掉。客户端已在听时，进度事件不再被丢掉。
+- `CompressionSession.progress` replays the latest value to a new listener.
+  `CompressionSession.progress` 会把最新进度重放给新的订阅者。
+- The example disposes a session after success, cancel, and failure.
+  示例在成功、取消和失败后都会释放会话。
+
 ## [2.2.0] - 2026-10-21
 
 ### Changed / 变更

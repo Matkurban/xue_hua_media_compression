@@ -31,13 +31,15 @@ method, field, enum value, and error code.
   missing parent directories.
 * `compress` returns `CompressionSession<VideoCompressResult>` immediately. It
   is not a `Future`.
-* Listen to `session.progress` before awaiting `session.result`. The stream is
-  broadcast and does not replay missed events.
+* Listen to `session.progress` before awaiting `session.result`. A new
+  listener receives the latest progress already produced, then live updates.
 * After `result` completes, `await session.dispose()`.
 * `bitrate` is **bits per second**, default `2000000`. Do not pass kbps/Mbps
   numbers without converting (`2` Mbps → `2000000`).
 * `keepAudio` defaults to `true` (AAC passthrough or transcode). Set `false` to
-  drop audio. Windows and Linux **ignore** `keepAudio`.
+  drop audio. Windows ignores `keepAudio`. Linux re-encodes the track to AAC
+  and throws `unsupported` when the source has audio but no AAC encoder is
+  installed.
 * `fps`, `maxDimension`, and `keyframeInterval` are optional. When set, each
   must be `> 0`. `null` keeps the source FPS / no scale / platform GOP default.
 * `file://` is normalized in Dart. `content://` is Android-only
@@ -46,8 +48,10 @@ method, field, enum value, and error code.
   `bitrate <= 0`, or `fps` / `maxDimension` / `keyframeInterval <= 0` when set.
   Native failures complete `session.result` with `MediaCompressionException`.
 * Compare `error.code` to constants on `MediaCompressionException`.
-* `VideoCodec.h265` without a hardware encoder throws `hardwareUnavailable`.
-  Do not silently fall back to H.264.
+* If `queryCapabilities().codecs` does not contain the codec, do not select it.
+  Compress throws `unsupported` or `hardwareUnavailable`. Linux lists H.265
+  when a software encoder such as `x265enc` is installed. Do not silently fall
+  back to H.264.
 
 ## Examples
 
@@ -100,8 +104,8 @@ final session = XueHuaMediaCompression.video.compress(
 );
 ```
 
-Windows and Linux ignore `keepAudio`; the flag still validates and is sent,
-but those platforms do not apply it.
+Windows ignores `keepAudio`. Linux applies it: the track is re-encoded to AAC,
+or compress fails with `unsupported` when no AAC encoder is installed.
 
 ### Empty path throws before native work
 

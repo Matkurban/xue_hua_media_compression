@@ -131,7 +131,9 @@ must be `> 0`.
 ### `final bool keepAudio`
 
 Keep the audio track (passthrough or transcode to AAC). Default `true`.
-Ignored on Windows and Linux.
+Ignored on Windows. Linux re-encodes the track to AAC. If the source has
+audio and no AAC encoder (`fdkaacenc` or `voaacenc`) is installed, compress
+fails with `unsupported` instead of dropping the track.
 
 ## `VideoCompressResult`
 
@@ -187,18 +189,23 @@ const VideoCompressionCapabilities({
 
 ### `final String? encoderName`
 
-Hardware encoder name. `null` when hardware encode is unavailable.
+Hardware encoder name. `null` when hardware encode is unavailable. Linux
+returns `GStreamerHW` when a VA or NVENC element is installed, and `null`
+when only software encoders are present. `VideoCompressResult.encoderName`
+names the element that actually ran, for example `GStreamer:x264enc`.
 
 ### `final Set<VideoCodec> codecs`
 
-Codecs that can be hardware-encoded on this device/OS right now.
+Codecs that can be encoded on this device/OS right now. On Linux this
+includes a software encoder when that is all that is installed.
 
 Typical pipelines (runtime `queryCapabilities()` is authoritative):
 
 - Android: Media3 Transformer
 - iOS / macOS: AVAssetWriter
 - Windows: MediaTranscoder
-- Linux: FFmpeg VAAPI
+- Linux: GStreamer hardware encoders, with software fallback. Do not install
+  gst-libav or FFmpeg for this plugin.
 
 ### `final bool acceptsContentUri`
 
@@ -218,8 +225,9 @@ H.264 / AVC, muxed into MP4.
 
 ### `h265`
 
-H.265 / HEVC, muxed into MP4. Throws `hardwareUnavailable` when no hardware
-encoder is available. Do not silently substitute `h264`.
+H.265 / HEVC, muxed into MP4. Throws `hardwareUnavailable` or `unsupported`
+when the codec is not in `queryCapabilities().codecs`. Linux may list it
+for a software encoder. Do not silently substitute `h264`.
 
 ## `CompressionSession<TResult>`
 
@@ -231,8 +239,8 @@ Returned immediately by `compress`. Native work is already started.
 
 Broadcast stream of progress in `0.0`–`1.0`, pushed from native code (not
 polled). Values are clamped. On success the implementation also emits `1.0`
-then closes the stream. There is **no replay buffer**: subscribe immediately
-after `compress` returns.
+then closes the stream. A new listener receives the latest progress already
+produced, then live updates.
 
 ### `Future<TResult> get result`
 

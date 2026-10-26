@@ -165,6 +165,7 @@ final class _PigeonCompressionSession<TResult>
   final StreamController<double> _progressController =
       StreamController<double>.broadcast();
   final Completer<TResult> _resultCompleter = Completer<TResult>();
+  double? _latestProgress;
 
   late final Future<int> _idFuture;
   StreamSubscription<dynamic>? _eventSub;
@@ -172,7 +173,30 @@ final class _PigeonCompressionSession<TResult>
   int? _id;
 
   @override
-  Stream<double> get progress => _progressController.stream;
+  Stream<double> get progress {
+    return Stream<double>.multi((MultiStreamController<double> controller) {
+      final latest = _latestProgress;
+      if (latest != null) {
+        controller.add(latest);
+      }
+      final subscription = _progressController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = () {
+        subscription.cancel();
+      };
+    });
+  }
+
+  void _emitProgress(double value) {
+    final clamped = value.clamp(0.0, 1.0);
+    _latestProgress = clamped;
+    if (!_progressController.isClosed) {
+      _progressController.add(clamped);
+    }
+  }
 
   @override
   Future<TResult> get result => _resultCompleter.future;
@@ -207,8 +231,8 @@ final class _PigeonCompressionSession<TResult>
     switch (type) {
       case 'progress':
         final value = (map['value'] as num?)?.toDouble();
-        if (value != null && !_progressController.isClosed) {
-          _progressController.add(value.clamp(0.0, 1.0));
+        if (value != null) {
+          _emitProgress(value);
         }
       case 'completed':
         final payload = map['result'];
@@ -237,8 +261,8 @@ final class _PigeonCompressionSession<TResult>
     if (!_resultCompleter.isCompleted) {
       _resultCompleter.complete(value);
     }
+    _emitProgress(1.0);
     if (!_progressController.isClosed) {
-      _progressController.add(1.0);
       unawaited(_progressController.close());
     }
   }
