@@ -5,6 +5,7 @@ import android.os.Looper
 import android.os.SystemClock
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Per-job EventChannel with the buffering rules required by the Dart session:
@@ -20,10 +21,12 @@ internal class JobEventStream(messenger: BinaryMessenger, id: Long) :
     private val channel =
         EventChannel(messenger, "xue_hua_media_compression/job_events_$id")
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val closed = AtomicBoolean(false)
     private var sink: EventChannel.EventSink? = null
     private var lastProgress: Double? = null
     private val pendingTerminal = ArrayDeque<Map<String, Any?>>()
     private var lastProgressSentAt = 0L
+    private var terminalSent = false
 
     init {
         channel.setStreamHandler(this)
@@ -31,6 +34,7 @@ internal class JobEventStream(messenger: BinaryMessenger, id: Long) :
 
     fun sendProgress(value: Double) {
         runOnMain {
+            if (closed.get() || terminalSent) return@runOnMain
             val clamped = value.coerceIn(0.0, 1.0)
             val now = SystemClock.elapsedRealtime()
             val currentSink = sink
@@ -50,40 +54,52 @@ internal class JobEventStream(messenger: BinaryMessenger, id: Long) :
 
     fun sendCompleted(result: Map<String, Any?>) {
         runOnMain {
-            val event = mapOf("type" to "completed", "result" to result)
-            val currentSink = sink
-            if (currentSink != null) {
-                currentSink.success(event)
-            } else {
-                pendingTerminal.addLast(event)
-            }
+            if (closed.get() || terminalSent) return@runOnMain
+            terminalSent = true
+            flushPendingProgress()
+            deliver(mapOf("type" to "completed", "result" to result))
         }
     }
 
     fun sendError(code: String, message: String, details: String? = null) {
         runOnMain {
-            val event =
+            if (closed.get() || terminalSent) return@runOnMain
+            terminalSent = true
+            deliver(
                 mapOf(
                     "type" to "error",
                     "code" to code,
                     "message" to message,
                     "details" to details,
-                )
-            val currentSink = sink
-            if (currentSink != null) {
-                currentSink.success(event)
-            } else {
-                pendingTerminal.addLast(event)
-            }
+                ),
+            )
         }
     }
 
     fun dispose() {
         runOnMain {
+            closed.set(true)
             sink = null
             channel.setStreamHandler(null)
             pendingTerminal.clear()
             lastProgress = null
+        }
+    }
+
+    private fun flushPendingProgress() {
+        val pending = lastProgress ?: return
+        val currentSink = sink ?: return
+        lastProgress = null
+        lastProgressSentAt = SystemClock.elapsedRealtime()
+        currentSink.success(mapOf("type" to "progress", "value" to pending))
+    }
+
+    private fun deliver(event: Map<String, Any?>) {
+        val currentSink = sink
+        if (currentSink != null) {
+            currentSink.success(event)
+        } else if (!closed.get()) {
+            pendingTerminal.addLast(event)
         }
     }
 

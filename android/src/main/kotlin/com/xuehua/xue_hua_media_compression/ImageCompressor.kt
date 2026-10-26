@@ -6,7 +6,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
-import android.media.MediaCodecList
 import android.os.Build
 import android.util.Size
 import androidx.annotation.RequiresApi
@@ -15,6 +14,7 @@ import androidx.heifwriter.HeifWriter
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import kotlin.math.max
@@ -26,8 +26,14 @@ internal object ImageCompressor {
     fun queryCapabilities(): ImageCapabilitiesMsg {
         val inputs = mutableListOf("jpeg", "png", "webp", "gif")
         val outputs = mutableListOf("jpeg", "png", "webp")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            MediaCodecs.hasDecoder(android.media.MediaFormat.MIMETYPE_VIDEO_HEVC)
+        ) {
             inputs.add("heic")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            MediaCodecs.hasEncoder(android.media.MediaFormat.MIMETYPE_VIDEO_HEVC)
+        ) {
             outputs.add("heic")
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -41,21 +47,38 @@ internal object ImageCompressor {
         source: SourceMsg,
         destination: DestinationMsg,
         options: ImageOptionsMsg,
+        isCancelled: () -> Boolean = { false },
     ): Map<String, Any?> {
+        if (isCancelled()) {
+            throw FlutterError("cancelled", "Cancelled", null)
+        }
         val format = options.format
         if (format == "gif" || format == "avif") {
             throw FlutterError("unsupported", "Android cannot encode $format", null)
         }
-        if (format == "heic" && Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            throw FlutterError("unsupported", "HEIC encode requires API 28+", null)
+        if (format == "heic" &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.P ||
+                !MediaCodecs.hasEncoder(android.media.MediaFormat.MIMETYPE_VIDEO_HEVC))
+        ) {
+            throw FlutterError("unsupported", "HEIC encode is not available", null)
         }
         val bitmap = decode(context, source, options.maxDimension?.toInt())
+        if (isCancelled()) {
+            bitmap.recycle()
+            throw FlutterError("cancelled", "Cancelled", null)
+        }
         try {
             val quality = options.quality.toInt().coerceIn(1, 100)
             val keepMetadata = options.keepMetadata && metadataWritable(format)
             return when (destination.kind) {
                 0L -> {
+                    if (isCancelled()) {
+                        throw FlutterError("cancelled", "Cancelled", null)
+                    }
                     var bytes = encodeToBytes(bitmap, format, quality)
+                    if (isCancelled()) {
+                        throw FlutterError("cancelled", "Cancelled", null)
+                    }
                     if (keepMetadata) {
                         bytes = withMetadata(context, source, bytes, format)
                     }
@@ -73,6 +96,10 @@ internal object ImageCompressor {
                         destination.path
                             ?: throw FlutterError("io", "Missing destination path", null)
                     writeFile(bitmap, format, quality, path)
+                    if (isCancelled()) {
+                        File(path).delete()
+                        throw FlutterError("cancelled", "Cancelled", null)
+                    }
                     if (keepMetadata) {
                         try {
                             copyMetadata(context, source, path)
@@ -98,10 +125,54 @@ internal object ImageCompressor {
     }
 
     private fun decode(context: Context, source: SourceMsg, maxDimension: Int?): Bitmap {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            decodeModern(context, source, maxDimension)
-        } else {
-            decodeLegacy(context, source, maxDimension)
+        if (source.kind == 1L) {
+            val path = source.path ?: throw FlutterError("notFound", "Missing source path", null)
+            assertReadable(context, path)
+        } else if (source.kind == 0L) {
+            val bytes = source.bytes
+            if (bytes == null || bytes.isEmpty()) {
+                throw FlutterError("decode", "Empty image bytes", null)
+            }
+        }
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                decodeModern(context, source, maxDimension)
+            } else {
+                decodeLegacy(context, source, maxDimension)
+            }
+        } catch (error: FlutterError) {
+            throw error
+        } catch (error: FileNotFoundException) {
+            throw FlutterError("notFound", error.message ?: "Image not found", null)
+        } catch (error: SecurityException) {
+            throw FlutterError("io", error.message ?: "Cannot read image", null)
+        } catch (error: Exception) {
+            throw FlutterError("decode", error.message ?: "Image decode failed", error.toString())
+        }
+    }
+
+    private fun assertReadable(context: Context, path: String) {
+        if (path.startsWith("content://")) {
+            try {
+                val stream =
+                    context.contentResolver.openInputStream(path.toUri())
+                        ?: throw FlutterError("notFound", "Image not found: $path", null)
+                stream.close()
+            } catch (error: FlutterError) {
+                throw error
+            } catch (error: FileNotFoundException) {
+                throw FlutterError("notFound", "Image not found: $path", null)
+            } catch (error: SecurityException) {
+                throw FlutterError("io", error.message ?: "Cannot read $path", null)
+            }
+            return
+        }
+        val file = File(path)
+        if (!file.exists()) {
+            throw FlutterError("notFound", "Image not found: $path", null)
+        }
+        if (file.isDirectory || !file.isFile) {
+            throw FlutterError("io", "Image path is not a file: $path", null)
         }
     }
 
@@ -144,16 +215,12 @@ internal object ImageCompressor {
 
                 else -> throw FlutterError("unsupported", "Unknown source kind", null)
             }
-        return try {
-            ImageDecoder.decodeBitmap(decoderSource) { decoder, info, _ ->
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                if (maxDimension != null) {
-                    val size = scaledSize(info.size.width, info.size.height, maxDimension)
-                    decoder.setTargetSize(size.width, size.height)
-                }
+        return ImageDecoder.decodeBitmap(decoderSource) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            if (maxDimension != null) {
+                val size = scaledSize(info.size.width, info.size.height, maxDimension)
+                decoder.setTargetSize(size.width, size.height)
             }
-        } catch (error: Exception) {
-            throw FlutterError("decode", error.message ?: "Image decode failed", error.toString())
         }
     }
 
@@ -325,15 +392,24 @@ internal object ImageCompressor {
     }
 
     private fun writeFile(bitmap: Bitmap, format: String, quality: Int, path: String) {
-        File(path).parentFile?.mkdirs()
-        if (format == "heic") {
-            writeHeic(bitmap, quality, path)
-            return
-        }
-        FileOutputStream(File(path)).use { out ->
-            if (!bitmap.compress(compressFormat(format), qualityFor(format, quality), out)) {
-                throw FlutterError("encode", "Bitmap.compress failed for $format", null)
+        val file = File(path)
+        file.parentFile?.mkdirs()
+        try {
+            if (format == "heic") {
+                writeHeic(bitmap, quality, path)
+                return
             }
+            FileOutputStream(file).use { out ->
+                if (!bitmap.compress(compressFormat(format), qualityFor(format, quality), out)) {
+                    throw FlutterError("encode", "Bitmap.compress failed for $format", null)
+                }
+            }
+        } catch (error: FlutterError) {
+            file.delete()
+            throw error
+        } catch (error: Exception) {
+            file.delete()
+            throw FlutterError("encode", error.message ?: "Image encode failed", error.toString())
         }
     }
 
@@ -459,17 +535,4 @@ internal object ImageCompressor {
         }
     }
 
-    fun hasHardwareVideoEncoder(mime: String): Boolean {
-        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-        return list.codecInfos.any { info ->
-            if (!info.isEncoder) return@any false
-            if (!info.supportedTypes.any { it.equals(mime, ignoreCase = true) }) return@any false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                info.isHardwareAccelerated
-            } else {
-                val name = info.name.lowercase()
-                !name.startsWith("omx.google") && !name.startsWith("c2.android")
-            }
-        }
-    }
 }

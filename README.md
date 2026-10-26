@@ -11,15 +11,15 @@ native hardware pipeline. **Web is not supported.**
 |------------------------------|--------------------|---------------|-------------------|-----------------|
 | JPEG / PNG                   | yes                | yes           | yes               | yes             |
 | WebP encode                  | yes                | if ImageIO    | if WIC present    | if libvips webp |
-| HEIC encode                  | API 28+            | yes           | if HEIF extension | no              |
+| HEIC encode                  | API 28+ with HEVC  | yes           | if HEIF extension | no              |
 | AVIF / GIF encode            | no                 | no            | no                | no              |
-| H.264 / H.265 MP4            | Media3 Transformer | AVAssetWriter | Media Foundation  | GStreamer HW/SW |
+| H.264 / H.265 MP4            | MediaCodec HW/SW   | AVAssetWriter | Media Foundation  | GStreamer HW/SW |
 | `content://` input           | yes                | no            | no                | no              |
 
 Video output is always MP4. `VideoCompressOptions.keepAudio` defaults to
-`true` (AAC passthrough or transcode). Windows and Linux re-encode audio to
-AAC and throw `unsupported` when the source has audio but no AAC encoder is
-installed.
+`true` (AAC passthrough or transcode). Android passes AAC through and
+transcodes other audio to AAC. Android, Windows, and Linux throw
+`unsupported` when the source has audio but no AAC encoder is installed.
 
 Call `queryCapabilities()` at runtime and use `outputFormats` / `codecs`.
 Missing capability → `MediaCompressionException.unsupported` or
@@ -34,7 +34,7 @@ supported platform.
 |-------------|-------------------------------------------------------------------------------|
 | Flutter     | ≥ 3.44.0                                                                      |
 | Dart        | ≥ 3.12.0                                                                      |
-| Android     | minSdk 23, Media3 Transformer                                                 |
+| Android     | minSdk 23, MediaCodec / MediaMuxer / Bitmap / ImageDecoder (no FFmpeg)       |
 | iOS / macOS | iOS 12 / macOS 10.15                                                          |
 | Windows     | Windows 10+, Media Foundation (no FFmpeg)                                     |
 | Linux       | `libvips-dev`, `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`, GStreamer base/good/bad/ugly plugins |
@@ -43,7 +43,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.3.1
+  xue_hua_media_compression: ^2.3.2
 ```
 
 ```dart
@@ -228,6 +228,36 @@ SO=example/build/linux/x64/release/bundle/lib/libxue_hua_media_compression_plugi
 readelf -d "$SO" | grep NEEDED
 ldd "$SO"
 strings "$SO" | grep -E 'libavcodec|libavformat|libavutil|libswscale|libswresample|libpostproc|avdec_|avenc_'
+```
+
+Android image and video compression (MediaCodec + MediaMuxer, no FFmpeg).
+On the maintainer Mac, `Pixel_8_Pro` is API 34 and appears as `emulator-5554`.
+Do not launch `Bgdl_API_35` or `Bgdl_API_36` (those AVDs belong to other
+projects). Other API levels can run in parallel; pass each emulator's id from
+`flutter devices`.
+
+```bash
+flutter emulators --launch Pixel_8_Pro
+cd example
+flutter test integration_test/android_driver_test.dart -d emulator-5554
+```
+
+```bash
+flutter test integration_test/android_driver_test.dart -d emulator-5554   # API 34, Pixel_8_Pro
+flutter test integration_test/android_driver_test.dart -d emulator-XXXX   # API 26
+flutter test integration_test/android_driver_test.dart -d emulator-XXXX   # API 30
+flutter test integration_test/android_driver_test.dart -d emulator-XXXX   # API 36
+```
+
+API 26 uses BitmapFactory. API 28+ uses ImageDecoder. `flutter drive` is the
+same entry point:
+
+```bash
+cd example
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/android_driver_test.dart \
+  -d emulator-5554
 ```
 
 ## License

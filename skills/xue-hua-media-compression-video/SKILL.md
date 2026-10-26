@@ -37,8 +37,9 @@ method, field, enum value, and error code.
 * `bitrate` is **bits per second**, default `2000000`. Do not pass kbps/Mbps
   numbers without converting (`2` Mbps → `2000000`).
 * `keepAudio` defaults to `true` (AAC passthrough or transcode). Set `false` to
-  drop audio. Windows and Linux re-encode the track to AAC and throw
-  `unsupported` when the source has audio but no AAC encoder is installed.
+  drop audio. Android passes AAC through and transcodes other audio to AAC.
+  Android, Windows, and Linux throw `unsupported` when the source has audio
+  but no AAC encoder is installed.
 * `fps`, `maxDimension`, and `keyframeInterval` are optional. When set, each
   must be `> 0`. `null` keeps the source FPS / no scale / platform GOP default.
   On Windows the encoded frame must be at least 64×64 or compress throws
