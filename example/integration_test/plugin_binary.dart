@@ -1,10 +1,10 @@
 /// True for a native image that actually contains the Darwin plugin.
 ///
 /// Flutter SPM macOS links the plugin into the app's companion
-/// `*.debug.dylib` next to the executable. CocoaPods builds may still emit
-/// `xue_hua_media_compression.framework` or
-/// `xue_hua_media_compression_darwin.framework`. Dart kernel blobs are never
-/// native images, even when the project directory name appears in their path.
+/// `*.debug.dylib` next to the executable, inside the bundle. A framework
+/// Mach-O is accepted only when that file itself is named. The running app
+/// must not list `Products/` outside the sandbox. Dart kernel blobs are
+/// never native images, even when the project directory name is in the path.
 ///
 /// 认真正链进插件的原生镜像。Flutter SPM 的 macOS 把插件链进可执行文件旁边的
 /// `*.debug.dylib`。CocoaPods 仍可能产出 framework。工程目录名出现在路径里

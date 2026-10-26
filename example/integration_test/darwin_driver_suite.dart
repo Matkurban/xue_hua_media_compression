@@ -785,30 +785,31 @@ Future<List<File>> _pluginBinaries() async {
   final pluginFiles = <File>[];
 
   Future<void> collect(Directory directory, {required bool recursive}) async {
-    if (!directory.existsSync()) {
-      return;
-    }
-    await for (final entity in directory.list(
-      recursive: recursive,
-      followLinks: false,
-    )) {
-      if (entity is File && isDarwinPluginMachO(entity.path)) {
-        pluginFiles.add(entity);
+    try {
+      if (!directory.existsSync()) {
+        return;
       }
+      await for (final entity in directory.list(
+        recursive: recursive,
+        followLinks: false,
+      )) {
+        if (entity is File && isDarwinPluginMachO(entity.path)) {
+          pluginFiles.add(entity);
+        }
+      }
+    } on FileSystemException {
+      // App Sandbox rejects paths outside the bundle. Skip them.
     }
   }
 
   // SPM Debug: Contents/MacOS/<app>.debug.dylib sits next to the executable.
+  // Stay inside the .app. Products/ next to the bundle is outside the sandbox.
   await collect(executable.parent, recursive: false);
-  // Pod / framework layouts under the app bundle.
+  if (pluginFiles.isNotEmpty) {
+    return pluginFiles;
+  }
   final contents = executable.parent.parent;
   await collect(Directory(_join(contents.path, 'Frameworks')), recursive: true);
-  // Xcode product next to the .app, not copied into Contents/Frameworks.
-  final products = contents.parent.parent;
-  await collect(
-    Directory(_join(products.path, 'xue_hua_media_compression_darwin')),
-    recursive: true,
-  );
   if (pluginFiles.isNotEmpty) {
     return pluginFiles;
   }
