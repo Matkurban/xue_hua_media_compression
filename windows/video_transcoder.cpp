@@ -129,6 +129,10 @@ uint32_t EvenDim(uint32_t value) {
   return value & ~1u;
 }
 
+// mfh264enc rejects frames below 64x64 with MF_E_INVALIDMEDIATYPE.
+// 64x64 encodes; 32x32 fails inside AddStream / SetInputMediaType.
+constexpr UINT kMinEncodedDimension = 64;
+
 BYTE ClampByte(int value) {
   if (value < 0) {
     return 0;
@@ -1030,6 +1034,11 @@ void CompressVideoWindows(
     }
     out_w = EvenDim(out_w);
     out_h = EvenDim(out_h);
+    if (out_w < kMinEncodedDimension || out_h < kMinEncodedDimension) {
+      fail("unsupported",
+           "Media Foundation H.264/HEVC output must be at least 64x64");
+      return;
+    }
 
     UINT target_fps = 30;
     if (frame.fps_den > 0 && frame.fps_num > 0) {

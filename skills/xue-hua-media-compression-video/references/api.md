@@ -121,7 +121,9 @@ Target frame rate. `null` (default) keeps the source FPS. When set, must be
 ### `final int? maxDimension`
 
 Max edge in pixels for proportional downscale. `null` (default) means no
-scale. When set, must be `> 0`.
+scale. When set, must be `> 0`. On Windows, Media Foundation H.264/HEVC
+output must be at least 64×64 after even rounding; a smaller frame throws
+`unsupported`.
 
 ### `final int? keyframeInterval`
 

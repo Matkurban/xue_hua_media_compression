@@ -4,12 +4,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
-import 'package:xue_hua_media_compression_example/main.dart';
 
-import 'facade_seam.dart';
 import 'windows_media.dart';
 
 const _timeout = Timeout(Duration(minutes: 3));
@@ -18,29 +14,7 @@ void driverTest(String name, Future<void> Function() body) {
   test(name, body, timeout: _timeout);
 }
 
-void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  registerFacadeSeamTests();
-
-  testWidgets('example home loads image and video cards', (tester) async {
-    await tester.pumpWidget(const MyApp());
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('图片压缩'), findsOneWidget);
-    expect(find.text('视频压缩'), findsOneWidget);
-    expect(find.text('选择图片并压缩'), findsOneWidget);
-    expect(find.text('选择视频并压缩'), findsOneWidget);
-    final errors = find.byIcon(Icons.error_outline);
-    if (errors.evaluate().isNotEmpty) {
-      final messages = find.byType(SelectableText).evaluate().map((element) {
-        final widget = element.widget as SelectableText;
-        return widget.data ?? widget.textSpan?.toPlainText() ?? '';
-      });
-      fail('example surfaced an error: ${messages.join('\n')}');
-    }
-  });
-
+void registerWindowsDriverTests() {
   if (!Platform.isWindows) {
     return;
   }
@@ -84,7 +58,7 @@ void main() {
         frames: 30,
         audio: true,
       );
-      await writeAvi(oddVideo, width: 101, height: 61, fps: 15, frames: 15);
+      await writeAvi(oddVideo, width: 129, height: 81, fps: 15, frames: 15);
       await File(shortVideo).copy(spacedVideo);
     });
 
@@ -508,15 +482,15 @@ void main() {
         outputPath: scaled,
         options: const VideoCompressOptions(
           bitrate: 400000,
-          maxDimension: 45,
+          maxDimension: 110,
           keepAudio: false,
         ),
       );
       final scale = await _resultOf(scaleSession);
+      expect(scale.width, 110);
+      expect(scale.height, 68);
       expect(scale.width.isEven, isTrue);
       expect(scale.height.isEven, isTrue);
-      expect(scale.width, lessThanOrEqualTo(45));
-      expect(scale.height, lessThanOrEqualTo(45));
       expect(scale.width, greaterThan(0));
       expect(scale.height, greaterThan(0));
       final mp4 = Mp4Probe.parse(await File(scaled).readAsBytes());
@@ -548,10 +522,10 @@ void main() {
         options: const VideoCompressOptions(bitrate: 400000, keepAudio: false),
       );
       final plainResult = await _resultOf(plainSession);
+      expect(plainResult.width, 128);
+      expect(plainResult.height, 80);
       expect(plainResult.width.isEven, isTrue);
       expect(plainResult.height.isEven, isTrue);
-      expect(plainResult.width, lessThanOrEqualTo(101));
-      expect(plainResult.height, lessThanOrEqualTo(61));
 
       final output = '${temp.path}\\new parent\\clip out.mp4';
       final session = XueHuaMediaCompression.video.compress(
