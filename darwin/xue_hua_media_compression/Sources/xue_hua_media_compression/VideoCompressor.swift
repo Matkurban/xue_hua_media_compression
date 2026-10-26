@@ -666,9 +666,11 @@ final class VideoCompressor {
       failed = true
     }
     stateLock.unlock()
-    let tearDown = { [weak self] in
-      self?.controlQueue.async {
-        guard let self else { return }
+    // Explicit `() -> Void`. Optional chaining would infer `() -> Void?`,
+    // which is not a DispatchWorkItem.
+    let tearDown: () -> Void = { [weak self] in
+      guard let self else { return }
+      self.controlQueue.async {
         self.removeOutput()
         if first {
           self.events.sendError(code: code, message: message, details: details)
