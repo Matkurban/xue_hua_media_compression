@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xue_hua_media_compression/src/path_utils.dart';
 
@@ -8,8 +10,11 @@ void main() {
       expect(normalizeInputPath(uri), uri);
     });
 
-    test('decodes file:// URIs', () {
-      expect(normalizeInputPath('file:///tmp/photo.jpg'), '/tmp/photo.jpg');
+    test('decodes file:// URIs to a platform path', () {
+      expect(
+        normalizeInputPath('file:///tmp/my%20photo.jpg'),
+        Platform.isWindows ? r'\tmp\my photo.jpg' : '/tmp/my photo.jpg',
+      );
     });
 
     test('trims ordinary paths', () {
