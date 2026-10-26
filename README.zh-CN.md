@@ -36,7 +36,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.2.0
+  xue_hua_media_compression: ^2.2.1
 ```
 
 ```dart
@@ -45,7 +45,7 @@ import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
 ## 用法
 
-`compress` **立即**返回 `CompressionSession`。立刻监听 `progress`（流不会重放错过的事件），再 `await session.result`，最后 `await session.dispose()`。
+`compress` **立即**返回 `CompressionSession`。监听 `progress` 获得 0.0–1.0。新的订阅者会先收到已经产生的最新进度，再收到后续更新。然后 `await session.result`，最后 `await session.dispose()`。
 
 ### 图片
 
@@ -133,6 +133,29 @@ dart run skills@ get --all
 flutter analyze
 flutter test
 dart run pigeon --input pigeons/messages.dart
+```
+
+Linux 图片 / 视频压缩（GStreamer + libvips，不要安装 `gstreamer1.0-libav`）：
+
+```bash
+# libvips-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+# gstreamer1.0-plugins-{base,good,bad,ugly} gstreamer1.0-tools
+cd example
+xvfb-run -a flutter test integration_test -d linux
+xvfb-run -a flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/linux_driver_test.dart \
+  -d linux
+flutter build linux
+```
+
+确认插件没有链接 FFmpeg：
+
+```bash
+SO=example/build/linux/x64/release/bundle/lib/libxue_hua_media_compression_plugin.so
+readelf -d "$SO" | grep NEEDED
+ldd "$SO"
+strings "$SO" | grep -E 'libavcodec|libavformat|libavutil|libswscale|libswresample|libpostproc|avdec_|avenc_'
 ```
 
 ## 许可

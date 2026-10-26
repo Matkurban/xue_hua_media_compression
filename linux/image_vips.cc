@@ -43,10 +43,19 @@ VipsImage* LoadSource(XhMcSourceMsg* source, char** code, char** message) {
     SetError(code, message, "unsupported", "content:// is Android-only");
     return nullptr;
   }
+  if (!g_file_test(path, G_FILE_TEST_EXISTS)) {
+    SetError(code, message, "notFound", "Unable to open input");
+    return nullptr;
+  }
+  if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+    SetError(code, message, "io", "Unable to open input");
+    return nullptr;
+  }
   VipsImage* image = vips_image_new_from_file(path, nullptr);
   if (image == nullptr) {
-    SetError(code, message, "notFound", vips_error_buffer());
+    SetError(code, message, "decode", vips_error_buffer());
     vips_error_clear();
+    return nullptr;
   }
   return image;
 }

@@ -41,7 +41,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.2.0
+  xue_hua_media_compression: ^2.2.1
 ```
 
 ```dart
@@ -51,8 +51,9 @@ import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 ## Quick start
 
 `compress` returns a `CompressionSession` immediately. Listen to `progress`
-right away (the stream does not replay missed events), then `await
-session.result`, then `await session.dispose()`.
+for values in 0.0–1.0. A new listener receives the latest progress already
+produced, then live updates. `await session.result`, then `await
+session.dispose()`.
 
 ### Image
 
@@ -149,6 +150,29 @@ From the package root:
 flutter analyze
 flutter test
 dart run pigeon --input pigeons/messages.dart
+```
+
+Linux image and video compression (GStreamer + libvips, no `gstreamer1.0-libav`):
+
+```bash
+# libvips-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+# gstreamer1.0-plugins-{base,good,bad,ugly} gstreamer1.0-tools
+cd example
+xvfb-run -a flutter test integration_test -d linux
+xvfb-run -a flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/linux_driver_test.dart \
+  -d linux
+flutter build linux
+```
+
+Confirm the plugin does not link FFmpeg:
+
+```bash
+SO=example/build/linux/x64/release/bundle/lib/libxue_hua_media_compression_plugin.so
+readelf -d "$SO" | grep NEEDED
+ldd "$SO"
+strings "$SO" | grep -E 'libavcodec|libavformat|libavutil|libswscale|libswresample|libpostproc|avdec_|avenc_'
 ```
 
 ## License

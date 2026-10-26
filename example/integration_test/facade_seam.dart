@@ -2,12 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 
-void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
+void registerFacadeSeamTests() {
   test('queryCapabilities returns non-empty image outputs', () async {
     final caps = await XueHuaMediaCompression.image.queryCapabilities();
     expect(caps.outputFormats, isNotEmpty);

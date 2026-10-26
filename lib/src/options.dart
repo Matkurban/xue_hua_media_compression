@@ -107,9 +107,10 @@ final class VideoCompressOptions {
   final int? keyframeInterval;
 
   /// 是否保留音轨。默认 true。
-  /// Windows/Linux 暂不支持，忽略此参数。
+  /// Windows 忽略此参数。Linux 在存在 AAC 编码器时转码为 AAC。
   ///
   /// Whether to keep the audio track. Default true.
-  /// Ignored on Windows/Linux for now.
+  /// Ignored on Windows. Linux transcodes the track to AAC when an AAC
+  /// encoder is installed.
   final bool keepAudio;
 }

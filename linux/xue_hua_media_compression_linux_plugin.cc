@@ -26,33 +26,36 @@ struct EventStream {
   bool listening = false;
   FlValue* last_progress = nullptr;
   std::vector<FlValue*> pending_terminal;
-  gint64 last_progress_us = 0;
+  std::atomic<bool> alive{true};
 
   ~EventStream() {
+    alive.store(false);
     if (last_progress) fl_value_unref(last_progress);
     for (FlValue* value : pending_terminal) fl_value_unref(value);
-    if (channel) g_object_unref(channel);
+    if (channel) {
+      fl_event_channel_set_stream_handlers(channel, nullptr, nullptr, nullptr,
+                                           nullptr);
+      g_object_unref(channel);
+      channel = nullptr;
+    }
   }
 
   void Send(FlValue* value, bool is_progress) {
-    if (listening) {
-      if (is_progress) {
-        const gint64 now = g_get_monotonic_time();
-        if (now - last_progress_us < 100000) {
-          if (last_progress) fl_value_unref(last_progress);
-          last_progress = value;
-          return;
-        }
-        last_progress_us = now;
-      }
-      fl_event_channel_send(channel, value, nullptr, nullptr);
+    if (!alive.load()) {
       fl_value_unref(value);
-    } else if (is_progress) {
-      if (last_progress) fl_value_unref(last_progress);
-      last_progress = value;
-    } else {
-      pending_terminal.push_back(value);
+      return;
     }
+    if (!listening) {
+      if (is_progress) {
+        if (last_progress) fl_value_unref(last_progress);
+        last_progress = value;
+      } else {
+        pending_terminal.push_back(value);
+      }
+      return;
+    }
+    fl_event_channel_send(channel, value, nullptr, nullptr);
+    fl_value_unref(value);
   }
 };
 
@@ -89,16 +92,17 @@ struct Job {
 struct _XueHuaMediaCompressionLinuxPlugin {
   GObject parent_instance;
   FlBinaryMessenger* messenger;
-  std::map<int64_t, std::unique_ptr<Job>>* jobs;
+  std::map<int64_t, std::shared_ptr<Job>>* jobs;
   int64_t next_id;
 };
 
 G_DEFINE_TYPE(XueHuaMediaCompressionLinuxPlugin,
               xue_hua_media_compression_linux_plugin, G_TYPE_OBJECT)
 
-static Job* JobOf(XueHuaMediaCompressionLinuxPlugin* self, int64_t id) {
+static std::shared_ptr<Job> JobOf(XueHuaMediaCompressionLinuxPlugin* self,
+                                  int64_t id) {
   auto it = self->jobs->find(id);
-  return it == self->jobs->end() ? nullptr : it->second.get();
+  return it == self->jobs->end() ? nullptr : it->second;
 }
 
 static void PostToMain(const std::function<void()>& task) {
@@ -130,10 +134,10 @@ static XhMcMediaCompressionHostApiCreateJobResponse* handle_create_job(
     gpointer user_data) {
   auto* self = XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(user_data);
   const int64_t id = self->next_id++;
-  auto job = std::make_unique<Job>();
+  auto job = std::make_shared<Job>();
   job->id = id;
   job->events = MakeEventStream(self->messenger, id);
-  self->jobs->emplace(id, std::move(job));
+  self->jobs->emplace(id, job);
   return xh_mc_media_compression_host_api_create_job_response_new(id);
 }
 
@@ -149,7 +153,7 @@ static void handle_start_image(
     XhMcMediaCompressionHostApiResponseHandle* response_handle,
     gpointer user_data) {
   auto* self = XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(user_data);
-  Job* job = JobOf(self, id);
+  std::shared_ptr<Job> job = JobOf(self, id);
   if (job == nullptr) {
     xh_mc_media_compression_host_api_respond_error_start_image_compress(
         response_handle, "instanceNotFound", "No job", nullptr);
@@ -165,17 +169,29 @@ static void handle_start_image(
   g_object_ref(source);
   g_object_ref(destination);
   g_object_ref(options);
-  EventStream* events = job->events.get();
-  std::thread([job, source, destination, options, events]() {
+  std::string output_path;
+  if (xh_mc_destination_msg_get_kind(destination) == 1) {
+    const gchar* path = xh_mc_destination_msg_get_path(destination);
+    if (path != nullptr) output_path = path;
+  }
+  std::thread([job, source, destination, options, output_path]() {
     char* code = nullptr;
     char* message = nullptr;
-    FlValue* result =
-        compress_image_vips(source, destination, options, &code, &message);
+    FlValue* result = nullptr;
+    if (job->cancelled.load()) {
+      code = g_strdup("cancelled");
+      message = g_strdup("Cancelled");
+    } else {
+      result =
+          compress_image_vips(source, destination, options, &code, &message);
+    }
     g_object_unref(source);
     g_object_unref(destination);
     g_object_unref(options);
-    PostToMain([job, events, result, code, message]() {
+    PostToMain([job, result, code, message, output_path]() {
+      EventStream* events = job->events.get();
       if (job->cancelled.load()) {
+        if (!output_path.empty()) g_remove(output_path.c_str());
         FlValue* map = fl_value_new_map();
         fl_value_set_string_take(map, "type", fl_value_new_string("error"));
         fl_value_set_string_take(map, "code", fl_value_new_string("cancelled"));
@@ -222,7 +238,7 @@ static void handle_start_video(
     XhMcMediaCompressionHostApiResponseHandle* response_handle,
     gpointer user_data) {
   auto* self = XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(user_data);
-  Job* job = JobOf(self, id);
+  std::shared_ptr<Job> job = JobOf(self, id);
   if (job == nullptr) {
     xh_mc_media_compression_host_api_respond_error_start_video_compress(
         response_handle, "instanceNotFound", "No job", nullptr);
@@ -238,48 +254,50 @@ static void handle_start_video(
   g_object_ref(options);
   std::string in = input_path;
   std::string out = output_path;
-  EventStream* events = job->events.get();
-  std::thread([job, in, out, options, events]() {
+  std::thread([job, in, out, options]() {
     compress_video_gst(
         in, out, options, &job->cancelled,
-        [events](double value) {
-          PostToMain([events, value]() {
+        [job](double value) {
+          PostToMain([job, value]() {
             FlValue* map = fl_value_new_map();
             fl_value_set_string_take(map, "type",
                                      fl_value_new_string("progress"));
             fl_value_set_string_take(map, "value", fl_value_new_float(value));
-            events->Send(map, true);
+            job->events->Send(map, true);
           });
         },
-        [events](FlValue* result) {
-          PostToMain([events, result]() {
+        [job](FlValue* result) {
+          PostToMain([job, result]() {
             FlValue* map = fl_value_new_map();
             fl_value_set_string_take(map, "type",
                                      fl_value_new_string("completed"));
             fl_value_set_string_take(map, "result", result);
-            events->Send(map, false);
+            job->events->Send(map, false);
           });
         },
-        [events](const char* code, const char* message) {
+        [job](const char* code, const char* message) {
           std::string c = code;
           std::string m = message;
-          PostToMain([events, c, m]() {
+          PostToMain([job, c, m]() {
             FlValue* map = fl_value_new_map();
             fl_value_set_string_take(map, "type", fl_value_new_string("error"));
             fl_value_set_string_take(map, "code", fl_value_new_string(c.c_str()));
             fl_value_set_string_take(map, "message",
                                      fl_value_new_string(m.c_str()));
-            events->Send(map, false);
+            job->events->Send(map, false);
           });
         });
     g_object_unref(options);
+    // Drop the worker's Job reference on the platform thread. EventStream owns
+    // a Flutter channel that must not be destroyed from this thread.
+    PostToMain([job]() {});
   }).detach();
 }
 
 static XhMcMediaCompressionHostApiCancelJobResponse* handle_cancel(
     int64_t id, gpointer user_data) {
   auto* self = XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(user_data);
-  Job* job = JobOf(self, id);
+  std::shared_ptr<Job> job = JobOf(self, id);
   if (job == nullptr) {
     return xh_mc_media_compression_host_api_cancel_job_response_new_error(
         "instanceNotFound", "No job", nullptr);
@@ -291,7 +309,12 @@ static XhMcMediaCompressionHostApiCancelJobResponse* handle_cancel(
 static XhMcMediaCompressionHostApiDisposeJobResponse* handle_dispose(
     int64_t id, gpointer user_data) {
   auto* self = XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(user_data);
-  self->jobs->erase(id);
+  auto it = self->jobs->find(id);
+  if (it != self->jobs->end()) {
+    it->second->cancelled.store(true);
+    if (it->second->events) it->second->events->alive.store(false);
+    self->jobs->erase(it);
+  }
   return xh_mc_media_compression_host_api_dispose_job_response_new();
 }
 
@@ -320,7 +343,7 @@ static void xue_hua_media_compression_linux_plugin_class_init(
 
 static void xue_hua_media_compression_linux_plugin_init(
     XueHuaMediaCompressionLinuxPlugin* self) {
-  self->jobs = new std::map<int64_t, std::unique_ptr<Job>>();
+  self->jobs = new std::map<int64_t, std::shared_ptr<Job>>();
   self->next_id = 1;
 }
 

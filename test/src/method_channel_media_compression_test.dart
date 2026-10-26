@@ -141,6 +141,47 @@ void main() {
         .setMockStreamHandler(const EventChannel('test/job_events_7'), null);
   });
 
+  test('late progress listener receives the latest value', () async {
+    platform.eventChannelFor = (int id) {
+      return EventChannel('test/job_events_$id');
+    };
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(
+          EventChannel('test/job_events_7'),
+          MockStreamHandler.inline(
+            onListen: (Object? arguments, MockStreamHandlerEventSink sink) {
+              sink.success(<String, Object?>{'type': 'progress', 'value': 0.25});
+              sink.success(<String, Object?>{'type': 'progress', 'value': 0.5});
+              sink.success(<String, Object?>{
+                'type': 'completed',
+                'result': <String, Object?>{
+                  'bytes': Uint8List.fromList(const [1]),
+                  'sizeBytes': 1,
+                  'format': 'jpeg',
+                  'width': 2,
+                  'height': 2,
+                },
+              });
+            },
+          ),
+        );
+    final session = platform.compressImage(
+      source: MediaSource.bytes(Uint8List.fromList(const [4])),
+      destination: MediaDestination.bytes(),
+      options: const ImageCompressOptions(),
+    );
+    await session.result;
+    final progresses = <double>[];
+    final sub = session.progress.listen(progresses.add);
+    await Future<void>.delayed(Duration.zero);
+    expect(progresses, [1.0]);
+    await sub.cancel();
+    await session.dispose();
+    expect(api.disposeCount, 1);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(const EventChannel('test/job_events_7'), null);
+  });
+
   test('pigeon start error becomes MediaCompressionException', () async {
     api.startError = PlatformException(
       code: MediaCompressionException.unsupported,

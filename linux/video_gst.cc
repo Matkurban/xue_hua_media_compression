@@ -179,6 +179,15 @@ RunResult RunPipeline(const std::string& description,
   GstElement* sink = gst_bin_get_by_name(bin, "sink");
   GstElement* dec = gst_bin_get_by_name(bin, "dec");
   GstElement* enc = gst_bin_get_by_name(bin, "enc");
+  if (src == nullptr || sink == nullptr || dec == nullptr || enc == nullptr) {
+    *err = "Pipeline is missing src, sink, dec, or enc";
+    if (src) gst_object_unref(src);
+    if (sink) gst_object_unref(sink);
+    if (dec) gst_object_unref(dec);
+    if (enc) gst_object_unref(enc);
+    gst_object_unref(pipeline);
+    return RunResult::kFailed;
+  }
   g_object_set(src, "location", input_path.c_str(), nullptr);
   g_object_set(sink, "location", output_path.c_str(), nullptr);
   g_signal_connect(dec, "autoplug-sort", G_CALLBACK(NoFfmpegAutoplugSort),
@@ -261,8 +270,10 @@ XhMcVideoCapabilitiesMsg* query_video_capabilities_gst() {
       }
     }
   }
-  if (fl_value_get_length(codecs) > 0) {
-    encoder_name = hw ? "GStreamerHW" : "GStreamerSoftware";
+  // encoderName is the hardware encoder label. Software-only machines keep it
+  // null and still advertise codecs so callers can compress.
+  if (hw && fl_value_get_length(codecs) > 0) {
+    encoder_name = "GStreamerHW";
   }
   return xh_mc_video_capabilities_msg_new(encoder_name, codecs, FALSE);
 }
@@ -306,6 +317,10 @@ void compress_video_gst(
     on_error("decode", err.empty() ? "Unable to probe input" : err.c_str());
     return;
   }
+  if (cancelled != nullptr && cancelled->load()) {
+    on_error("cancelled", "Cancelled");
+    return;
+  }
 
   int out_w = info.width;
   int out_h = info.height;
@@ -337,9 +352,13 @@ void compress_video_gst(
   const int64_t bitrate = xh_mc_video_options_msg_get_bitrate(options);
 
   const char* aac = AacEncoder();
-  const bool with_audio =
-      xh_mc_video_options_msg_get_keep_audio(options) && info.has_audio &&
-      aac != nullptr;
+  const bool keep_audio = xh_mc_video_options_msg_get_keep_audio(options);
+  if (keep_audio && info.has_audio && aac == nullptr) {
+    on_error("unsupported",
+             "keepAudio requires an AAC encoder (fdkaacenc or voaacenc)");
+    return;
+  }
+  const bool with_audio = keep_audio && info.has_audio;
 
   gchar* dir = g_path_get_dirname(output_path.c_str());
   g_mkdir_with_parents(dir, 0755);

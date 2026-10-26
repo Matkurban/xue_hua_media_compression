@@ -122,18 +122,19 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
       _error = null;
       _progress = 0;
     });
+    CompressionSession<ImageCompressResult>? session;
+    StreamSubscription<double>? sub;
     try {
       final picked = await _pickMediaFile(
         type: FileType.image,
         dialogTitle: '选择图片',
       );
       if (picked == null) {
-        setState(() => _busy = false);
         return;
       }
       final tmp =
           '${Directory.systemTemp.path}/xh_img_out_${DateTime.now().millisecondsSinceEpoch}${_ext(_format)}';
-      final session = XueHuaMediaCompression.image.compress(
+      session = XueHuaMediaCompression.image.compress(
         source: MediaSource.path(picked.path),
         destination: MediaDestination.path(tmp),
         options: ImageCompressOptions(
@@ -142,15 +143,12 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
         ),
       );
       _session = session;
-      final sub = session.progress.listen((value) {
+      sub = session.progress.listen((value) {
         if (mounted) setState(() => _progress = value);
       });
       final sw = Stopwatch()..start();
       final result = await session.result;
       sw.stop();
-      await sub.cancel();
-      await session.dispose();
-      _session = null;
       if (!mounted) return;
       setState(() {
         _name = picked.name;
@@ -162,14 +160,22 @@ class _ImageCompressionCardState extends State<ImageCompressionCard> {
         _progress = 1;
       });
     } on MediaCompressionException catch (error) {
+      if (!mounted) return;
       if (error.code == MediaCompressionException.cancelled) {
         setState(() => _error = '已取消');
       } else {
         setState(() => _error = '$error');
       }
     } catch (error) {
+      if (!mounted) return;
       setState(() => _error = '$error');
     } finally {
+      await sub?.cancel();
+      final finished = session;
+      if (identical(_session, finished)) {
+        _session = null;
+      }
+      await finished?.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -341,13 +347,14 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
       _progress = 0;
       _compressedSize = null;
     });
+    CompressionSession<VideoCompressResult>? session;
+    StreamSubscription<double>? sub;
     try {
       final picked = await _pickMediaFile(
         type: FileType.video,
         dialogTitle: '选择视频',
       );
       if (picked == null) {
-        setState(() => _busy = false);
         return;
       }
       final output =
@@ -357,7 +364,7 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
         _name = picked.name;
         _originalSize = originalSize;
       });
-      final session = XueHuaMediaCompression.video.compress(
+      session = XueHuaMediaCompression.video.compress(
         inputPath: picked.path,
         outputPath: output,
         options: VideoCompressOptions(
@@ -366,15 +373,12 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
         ),
       );
       _session = session;
-      final sub = session.progress.listen((value) {
+      sub = session.progress.listen((value) {
         if (mounted) setState(() => _progress = value);
       });
       final sw = Stopwatch()..start();
       final result = await session.result;
       sw.stop();
-      await sub.cancel();
-      await session.dispose();
-      _session = null;
       if (!mounted) return;
       setState(() {
         _compressedSize = result.sizeBytes;
@@ -383,14 +387,22 @@ class _VideoCompressionCardState extends State<VideoCompressionCard> {
         _progress = 1;
       });
     } on MediaCompressionException catch (error) {
+      if (!mounted) return;
       if (error.code == MediaCompressionException.cancelled) {
         setState(() => _error = '已取消');
       } else {
         setState(() => _error = '$error');
       }
     } catch (error) {
+      if (!mounted) return;
       setState(() => _error = '$error');
     } finally {
+      await sub?.cancel();
+      final finished = session;
+      if (identical(_session, finished)) {
+        _session = null;
+      }
+      await finished?.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
