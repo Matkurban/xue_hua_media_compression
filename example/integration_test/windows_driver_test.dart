@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart'; // ignore: deprecated_member_use
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:xue_hua_media_compression/xue_hua_media_compression.dart';
 import 'package:xue_hua_media_compression_example/main.dart';
 
