@@ -26,6 +26,15 @@ final class VideoCompressor {
   private let onFinished: () -> Void
   private let encodeQueue = DispatchQueue(
     label: "com.xuehua.media_compression.video", qos: .userInitiated)
+  /// Writer teardown never runs on `encodeQueue` or the platform thread.
+  /// `cancelWriting` waits for the media callback; doing that from the callback
+  /// or from the main thread deadlocks the session.
+  ///
+  /// 拆编码器不在 `encodeQueue` 上，也不在平台线程上。
+  /// `cancelWriting` 会等媒体回调；在回调里或主线程里调用会把会话卡死。
+  private let controlQueue = DispatchQueue(
+    label: "com.xuehua.media_compression.video.control", qos: .userInitiated)
+  private let encodeQueueToken = DispatchSpecificKey<UInt8>()
   private let stateLock = NSLock()
   private var _cancelled = false
   private var didFinish = false
@@ -80,6 +89,7 @@ final class VideoCompressor {
     if FileManager.default.fileExists(atPath: outputURL.path) {
       try FileManager.default.removeItem(at: outputURL)
     }
+    encodeQueue.setSpecific(key: encodeQueueToken, value: 1)
     let asset = AVURLAsset(url: URL(fileURLWithPath: resolvedInput))
     asset.loadValuesAsynchronously(forKeys: ["tracks", "duration"]) { [weak self] in
       // Leave the load callback before touching the reader/writer so cancel()
@@ -92,8 +102,9 @@ final class VideoCompressor {
 
   func cancel() {
     cancelled = true
-    reader?.cancelReading()
-    writer?.cancelWriting()
+    // Return immediately. The platform channel runs on the main thread, and
+    // waiting here for AVAssetWriter blocks that thread forever.
+    requestStop(code: "cancelled", message: "Cancelled", details: nil)
   }
 
   static func queryCapabilities() -> VideoCapabilitiesMsg {
@@ -111,34 +122,25 @@ final class VideoCompressor {
 
   private func handleLoaded(_ asset: AVAsset) {
     if isStopped() {
-      removeOutput()
-      events.sendError(code: "cancelled", message: "Cancelled")
-      finishOnce()
+      requestStop(code: "cancelled", message: "Cancelled", details: nil)
       return
     }
     var error: NSError?
     guard asset.statusOfValue(forKey: "tracks", error: &error) == .loaded else {
-      removeOutput()
-      events.sendError(
+      requestStop(
         code: "decode",
         message: error?.localizedDescription ?? "Unable to load tracks",
         details: error?.description)
-      finishOnce()
       return
     }
     do {
       try configure(asset: asset)
     } catch let pigeon as PigeonError {
-      removeOutput()
-      events.sendError(
+      requestStop(
         code: pigeon.code, message: pigeon.message ?? pigeon.code,
         details: pigeon.details.map { "\($0)" })
-      finishOnce()
     } catch {
-      removeOutput()
-      events.sendError(
-        code: "encode", message: error.localizedDescription, details: "\(error)")
-      finishOnce()
+      requestStop(code: "encode", message: error.localizedDescription, details: "\(error)")
     }
   }
 
@@ -181,8 +183,14 @@ final class VideoCompressor {
         details: nil)
     }
     opened.writer.startSession(atSourceTime: .zero)
+    stateLock.lock()
     self.reader = reader
     self.writer = opened.writer
+    stateLock.unlock()
+    if isStopped() {
+      requestStop(code: "cancelled", message: "Cancelled", details: nil)
+      return
+    }
     let seconds = CMTimeGetSeconds(asset.duration)
     let duration = seconds.isFinite && seconds > 0 ? seconds : 0
     pump(
@@ -535,16 +543,8 @@ final class VideoCompressor {
     var remainingTracks = 1 + (audioInput != nil ? 1 : 0)
 
     func fail(code: String, message: String, details: String?) {
-      stateLock.lock()
-      if failed || didFinish {
-        stateLock.unlock()
-        return
-      }
-      failed = true
-      stateLock.unlock()
-      self.removeOutput()
-      self.events.sendError(code: code, message: message, details: details)
-      self.finishOnce()
+      // Do not touch AVAssetWriter here. This runs on encodeQueue.
+      self.requestStop(code: code, message: message, details: details)
     }
 
     func finishTrack(_ input: AVAssetWriterInput) {
@@ -620,24 +620,22 @@ final class VideoCompressor {
   }
 
   private func finish(writer: AVAssetWriter, width: Int, height: Int) {
-    stateLock.lock()
-    let stop = failed || didFinish
-    stateLock.unlock()
-    if stop { return }
     if isStopped() {
-      removeOutput()
-      events.sendError(code: "cancelled", message: "Cancelled")
-      finishOnce()
+      requestStop(code: "cancelled", message: "Cancelled", details: nil)
       return
     }
     if writer.status == .failed {
       let message = writer.error?.localizedDescription ?? "finishWriting failed"
-      removeOutput()
-      events.sendError(
-        code: "mux", message: message, details: writer.error.map { "\($0)" })
-      finishOnce()
+      requestStop(code: "mux", message: message, details: writer.error.map { "\($0)" })
       return
     }
+    stateLock.lock()
+    if failed || didFinish {
+      stateLock.unlock()
+      return
+    }
+    didFinish = true
+    stateLock.unlock()
     let size = Self.byteSize(at: outputURL.path)
     events.sendProgress(1)
     events.sendCompleted([
@@ -648,7 +646,43 @@ final class VideoCompressor {
       "width": Int64(width),
       "height": Int64(height),
     ])
-    finishOnce()
+    onFinished()
+  }
+
+  /// Records the terminal failure once, then stops the reader and writer on
+  /// `controlQueue`. Safe to call from the media callback and from the main
+  /// thread: both return without waiting for `cancelWriting`.
+  ///
+  /// 只记一次失败，然后在 `controlQueue` 上停掉读写。
+  /// 媒体回调和主线程都可以调，两边都不会等 `cancelWriting`。
+  private func requestStop(code: String, message: String, details: String?) {
+    stateLock.lock()
+    if didFinish && !failed {
+      stateLock.unlock()
+      return
+    }
+    let first = !failed
+    if first {
+      failed = true
+    }
+    stateLock.unlock()
+    let tearDown = { [weak self] in
+      self?.controlQueue.async {
+        guard let self else { return }
+        self.removeOutput()
+        if first {
+          self.events.sendError(code: code, message: message, details: details)
+          self.finishOnce()
+        }
+      }
+    }
+    // `cancelWriting` syncs onto encodeQueue. If we are inside that callback,
+    // hop to the tail of the queue so the callback can return first.
+    if DispatchQueue.getSpecific(key: encodeQueueToken) != nil {
+      encodeQueue.async(execute: tearDown)
+    } else {
+      tearDown()
+    }
   }
 
   private func ensureRunning() throws {
@@ -662,12 +696,16 @@ final class VideoCompressor {
   }
 
   private func removeOutput() {
+    stateLock.lock()
+    let writer = self.writer
+    let reader = self.reader
+    self.writer = nil
+    self.reader = nil
+    stateLock.unlock()
+    reader?.cancelReading()
     if let writer, writer.status == .writing {
       writer.cancelWriting()
     }
-    reader?.cancelReading()
-    self.writer = nil
-    self.reader = nil
     if FileManager.default.fileExists(atPath: outputURL.path) {
       try? FileManager.default.removeItem(at: outputURL)
     }

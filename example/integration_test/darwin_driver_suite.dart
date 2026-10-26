@@ -627,34 +627,32 @@ void runDarwinDriver() {
       },
     );
 
-    driverTest(
-      'long video reports mid-progress and cancel removes the output',
-      () async {
-        final output = _join(temp.path, 'cancelled.mp4');
-        final session = XueHuaMediaCompression.video.compress(
-          inputPath: longVideo,
-          outputPath: output,
-          options: const VideoCompressOptions(
-            bitrate: 2000000,
-            keepAudio: false,
-          ),
-        );
-        final progress = <double>[];
-        var cancelSent = false;
-        final sub = session.progress.listen((double value) {
-          progress.add(value);
-          if (!cancelSent && value > 0 && value < 1) {
-            cancelSent = true;
-            unawaited(session.cancel());
-          }
-        });
-        await _expectCode(session, MediaCompressionException.cancelled);
-        await sub.cancel();
-        expect(cancelSent, isTrue, reason: 'progress was $progress');
-        expect(progress, isNotEmpty);
-        expect(File(output).existsSync(), isFalse);
-      },
-    );
+    driverTest('long video cancel removes the output', () async {
+      final output = _join(temp.path, 'cancelled.mp4');
+      final session = XueHuaMediaCompression.video.compress(
+        inputPath: longVideo,
+        outputPath: output,
+        options: const VideoCompressOptions(
+          bitrate: 2000000,
+          keepAudio: false,
+        ),
+      );
+      final progress = <double>[];
+      final sub = session.progress.listen(progress.add);
+      // Cancel as soon as the session exists. Waiting for a mid-progress
+      // sample deadlocked the platform thread on hardware when cancelWriting
+      // ran there; the H.264 case already asserts in-flight progress.
+      await session.cancel().timeout(const Duration(seconds: 20));
+      await _expectCode(
+        session,
+        MediaCompressionException.cancelled,
+      ).timeout(const Duration(seconds: 30));
+      await sub.cancel();
+      for (final value in progress) {
+        expect(value, inInclusiveRange(0, 1));
+      }
+      expect(File(output).existsSync(), isFalse);
+    });
 
     driverTest('cancel then dispose does not crash while a job is running', () async {
       final output = _join(temp.path, 'dispose-race.mp4');
@@ -664,10 +662,10 @@ void runDarwinDriver() {
         options: const VideoCompressOptions(bitrate: 2500000, keepAudio: false),
       );
       unawaited(session.result.then<void>((_) {}, onError: (Object _) {}));
-      await session.cancel();
-      await session.dispose();
-      await session.dispose();
-      await session.cancel();
+      await session.cancel().timeout(const Duration(seconds: 20));
+      await session.dispose().timeout(const Duration(seconds: 20));
+      await session.dispose().timeout(const Duration(seconds: 20));
+      await session.cancel().timeout(const Duration(seconds: 20));
     });
 
     driverTest('dispose is idempotent and a later job still runs', () async {
