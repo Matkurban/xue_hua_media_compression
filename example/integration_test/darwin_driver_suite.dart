@@ -783,11 +783,13 @@ Future<void> _expectCode<T>(CompressionSession<T> session, String code) async {
 Future<List<File>> _pluginBinaries() async {
   final executable = File(Platform.resolvedExecutable);
   final pluginFiles = <File>[];
-  final contents = executable.parent.parent;
-  final frameworks = Directory(_join(contents.path, 'Frameworks'));
-  if (frameworks.existsSync()) {
-    await for (final entity in frameworks.list(
-      recursive: true,
+
+  Future<void> collect(Directory directory, {required bool recursive}) async {
+    if (!directory.existsSync()) {
+      return;
+    }
+    await for (final entity in directory.list(
+      recursive: recursive,
       followLinks: false,
     )) {
       if (entity is File && isDarwinPluginMachO(entity.path)) {
@@ -795,12 +797,24 @@ Future<List<File>> _pluginBinaries() async {
       }
     }
   }
+
+  // SPM Debug: Contents/MacOS/<app>.debug.dylib sits next to the executable.
+  await collect(executable.parent, recursive: false);
+  // Pod / framework layouts under the app bundle.
+  final contents = executable.parent.parent;
+  await collect(Directory(_join(contents.path, 'Frameworks')), recursive: true);
+  // Xcode product next to the .app, not copied into Contents/Frameworks.
+  final products = contents.parent.parent;
+  await collect(
+    Directory(_join(products.path, 'xue_hua_media_compression_darwin')),
+    recursive: true,
+  );
   if (pluginFiles.isNotEmpty) {
     return pluginFiles;
   }
-  // iOS links the plugin into the app executable. macOS ships a framework;
-  // scanning the runner or App.framework would see Dart kernel text.
-  if (Platform.isIOS && executable.existsSync()) {
+  // Static link (iOS, or a macOS host with no companion dylib). Never a
+  // kernel blob or App.framework resource.
+  if (executable.existsSync() && !isDarwinBundleAsset(executable.path)) {
     return <File>[executable];
   }
   return pluginFiles;

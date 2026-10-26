@@ -120,6 +120,24 @@ void main() {
       ),
       isTrue,
     );
+    expect(
+      isDarwinPluginMachO(
+        '$app/Contents/MacOS/xue_hua_media_compression_example.debug.dylib',
+      ),
+      isTrue,
+    );
+    expect(
+      isDarwinPluginMachO(
+        '$app/../xue_hua_media_compression_darwin/xue_hua_media_compression_darwin.framework/Versions/A/xue_hua_media_compression_darwin',
+      ),
+      isTrue,
+    );
+    expect(
+      isDarwinBundleAsset(
+        '$app/Contents/MacOS/xue_hua_media_compression_example',
+      ),
+      isFalse,
+    );
   });
 }
 

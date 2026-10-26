@@ -185,7 +185,7 @@ flutter drive \
 确认 macOS 插件二进制没有 FFmpeg：
 
 ```bash
-BIN=$(find example/build/macos -type f -name xue_hua_media_compression | head -n 1)
+BIN=$(find example/build/macos/Build/Products -type f \( -name '*.debug.dylib' -o -name 'xue_hua_media_compression_darwin' -o -name 'xue_hua_media_compression' \) ! -path '*/App.framework/*' ! -path '*/flutter_assets/*' | head -n 1)
 strings "$BIN" | grep -E 'libavcodec|libavformat|libavutil|ffmpeg|gst-libav' && exit 1 || true
 ```
 
