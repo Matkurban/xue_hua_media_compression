@@ -157,6 +157,7 @@ final class XueHuaVideoCompression {
   /// - [ArgumentError]: 空路径、bitrate / fps / maxDimension / keyframeInterval 非法。
   /// - [MediaCompressionException.cancelled]
   /// - [MediaCompressionException.unsupported] / [hardwareUnavailable]
+  ///   Windows：编码后的宽或高小于 64 时为 `unsupported`。
   /// - [MediaCompressionException.decode] / [encode] / [mux] / [io] / [notFound]
   ///
   /// **平台 / Platforms**

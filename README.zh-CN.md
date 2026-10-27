@@ -105,6 +105,8 @@ await session.dispose();
 
 `await session.cancel()` 中止任务；随后 `session.result` 抛 `MediaCompressionException.cancelled`。`cancel` 与 `dispose` 均可重复调用。
 
+Windows 的 Media Foundation H.264 / HEVC 编码器拒绝小于 64×64 的画面（`MF_E_INVALIDMEDIATYPE`）。偶数对齐之后只要有一边小于 64，压缩抛 `unsupported`，并且不写输出文件。
+
 ## 错误
 
 进入原生之前，下列情况在 Dart 侧抛 `ArgumentError`：
@@ -144,7 +146,7 @@ cd example
 xvfb-run -a flutter test integration_test -d linux
 xvfb-run -a flutter drive \
   --driver=test_driver/integration_test.dart \
-  --target=integration_test/linux_driver_test.dart \
+  --target=integration_test/driver_test.dart \
   -d linux
 flutter build linux
 ```
@@ -156,7 +158,7 @@ cd example
 flutter test integration_test -d windows
 flutter drive \
   --driver=test_driver/integration_test.dart \
-  --target=integration_test/windows_driver_test.dart \
+  --target=integration_test/driver_test.dart \
   -d windows
 flutter build windows
 ```

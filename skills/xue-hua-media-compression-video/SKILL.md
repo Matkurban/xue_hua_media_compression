@@ -41,6 +41,8 @@ method, field, enum value, and error code.
   `unsupported` when the source has audio but no AAC encoder is installed.
 * `fps`, `maxDimension`, and `keyframeInterval` are optional. When set, each
   must be `> 0`. `null` keeps the source FPS / no scale / platform GOP default.
+  On Windows the encoded frame must be at least 64×64 or compress throws
+  `unsupported`.
 * `file://` is normalized in Dart. `content://` is Android-only
   (`acceptsContentUri` is true only on Android).
 * Dart throws `ArgumentError` synchronously from `compress` for empty paths,

@@ -121,6 +121,10 @@ await session.dispose();
 `await session.cancel()` aborts the job; `session.result` then throws
 `MediaCompressionException.cancelled`. `cancel` and `dispose` are idempotent.
 
+Windows Media Foundation H.264 and HEVC encoders reject a frame smaller than
+64×64 (`MF_E_INVALIDMEDIATYPE`). After even rounding, if either edge is below
+64, compress throws `unsupported` and does not write the output.
+
 ## Errors
 
 Dart throws `ArgumentError` before native work when:
@@ -163,7 +167,7 @@ cd example
 xvfb-run -a flutter test integration_test -d linux
 xvfb-run -a flutter drive \
   --driver=test_driver/integration_test.dart \
-  --target=integration_test/linux_driver_test.dart \
+  --target=integration_test/driver_test.dart \
   -d linux
 flutter build linux
 ```
@@ -177,7 +181,7 @@ cd example
 flutter test integration_test -d windows
 flutter drive \
   --driver=test_driver/integration_test.dart \
-  --target=integration_test/windows_driver_test.dart \
+  --target=integration_test/driver_test.dart \
   -d windows
 flutter build windows
 ```

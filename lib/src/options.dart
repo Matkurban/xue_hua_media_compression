@@ -66,7 +66,10 @@ final class VideoCompressOptions {
   /// - [fps]: 目标帧率；null 沿用源帧率。必须 > 0。
   ///   Target frame rate; null keeps the source rate. Must be > 0 when set.
   /// - [maxDimension]: 最长边像素；null 不缩放。必须 > 0。
+  ///   Windows 上编码后的宽和高都必须 ≥ 64，否则抛 `unsupported`。
   ///   Max edge in pixels; null means no scale. Must be > 0 when set.
+  ///   On Windows the encoded width and height must both be ≥ 64, or
+  ///   compress throws `unsupported`.
   /// - [keyframeInterval]: GOP（帧）；null 使用平台默认。必须 > 0。
   ///   GOP size in frames; null uses the platform default. Must be > 0 when set.
   /// - [keepAudio]: 是否保留音轨（透传或转码为 AAC），默认 true。
@@ -97,8 +100,10 @@ final class VideoCompressOptions {
   final int? fps;
 
   /// 等比缩放最大边长。null 不缩放。
+  /// Windows 的 Media Foundation H.264/HEVC 输出宽和高都必须 ≥ 64。
   ///
   /// Max edge for proportional downscale. Null means no scale.
+  /// Windows Media Foundation H.264/HEVC output must be at least 64×64.
   final int? maxDimension;
 
   /// 关键帧间隔（帧）。null 为平台默认。

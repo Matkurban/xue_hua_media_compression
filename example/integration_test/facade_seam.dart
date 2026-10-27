@@ -110,6 +110,18 @@ void registerFacadeSeamTests() {
       outputPath: output,
       options: const VideoCompressOptions(bitrate: 400000, maxDimension: 32),
     );
+    if (Platform.isWindows) {
+      try {
+        await session.result;
+        fail('32x32 is below the Media Foundation 64x64 minimum');
+      } on MediaCompressionException catch (error) {
+        expect(error.code, MediaCompressionException.unsupported);
+      } finally {
+        await session.dispose();
+      }
+      expect(File(output).existsSync(), isFalse);
+      return;
+    }
     final result = await session.result;
     await session.dispose();
     expect(result.width, 32);
@@ -146,29 +158,26 @@ void registerFacadeSeamTests() {
     expect(result.sizeBytes, greaterThan(0));
   });
 
-  test(
-    'video compress missing input surfaces MediaCompressionException',
-    () async {
-      final output =
-          '${Directory.systemTemp.path}/xue_missing_input_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: '/nonexistent/xue_video_missing_test.mp4',
-        outputPath: output,
-      );
-      await expectLater(
-        session.result,
-        throwsA(
-          isA<MediaCompressionException>().having(
-            (e) => e.code,
-            'code',
-            anyOf(
-              MediaCompressionException.notFound,
-              MediaCompressionException.decode,
-            ),
+  test('video compress missing input surfaces MediaCompressionException', () async {
+    final output =
+        '${Directory.systemTemp.path}/xue_missing_input_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final session = XueHuaMediaCompression.video.compress(
+      inputPath: '/nonexistent/xue_video_missing_test.mp4',
+      outputPath: output,
+    );
+    await expectLater(
+      session.result,
+      throwsA(
+        isA<MediaCompressionException>().having(
+          (e) => e.code,
+          'code',
+          anyOf(
+            MediaCompressionException.notFound,
+            MediaCompressionException.decode,
           ),
         ),
-      );
-      await session.dispose();
-    },
-  );
+      ),
+    );
+    await session.dispose();
+  });
 }
