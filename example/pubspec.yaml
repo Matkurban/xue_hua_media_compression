@@ -59,3 +59,7 @@ flutter:
     - integration_test/fixtures/sample.mp4
     - integration_test/fixtures/sample.jpg
     - integration_test/fixtures/sample.png
+    - integration_test/fixtures/android/short.mp4
+    - integration_test/fixtures/android/with_audio.mp4
+    - integration_test/fixtures/android/odd.mp4
+    - integration_test/fixtures/android/long.mp4

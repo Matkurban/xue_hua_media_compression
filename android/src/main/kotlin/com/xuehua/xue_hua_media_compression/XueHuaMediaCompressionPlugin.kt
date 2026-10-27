@@ -1,19 +1,18 @@
 package com.xuehua.xue_hua_media_compression
 
-import android.content.Context
-import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
+import java.io.File
 import java.util.concurrent.Executors
 
 /**
- * Android implementation: ImageDecoder/Bitmap/HeifWriter + Media3 Transformer.
+ * Android implementation: ImageDecoder/Bitmap/HeifWriter and MediaCodec/MediaMuxer.
  *
- * Android 实现：图片走 ImageDecoder/Bitmap/HeifWriter，视频走 Media3 Transformer。
+ * Jobs stay alive until the worker finishes so dispose during an encode does
+ * not tear the event channel down from under the codec.
  */
 class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
-    private lateinit var context: Context
+    private lateinit var context: android.content.Context
     private lateinit var messenger: BinaryMessenger
     private val executor = Executors.newCachedThreadPool()
 
@@ -26,15 +25,13 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
         MediaCompressionHostApi.setUp(messenger, this)
     }
 
-    @OptIn(UnstableApi::class)
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         MediaCompressionHostApi.setUp(binding.binaryMessenger, null)
-        jobs.values.forEach { it.dispose() }
+        jobs.values.forEach { it.requestDispose() }
         jobs.clear()
         executor.shutdownNow()
     }
 
-    @OptIn(UnstableApi::class)
     override fun createJob(): Long {
         val id = nextId++
         jobs[id] = Job(JobEventStream(messenger, id))
@@ -45,7 +42,6 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
         return ImageCompressor.queryCapabilities()
     }
 
-    @OptIn(UnstableApi::class)
     override suspend fun startImageCompress(
         id: Long,
         source: SourceMsg,
@@ -57,42 +53,54 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
             throw FlutterError("invalidState", "Job $id already started", null)
         }
         job.started = true
+        val outputPath = if (destination.kind == 1L) destination.path else null
         executor.execute {
             try {
                 if (job.cancelled) {
+                    deleteIfPresent(outputPath)
                     job.events.sendError("cancelled", "Cancelled", null)
                     return@execute
                 }
                 job.events.sendProgress(0.05)
-                val result = ImageCompressor.compress(context, source, destination, options)
+                val result =
+                    ImageCompressor.compress(context, source, destination, options) {
+                        job.cancelled
+                    }
                 if (job.cancelled) {
+                    deleteIfPresent(outputPath)
                     job.events.sendError("cancelled", "Cancelled", null)
                     return@execute
                 }
                 job.events.sendProgress(1.0)
                 job.events.sendCompleted(result)
             } catch (error: FlutterError) {
-                job.events.sendError(
-                    error.code,
-                    error.message ?: error.code,
-                    error.details?.toString()
-                )
+                if (error.code == "cancelled" || job.cancelled) {
+                    deleteIfPresent(outputPath)
+                    job.events.sendError("cancelled", "Cancelled", null)
+                } else {
+                    job.events.sendError(
+                        error.code,
+                        error.message ?: error.code,
+                        error.details?.toString(),
+                    )
+                }
             } catch (error: Exception) {
+                deleteIfPresent(outputPath)
                 job.events.sendError(
                     "encode",
                     error.message ?: "Image compress failed",
-                    error.toString()
+                    error.toString(),
                 )
+            } finally {
+                job.onWorkerFinished()
             }
         }
     }
 
-    @OptIn(UnstableApi::class)
     override fun queryVideoCapabilities(): VideoCapabilitiesMsg {
         return VideoCompressor.queryCapabilities()
     }
 
-    @UnstableApi
     override suspend fun startVideoCompress(
         id: Long,
         inputPath: String,
@@ -104,61 +112,94 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
             throw FlutterError("invalidState", "Job $id already started", null)
         }
         job.started = true
-        // 探测（MediaMetadataRetriever、MediaCodecList 扫描）在后台执行，
-        // 避免大文件启动时阻塞平台主线程。
-        // Probing (MediaMetadataRetriever, MediaCodecList scan) runs off the
-        // platform main thread to avoid jank on large inputs.
         executor.execute {
             try {
                 if (job.cancelled) {
+                    deleteIfPresent(outputPath)
                     job.events.sendError("cancelled", "Cancelled", null)
                     return@execute
                 }
-                val compressor = VideoCompressor(context, job.events)
-                job.video = compressor
-                compressor.start(inputPath, outputPath, options)
+                val compressor =
+                    VideoCompressor(context, job.events) {
+                        job.cancelled
+                    }
+                val result = compressor.start(inputPath, outputPath, options)
                 if (job.cancelled) {
-                    compressor.cancel()
+                    deleteIfPresent(outputPath)
+                    job.events.sendError("cancelled", "Cancelled", null)
+                    return@execute
                 }
+                job.events.sendProgress(1.0)
+                job.events.sendCompleted(result)
             } catch (error: FlutterError) {
+                deleteIfPresent(outputPath)
+                val code = if (job.cancelled) "cancelled" else error.code
                 job.events.sendError(
-                    error.code,
-                    error.message ?: error.code,
-                    error.details?.toString()
+                    code,
+                    if (code == "cancelled") "Cancelled" else error.message ?: error.code,
+                    error.details?.toString(),
                 )
             } catch (error: Exception) {
+                deleteIfPresent(outputPath)
                 job.events.sendError(
-                    "encode",
-                    error.message ?: "Video start failed",
-                    error.toString()
+                    if (job.cancelled) "cancelled" else "encode",
+                    error.message ?: "Video compress failed",
+                    error.toString(),
                 )
+            } finally {
+                job.onWorkerFinished()
             }
         }
     }
 
-    @OptIn(UnstableApi::class)
     override fun cancelJob(id: Long) {
         val job = jobs[id] ?: throw FlutterError("instanceNotFound", "No job $id", null)
         job.cancelled = true
-        job.video?.cancel()
     }
 
-    @OptIn(UnstableApi::class)
     override fun disposeJob(id: Long) {
-        jobs.remove(id)?.dispose()
+        jobs.remove(id)?.requestDispose()
     }
 
-    @UnstableApi
+    private fun deleteIfPresent(path: String?) {
+        if (path.isNullOrEmpty() || path.startsWith("content://")) return
+        try {
+            File(path).delete()
+        } catch (_: Exception) {
+        }
+    }
+
     private class Job(val events: JobEventStream) {
         var started = false
+
         @Volatile
         var cancelled = false
-        var video: VideoCompressor? = null
 
-        fun dispose() {
+        private val gate = Any()
+        private var workerFinished = false
+        private var disposeRequested = false
+
+        fun onWorkerFinished() {
+            val disposeNow =
+                synchronized(gate) {
+                    workerFinished = true
+                    disposeRequested
+                }
+            if (disposeNow) {
+                events.dispose()
+            }
+        }
+
+        fun requestDispose() {
             cancelled = true
-            video?.cancel()
-            events.dispose()
+            val disposeNow =
+                synchronized(gate) {
+                    disposeRequested = true
+                    workerFinished
+                }
+            if (disposeNow) {
+                events.dispose()
+            }
         }
     }
 }

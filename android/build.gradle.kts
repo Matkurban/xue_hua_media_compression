@@ -55,9 +55,7 @@ kotlin {
 dependencies {
     // Pigeon 29 generates suspend host APIs.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("androidx.media3:media3-transformer:1.11.1")
-    implementation("androidx.media3:media3-effect:1.11.1")
-    implementation("androidx.media3:media3-common:1.11.1")
     implementation("androidx.heifwriter:heifwriter:1.1.0")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
+    implementation("androidx.core:core-ktx:1.16.0")
 }

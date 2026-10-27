@@ -163,9 +163,11 @@ Output size in bytes.
 
 ### `final String encoderName`
 
-Encoder that actually ran. Darwin examples: `VideoToolbox:H264` (software)
-and `VideoToolboxHW:H265` (hardware). Capability `encoderName` is
-`VideoToolboxHW` or null; it is not the constant `VideoToolbox`.
+Encoder that actually ran. Android examples: `MediaCodec:H264` (software)
+and `MediaCodecHW:H265` (hardware). Darwin examples: `VideoToolbox:H264`
+(software) and `VideoToolboxHW:H265` (hardware). Capability `encoderName`
+is `MediaCodecHW` or `VideoToolboxHW` when that hardware encoder is present,
+otherwise null. It is not the constant `MediaCodec` or `VideoToolbox`.
 
 ### `final VideoCodec codec`
 
@@ -193,12 +195,13 @@ const VideoCompressionCapabilities({
 
 ### `final String? encoderName`
 
-Hardware encoder name. `null` when hardware encode is unavailable. Linux
-returns `GStreamerHW` when a VA or NVENC element is installed, and `null`
-when only software encoders are present. On iOS and macOS the hardware name
-is `VideoToolboxHW` (null on the iOS Simulator, where only software runs).
-`VideoCompressResult.encoderName` names the encoder that actually ran, for
-example `GStreamer:x264enc` or `VideoToolbox:H264`.
+Hardware encoder name. `null` when hardware encode is unavailable. Android
+returns `MediaCodecHW` when a hardware MediaCodec video encoder is installed.
+Linux returns `GStreamerHW` when a VA or NVENC element is installed, and
+`null` when only software encoders are present. On iOS and macOS the hardware
+name is `VideoToolboxHW` (null on the iOS Simulator, where only software
+runs). `VideoCompressResult.encoderName` names the encoder that actually ran,
+for example `MediaCodec:H264`, `GStreamer:x264enc`, or `VideoToolbox:H264`.
 
 ### `final Set<VideoCodec> codecs`
 
@@ -207,7 +210,7 @@ includes a software encoder when that is all that is installed.
 
 Typical pipelines (runtime `queryCapabilities()` is authoritative):
 
-- Android: Media3 Transformer
+- Android: MediaCodec + MediaMuxer (hardware when present, software otherwise). No FFmpeg.
 - iOS / macOS: AVAssetWriter
 - Windows: Media Foundation (Source Reader + Sink Writer). No FFmpeg.
 - Linux: GStreamer hardware encoders, with software fallback. Do not install

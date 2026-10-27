@@ -1,3 +1,21 @@
+## [2.3.2] - 2026-10-26
+
+### Fixed / 修复
+
+- Android video no longer requires a hardware encoder or Media3 Transformer. `codecs` lists MediaCodec encoders that are installed (hardware or software). `encoderName` is `MediaCodecHW` only when a hardware video encoder is present, otherwise null. Compress results name the encoder that ran (`MediaCodec:H264`, `MediaCodecHW:H265`, …). Missing H.264/H.265 throws `unsupported`.
+  Android 视频不再强制硬编，也不再使用 Media3 Transformer。`codecs` 是本机已安装的 MediaCodec 编码器（硬编或软编）。只有存在硬编时 `encoderName` 才是 `MediaCodecHW`，否则为 null。压缩结果里的名字是实际编码器（`MediaCodec:H264`、`MediaCodecHW:H265` 等）。没有 H.264/H.265 编码器时抛 `unsupported`。
+- Android video honours `keepAudio` (AAC passthrough, or PCM transcode when the source is not AAC). When the source has audio and no AAC encoder is installed, `keepAudio: true` throws `unsupported` instead of dropping the track. `keepAudio: false` writes a silent MP4. `fps`, `maxDimension` (even dimensions), and `keyframeInterval` are applied. Cancel stops the encode and deletes the output. A missing file is `notFound`, a directory is `io`, and a corrupt file is `decode`. `content://` input is accepted.
+  Android 视频遵守 `keepAudio`（AAC 透传，非 AAC 则转码）。源片有音轨但没有 AAC 编码器时，`keepAudio: true` 抛 `unsupported`，不再静默丢掉音轨。`keepAudio: false` 写出无音轨 MP4。`fps`、`maxDimension`（偶数尺寸）和 `keyframeInterval` 会生效。取消会停掉编码并删除输出。文件不存在为 `notFound`，目录为 `io`，损坏文件为 `decode`。接受 `content://` 输入。
+- Android image errors match the other platforms: a missing file or `content://` is `notFound`, a file that exists but cannot be decoded is `decode`, and a directory is `io`. Cancelling an image compress deletes the output. Encode failures remove a partial file. HEIC output is advertised only on API 28+ when an HEVC encoder is installed.
+  Android 图片错误与其它平台对齐：文件或 `content://` 不存在为 `notFound`，文件在但解不出为 `decode`，目录为 `io`。取消图片压缩会删掉输出。编码失败会删掉半成品。只有 API 28+ 且安装了 HEVC 编码器时才宣告 HEIC 输出。
+- Jobs stay alive until the worker finishes, so `dispose` during an encode no longer frees the event channel out from under MediaCodec. Progress below 1.0 stays throttled, and the latest value is flushed before completion.
+  任务会活到工作线程结束，编码过程中 `dispose` 不再把事件通道从 MediaCodec 底下拆掉。低于 1.0 的进度仍节流，完成前会送出最新一条。
+
+### Changed / 变更
+
+- Android video encode uses MediaCodec + MediaMuxer (hardware when present, software otherwise) and image encode uses Bitmap / ImageDecoder / HeifWriter. The plugin does not use FFmpeg, libav, or Media3.
+  Android 视频走 MediaCodec + MediaMuxer（有硬编用硬编，否则软编），图片走 Bitmap / ImageDecoder / HeifWriter。不使用 FFmpeg、libav 或 Media3。
+
 ## [2.3.1] - 2026-10-26
 
 ### Fixed / 修复

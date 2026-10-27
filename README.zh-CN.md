@@ -10,12 +10,12 @@ Flutter 插件，提供**图片与视频压缩**。各端使用系统硬编管�
 |------------------------|--------------------|---------------|-----------------|--------------------|
 | JPEG / PNG             | 是                  | 是             | 是               | 是                  |
 | WebP 编码              | 是                  | ImageIO 支持时  | 有 WIC 才支持     | libvips 含 webp 才支持 |
-| HEIC 编码              | API 28+            | 是             | 有 HEIF 扩展才支持 | 否                  |
+| HEIC 编码              | API 28+ 且有 HEVC   | 是             | 有 HEIF 扩展才支持 | 否                  |
 | AVIF / GIF 编码        | 否                  | 否             | 否               | 否                  |
-| H.264 / H.265 MP4      | Media3 Transformer | AVAssetWriter | Media Foundation | GStreamer HW/SW   |
+| H.264 / H.265 MP4      | MediaCodec HW/SW   | AVAssetWriter | Media Foundation | GStreamer HW/SW   |
 | `content://` 输入      | 是                  | 否             | 否               | 否                  |
 
-视频输出始终为 MP4。`VideoCompressOptions.keepAudio` 默认 `true`（AAC 透传或转码）。Windows 与 Linux 都将音频转码为 AAC；源片有音轨但没有 AAC 编码器时抛 `unsupported`。
+视频输出始终为 MP4。`VideoCompressOptions.keepAudio` 默认 `true`（AAC 透传或转码）。Android 对 AAC 透传，其它音轨转成 AAC。Android、Windows 与 Linux 在源片有音轨但没有 AAC 编码器时抛 `unsupported`。
 
 运行时先调用 `queryCapabilities()`，用 `outputFormats` / `codecs` 填选项。缺能力抛 `MediaCompressionException.unsupported` 或 `hardwareUnavailable`，禁止静默改格式。
 
@@ -27,7 +27,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 |-------------|-------------------------------------------------------------------------------|
 | Flutter     | ≥ 3.44.0                                                                      |
 | Dart        | ≥ 3.12.0                                                                      |
-| Android     | minSdk 23, Media3 Transformer                                                 |
+| Android     | minSdk 23，MediaCodec / MediaMuxer / Bitmap / ImageDecoder（不使用 FFmpeg） |
 | iOS / macOS | iOS 12 / macOS 10.15                                                          |
 | Windows     | Windows 10+，Media Foundation（不使用 FFmpeg）                                |
 | Linux       | `libvips-dev`、`libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev` 以及 GStreamer base/good/bad/ugly 插件 |
@@ -36,7 +36,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.3.1
+  xue_hua_media_compression: ^2.3.2
 ```
 
 ```dart
@@ -143,7 +143,7 @@ Linux 图片 / 视频压缩（GStreamer + libvips，不要安装 `gstreamer1.0-l
 # libvips-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 # gstreamer1.0-plugins-{base,good,bad,ugly} gstreamer1.0-tools
 cd example
-xvfb-run -a flutter test integration_test -d linux
+xvfb-run -a flutter test integration_test/driver_test.dart -d linux
 xvfb-run -a flutter drive \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/driver_test.dart \
@@ -155,7 +155,7 @@ Windows 图片与视频（WIC + Media Foundation，不用 FFmpeg）。机器需�
 
 ```bash
 cd example
-flutter test integration_test -d windows
+flutter test integration_test/driver_test.dart -d windows
 flutter drive \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/driver_test.dart \
@@ -198,6 +198,31 @@ SO=example/build/linux/x64/release/bundle/lib/libxue_hua_media_compression_plugi
 readelf -d "$SO" | grep NEEDED
 ldd "$SO"
 strings "$SO" | grep -E 'libavcodec|libavformat|libavutil|libswscale|libswresample|libpostproc|avdec_|avenc_'
+```
+
+Android 图片 / 视频压缩（MediaCodec + MediaMuxer，不用 FFmpeg）。维护者的 Mac 上 `Pixel_8_Pro` 是 API 34，设备号为 `emulator-5554`。不要启动 `Bgdl_API_35` 或 `Bgdl_API_36`（那是其它项目的模拟器）。其它 API 可以并行跑，把 `flutter devices` 里各自的 id 传进去。
+
+```bash
+flutter emulators --launch Pixel_8_Pro
+cd example
+flutter test integration_test/android_driver_test.dart -d emulator-5554
+```
+
+```bash
+flutter test integration_test/android_driver_test.dart -d emulator-5554   # API 34，Pixel_8_Pro
+flutter test integration_test/android_driver_test.dart -d emulator-XXXX   # API 26
+flutter test integration_test/android_driver_test.dart -d emulator-XXXX   # API 30
+flutter test integration_test/android_driver_test.dart -d emulator-XXXX   # API 36
+```
+
+API 26 走 BitmapFactory，API 28+ 走 ImageDecoder。也可以用 `flutter drive`：
+
+```bash
+cd example
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/android_driver_test.dart \
+  -d emulator-5554
 ```
 
 ## 许可

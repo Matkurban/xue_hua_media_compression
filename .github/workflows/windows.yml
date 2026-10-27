@@ -54,6 +54,9 @@ jobs:
       - name: Build Windows
         working-directory: example
         run: flutter build windows
+      # Desktop Flutter closes the log reader when the first integration_test
+      # file exits, so Android, iOS, and macOS entry points cannot share this
+      # process. driver_test.dart already registers the Windows suite.
       - name: Integration tests
         working-directory: example
-        run: flutter test integration_test -d windows
+        run: flutter test integration_test/driver_test.dart -d windows

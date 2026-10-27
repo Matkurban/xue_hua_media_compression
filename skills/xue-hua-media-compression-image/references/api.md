@@ -208,7 +208,7 @@ Typical encode support (runtime `queryCapabilities()` is authoritative):
 
 - JPEG / PNG: Android, iOS, macOS, Windows, Linux
 - WebP: Android; Windows if WIC present; Linux if libvips has webp; not iOS/macOS
-- HEIC: Android API 28+; iOS/macOS; Windows if HEIF extension; not Linux
+- HEIC: Android API 28+ when a HEVC encoder is installed; iOS/macOS; Windows if HEIF extension; not Linux
 - AVIF / GIF: encode impossible on all supported platforms
 
 ## `ImageFormat`

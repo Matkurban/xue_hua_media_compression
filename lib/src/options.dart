@@ -112,12 +112,13 @@ final class VideoCompressOptions {
   final int? keyframeInterval;
 
   /// 是否保留音轨。默认 true。
-  /// Windows / Linux 在存在 AAC 编码器时转码为 AAC；源片有音轨但没有
-  /// AAC 编码器时抛 `unsupported`。
+  /// Android 对 AAC 透传，其它音轨转成 AAC。Windows / Linux 在存在 AAC
+  /// 编码器时转码为 AAC。源片有音轨但没有 AAC 编码器时抛 `unsupported`。
   ///
   /// Whether to keep the audio track. Default true.
-  /// Windows and Linux transcode it to AAC when an AAC encoder is installed.
-  /// If the source has audio and no AAC encoder is installed, compress throws
+  /// Android passes AAC through and transcodes other audio to AAC. Windows
+  /// and Linux transcode to AAC when an AAC encoder is installed. If the
+  /// source has audio and no AAC encoder is installed, compress throws
   /// `unsupported`.
   final bool keepAudio;
 }
