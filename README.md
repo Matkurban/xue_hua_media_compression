@@ -164,7 +164,7 @@ Linux image and video compression (GStreamer + libvips, no `gstreamer1.0-libav`)
 # libvips-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 # gstreamer1.0-plugins-{base,good,bad,ugly} gstreamer1.0-tools
 cd example
-xvfb-run -a flutter test integration_test -d linux
+xvfb-run -a flutter test integration_test/driver_test.dart -d linux
 xvfb-run -a flutter drive \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/driver_test.dart \
@@ -178,7 +178,7 @@ some Server images need the Media Feature Pack):
 
 ```bash
 cd example
-flutter test integration_test -d windows
+flutter test integration_test/driver_test.dart -d windows
 flutter drive \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/driver_test.dart \

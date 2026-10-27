@@ -143,7 +143,7 @@ Linux 图片 / 视频压缩（GStreamer + libvips，不要安装 `gstreamer1.0-l
 # libvips-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 # gstreamer1.0-plugins-{base,good,bad,ugly} gstreamer1.0-tools
 cd example
-xvfb-run -a flutter test integration_test -d linux
+xvfb-run -a flutter test integration_test/driver_test.dart -d linux
 xvfb-run -a flutter drive \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/driver_test.dart \
@@ -155,7 +155,7 @@ Windows 图片与视频（WIC + Media Foundation，不用 FFmpeg）。机器需�
 
 ```bash
 cd example
-flutter test integration_test -d windows
+flutter test integration_test/driver_test.dart -d windows
 flutter drive \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/driver_test.dart \
