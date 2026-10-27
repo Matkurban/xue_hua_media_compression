@@ -76,13 +76,24 @@ void main() {
     late String spacedVideo;
 
     setUpAll(() async {
-      // Android's dart:io temp directory is the app cache dir, which the
-      // example FileProvider serves at content://<authority>/cache/.
-      cache = Directory.systemTemp;
+      // FileProvider serves Context.getCacheDir() at content://…/cache/.
+      // Flutter 3.47+ may point Directory.systemTemp at …/code_cache instead;
+      // prefer the sibling app cache dir so content:// URIs resolve.
+      final systemTemp = Directory.systemTemp;
+      if (systemTemp.path.endsWith('/code_cache')) {
+        cache = Directory(
+          '${systemTemp.path.substring(0, systemTemp.path.length - '/code_cache'.length)}/cache',
+        );
+        if (!cache.existsSync()) {
+          cache.createSync(recursive: true);
+        }
+      } else {
+        cache = systemTemp;
+      }
       expect(
-        cache.path.contains('/cache'),
+        cache.path.endsWith('/cache') || cache.path.contains('/cache/'),
         isTrue,
-        reason: 'expected the app cache dir, got ${cache.path}',
+        reason: 'expected the app cache dir, got ${cache.path} (systemTemp=${systemTemp.path})',
       );
       temp = owned = Directory(
         '${cache.path}/xh_android_driver_${DateTime.now().millisecondsSinceEpoch}',
