@@ -1,3 +1,9 @@
+## 2.3.3
+
+* Android: strip display-width/height before MediaCodec decoder configure (MPEG-4 on API 30).
+* Android: map missing content:// videos to notFound via ContentResolver.
+* Tests: resolve FileProvider cache when systemTemp is code_cache; stream-read /proc/self/maps.
+
 ## [2.3.2] - 2026-10-26
 
 ### Fixed / 修复

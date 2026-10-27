@@ -90,7 +90,15 @@ internal class VideoCompressor(
                     )
                 }
             decoder = videoDecoder
-            videoDecoder.configure(inputFormat, null, null, 0)
+            try {
+                videoDecoder.configure(stripDisplaySizeKeys(inputFormat), null, null, 0)
+            } catch (error: Exception) {
+                throw FlutterError(
+                    "decode",
+                    "Cannot configure decoder for $inputMime",
+                    error.toString(),
+                )
+            }
             videoDecoder.start()
 
             val sourceFps = positiveInt(inputFormat, MediaFormat.KEY_FRAME_RATE, 30)
@@ -864,7 +872,14 @@ internal class VideoCompressor(
             if (path.startsWith("content://")) {
                 val uri = path.toUri()
                 try {
-                    extractor.setDataSource(context, uri, null)
+                    val pfd =
+                        context.contentResolver.openFileDescriptor(uri, "r")
+                            ?: throw FlutterError("notFound", "Video not found: $path", null)
+                    pfd.use { descriptor ->
+                        extractor.setDataSource(descriptor.fileDescriptor)
+                    }
+                } catch (error: FlutterError) {
+                    throw error
                 } catch (error: Exception) {
                     if (isNotFound(error)) {
                         throw FlutterError("notFound", "Video not found: $path", null)
@@ -927,12 +942,30 @@ internal class VideoCompressor(
         }
     }
 
+    /** Drop display-width/height that some C2 decoders reject during configure. */
+    private fun stripDisplaySizeKeys(source: MediaFormat): MediaFormat {
+        if (Build.VERSION.SDK_INT < 29) {
+            return source
+        }
+        val copy = MediaFormat(source)
+        copy.removeKey("display-width")
+        copy.removeKey("display-height")
+        return copy
+    }
+
     private fun isNotFound(error: Throwable): Boolean {
+
         var current: Throwable? = error
         while (current != null) {
             if (current is FileNotFoundException) return true
             val message = current.message?.lowercase() ?: ""
-            if (message.contains("no such file") || message.contains("enoent")) return true
+            if (message.contains("no such file") ||
+                message.contains("enoent") ||
+                message.contains("failed to instantiate extractor") ||
+                message.contains("open failed")
+            ) {
+                return true
+            }
             current = current.cause
         }
         return false
