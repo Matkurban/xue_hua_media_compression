@@ -79,9 +79,9 @@ final class VideoCompressResult {
   /// Output size in bytes.
   final int sizeBytes;
 
-  /// 实际使用的编码器名称（如 `Media3Transformer`、`VideoToolbox`）。
+  /// 实际使用的编码器名称（如 `VideoToolbox:H264`、`VideoToolboxHW:H265`）。
   ///
-  /// Encoder that actually ran (e.g. `Media3Transformer`, `VideoToolbox`).
+  /// Encoder that actually ran (e.g. `VideoToolbox:H264`, `VideoToolboxHW:H265`).
   final String encoderName;
 
   /// 实际使用的编码。

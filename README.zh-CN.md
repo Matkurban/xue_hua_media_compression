@@ -9,7 +9,7 @@ Flutter 插件，提供**图片与视频压缩**。各端使用系统硬编管�
 |                        | Android            | iOS / macOS   | Windows         | Linux              |
 |------------------------|--------------------|---------------|-----------------|--------------------|
 | JPEG / PNG             | 是                  | 是             | 是               | 是                  |
-| WebP 编码              | 是                  | 否             | 有 WIC 才支持     | libvips 含 webp 才支持 |
+| WebP 编码              | 是                  | ImageIO 支持时  | 有 WIC 才支持     | libvips 含 webp 才支持 |
 | HEIC 编码              | API 28+            | 是             | 有 HEIF 扩展才支持 | 否                  |
 | AVIF / GIF 编码        | 否                  | 否             | 否               | 否                  |
 | H.264 / H.265 MP4      | Media3 Transformer | AVAssetWriter | Media Foundation | GStreamer HW/SW   |
@@ -36,7 +36,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.3.0
+  xue_hua_media_compression: ^2.3.1
 ```
 
 ```dart
@@ -161,6 +161,34 @@ flutter drive \
   --target=integration_test/driver_test.dart \
   -d windows
 flutter build windows
+```
+
+macOS 与 iOS（共用 Darwin 源码：ImageIO + AVFoundation / VideoToolbox，不用 FFmpeg）。在 Apple Silicon Mac，或 iOS 模拟器 / 真机上，用示例工程的 Flutter SDK 运行：
+
+```bash
+cd example
+flutter test integration_test/macos_driver_test.dart -d macos
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/macos_driver_test.dart \
+  -d macos
+flutter build macos
+
+# iOS 模拟器或已连接的 iPhone。设备 id 用 flutter devices 查看。
+flutter test integration_test/ios_driver_test.dart -d <device-id>
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/ios_driver_test.dart \
+  -d <device-id>
+```
+
+有硬编时 `queryVideoCapabilities().encoderName` 为 `VideoToolboxHW`，模拟器上为 null。压缩结果是 `VideoToolbox:H264` 或 `VideoToolboxHW:H264`（H.265 同理）。
+
+确认 macOS 插件二进制没有 FFmpeg：
+
+```bash
+BIN=$(find example/build/macos/Build/Products -type f \( -name '*.debug.dylib' -o -name 'xue_hua_media_compression_darwin' -o -name 'xue_hua_media_compression' \) ! -path '*/App.framework/*' ! -path '*/flutter_assets/*' | head -n 1)
+strings "$BIN" | grep -E 'libavcodec|libavformat|libavutil|ffmpeg|gst-libav' && exit 1 || true
 ```
 
 确认插件没有链接 FFmpeg：

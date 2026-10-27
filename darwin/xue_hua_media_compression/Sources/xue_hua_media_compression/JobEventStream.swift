@@ -15,6 +15,8 @@ final class JobEventStream: NSObject, FlutterStreamHandler {
   private var lastProgress: Double?
   private var pendingTerminal: [[String: Any?]] = []
   private var lastProgressSentAt: CFTimeInterval = 0
+  private var sentPositive = false
+  private var terminal = false
 
   init(messenger: FlutterBinaryMessenger, id: Int64) {
     channel = FlutterEventChannel(
@@ -27,23 +29,26 @@ final class JobEventStream: NSObject, FlutterStreamHandler {
   func sendProgress(_ value: Double) {
     let clamped = min(max(value, 0), 1)
     runOnMain {
+      if self.terminal { return }
       let now = CACurrentMediaTime()
+      let firstPositive = clamped > 0 && clamped < 1 && !self.sentPositive
       if self.sink == nil {
         self.lastProgress = clamped
         return
       }
-      if clamped < 1 && now - self.lastProgressSentAt < 0.1 {
+      if !firstPositive && clamped < 1 && now - self.lastProgressSentAt < 0.1 {
         self.lastProgress = clamped
         return
       }
-      self.lastProgressSentAt = now
-      self.lastProgress = nil
-      self.sink?(["type": "progress", "value": clamped])
+      self.emitProgress(clamped, now: now)
     }
   }
 
   func sendCompleted(_ result: [String: Any?]) {
     runOnMain {
+      if self.terminal { return }
+      self.flushCoalescedProgress()
+      self.terminal = true
       let event: [String: Any?] = ["type": "completed", "result": result]
       if let sink = self.sink {
         sink(event)
@@ -55,6 +60,8 @@ final class JobEventStream: NSObject, FlutterStreamHandler {
 
   func sendError(code: String, message: String, details: String? = nil) {
     runOnMain {
+      if self.terminal { return }
+      self.terminal = true
       let event: [String: Any?] = [
         "type": "error",
         "code": code,
@@ -71,6 +78,7 @@ final class JobEventStream: NSObject, FlutterStreamHandler {
 
   func dispose() {
     runOnMain {
+      self.terminal = true
       self.sink = nil
       self.channel.setStreamHandler(nil)
       self.pendingTerminal.removeAll()
@@ -83,8 +91,7 @@ final class JobEventStream: NSObject, FlutterStreamHandler {
   {
     sink = events
     if let lastProgress {
-      events(["type": "progress", "value": lastProgress])
-      self.lastProgress = nil
+      emitProgress(lastProgress, now: CACurrentMediaTime())
     }
     for event in pendingTerminal {
       events(event)
@@ -96,6 +103,20 @@ final class JobEventStream: NSObject, FlutterStreamHandler {
   func onCancel(withArguments arguments: Any?) -> FlutterError? {
     sink = nil
     return nil
+  }
+
+  private func emitProgress(_ clamped: Double, now: CFTimeInterval) {
+    lastProgressSentAt = now
+    lastProgress = nil
+    if clamped > 0 && clamped < 1 {
+      sentPositive = true
+    }
+    sink?(["type": "progress", "value": clamped])
+  }
+
+  private func flushCoalescedProgress() {
+    guard let lastProgress, sink != nil else { return }
+    emitProgress(lastProgress, now: CACurrentMediaTime())
   }
 
   private func runOnMain(_ block: @escaping () -> Void) {
