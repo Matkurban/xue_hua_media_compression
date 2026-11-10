@@ -35,8 +35,8 @@ dependencies:
   xue_hua_media_compression:
     path: ../
   cupertino_icons: ^2.0.0
-  material_ui: ^1.8.0
-  xue_hua_file_operations: ^1.4.0
+  material_ui: ^1.11.0
+  xue_hua_file_operations: ^1.5.5
 
 dev_dependencies:
   flutter_test:
