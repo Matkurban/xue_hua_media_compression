@@ -1,3 +1,8 @@
+## 2.3.4
+
+* update pigeon to `29.2.0`
+* update build tools to `9.1.1`
+
 ## 2.3.3
 
 * Android: strip display-width/height before MediaCodec decoder configure (MPEG-4 on API 30).
