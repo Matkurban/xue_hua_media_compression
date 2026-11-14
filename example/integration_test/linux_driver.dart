@@ -39,49 +39,108 @@ void registerLinuxDriverTests() {
       spacedVideo = '${spacedDir.path}/clip.mkv';
 
       await _gst([
-        'videotestsrc', 'num-buffers=1', 'pattern=smpte', '!',
-        'video/x-raw,width=320,height=240', '!',
-        'pngenc', '!',
-        'filesink', 'location=$pngPath',
+        'videotestsrc',
+        'num-buffers=1',
+        'pattern=smpte',
+        '!',
+        'video/x-raw,width=320,height=240',
+        '!',
+        'pngenc',
+        '!',
+        'filesink',
+        'location=$pngPath',
       ]);
       await _gst([
-        'videotestsrc', 'num-buffers=1', 'pattern=ball', '!',
-        'video/x-raw,width=160,height=120', '!',
-        'jpegenc', 'quality=90', '!',
-        'filesink', 'location=$jpegPath',
+        'videotestsrc',
+        'num-buffers=1',
+        'pattern=ball',
+        '!',
+        'video/x-raw,width=160,height=120',
+        '!',
+        'jpegenc',
+        'quality=90',
+        '!',
+        'filesink',
+        'location=$jpegPath',
       ]);
       await _gst([
-        'videotestsrc', 'num-buffers=30', 'pattern=smpte', '!',
-        'video/x-raw,width=64,height=64,framerate=30/1', '!',
-        'vp8enc', 'deadline=1', 'cpu-used=16', '!',
-        'matroskamux', '!',
-        'filesink', 'location=$shortVideo',
+        'videotestsrc',
+        'num-buffers=30',
+        'pattern=smpte',
+        '!',
+        'video/x-raw,width=64,height=64,framerate=30/1',
+        '!',
+        'vp8enc',
+        'deadline=1',
+        'cpu-used=16',
+        '!',
+        'matroskamux',
+        '!',
+        'filesink',
+        'location=$shortVideo',
       ]);
       await _gst([
-        'videotestsrc', 'num-buffers=30', 'pattern=ball', '!',
-        'video/x-raw,width=96,height=64,framerate=30/1', '!',
-        'vp8enc', 'deadline=1', 'cpu-used=16', '!',
-        'queue', '!', 'mux.',
-        'audiotestsrc', 'num-buffers=47', 'samplesperbuffer=1024', '!',
-        'audio/x-raw,rate=48000,channels=2', '!',
-        'vorbisenc', '!',
-        'queue', '!', 'mux.',
-        'matroskamux', 'name=mux', '!',
-        'filesink', 'location=$audioVideo',
+        'videotestsrc',
+        'num-buffers=30',
+        'pattern=ball',
+        '!',
+        'video/x-raw,width=96,height=64,framerate=30/1',
+        '!',
+        'vp8enc',
+        'deadline=1',
+        'cpu-used=16',
+        '!',
+        'queue',
+        '!',
+        'mux.',
+        'audiotestsrc',
+        'num-buffers=47',
+        'samplesperbuffer=1024',
+        '!',
+        'audio/x-raw,rate=48000,channels=2',
+        '!',
+        'vorbisenc',
+        '!',
+        'queue',
+        '!',
+        'mux.',
+        'matroskamux',
+        'name=mux',
+        '!',
+        'filesink',
+        'location=$audioVideo',
       ]);
       await _gst([
-        'videotestsrc', 'num-buffers=15', 'pattern=smpte', '!',
-        'video/x-raw,width=100,height=60,framerate=30/1', '!',
-        'vp8enc', 'deadline=1', 'cpu-used=16', '!',
-        'matroskamux', '!',
-        'filesink', 'location=$oddVideo',
+        'videotestsrc',
+        'num-buffers=15',
+        'pattern=smpte',
+        '!',
+        'video/x-raw,width=100,height=60,framerate=30/1',
+        '!',
+        'vp8enc',
+        'deadline=1',
+        'cpu-used=16',
+        '!',
+        'matroskamux',
+        '!',
+        'filesink',
+        'location=$oddVideo',
       ]);
       await _gst([
-        'videotestsrc', 'num-buffers=180', 'pattern=smpte', '!',
-        'video/x-raw,width=1280,height=720,framerate=30/1', '!',
-        'vp8enc', 'deadline=1', 'cpu-used=16', '!',
-        'matroskamux', '!',
-        'filesink', 'location=$longVideo',
+        'videotestsrc',
+        'num-buffers=180',
+        'pattern=smpte',
+        '!',
+        'video/x-raw,width=1280,height=720,framerate=30/1',
+        '!',
+        'vp8enc',
+        'deadline=1',
+        'cpu-used=16',
+        '!',
+        'matroskamux',
+        '!',
+        'filesink',
+        'location=$longVideo',
       ]);
       await File(shortVideo).copy(spacedVideo);
     });
@@ -92,61 +151,64 @@ void registerLinuxDriverTests() {
       }
     });
 
-    driverTest('image and video capabilities match installed encoders', () async {
-      final images = await XueHuaMediaCompression.image.queryCapabilities();
-      expect(images.inputFormats, contains(ImageFormat.jpeg));
-      expect(images.inputFormats, contains(ImageFormat.png));
-      expect(images.outputFormats, contains(ImageFormat.jpeg));
-      expect(images.outputFormats, contains(ImageFormat.png));
-      expect(images.outputFormats, isNot(contains(ImageFormat.gif)));
-      expect(images.outputFormats, isNot(contains(ImageFormat.avif)));
-      expect(images.outputFormats, isNot(contains(ImageFormat.heic)));
-      if (images.outputFormats.contains(ImageFormat.webp)) {
-        expect(images.inputFormats, contains(ImageFormat.webp));
-      }
+    driverTest(
+      'image and video capabilities match installed encoders',
+      () async {
+        final images = await XueHuaMediaCompression.image.queryCapabilities();
+        expect(images.inputFormats, contains(ImageFormat.jpeg));
+        expect(images.inputFormats, contains(ImageFormat.png));
+        expect(images.outputFormats, contains(ImageFormat.jpeg));
+        expect(images.outputFormats, contains(ImageFormat.png));
+        expect(images.outputFormats, isNot(contains(ImageFormat.gif)));
+        expect(images.outputFormats, isNot(contains(ImageFormat.avif)));
+        expect(images.outputFormats, isNot(contains(ImageFormat.heic)));
+        if (images.outputFormats.contains(ImageFormat.webp)) {
+          expect(images.inputFormats, contains(ImageFormat.webp));
+        }
 
-      final video = await XueHuaMediaCompression.video.queryCapabilities();
-      expect(video.acceptsContentUri, isFalse);
-      final h264 = await _anyFactory(const [
-        'vah264enc',
-        'vah264lpenc',
-        'vaapih264enc',
-        'nvh264enc',
-        'x264enc',
-        'openh264enc',
-      ]);
-      final h265 = await _anyFactory(const [
-        'vah265enc',
-        'vah265lpenc',
-        'vaapih265enc',
-        'nvh265enc',
-        'x265enc',
-      ]);
-      final hardware = await _anyFactory(const [
-        'vah264enc',
-        'vah264lpenc',
-        'vaapih264enc',
-        'nvh264enc',
-        'vah265enc',
-        'vah265lpenc',
-        'vaapih265enc',
-        'nvh265enc',
-      ]);
-      if (h264) {
-        expect(video.codecs, contains(VideoCodec.h264));
-      }
-      if (h265) {
-        expect(video.codecs, contains(VideoCodec.h265));
-      }
-      expect(video.codecs, isNotEmpty);
-      if (hardware) {
-        expect(video.encoderName, 'GStreamerHW');
-      } else {
-        expect(video.encoderName, isNull);
-      }
-      expect(video.encoderName, isNot(contains('FFmpeg')));
-      expect(video.encoderName, isNot(contains('libav')));
-    });
+        final video = await XueHuaMediaCompression.video.queryCapabilities();
+        expect(video.acceptsContentUri, isFalse);
+        final h264 = await _anyFactory(const [
+          'vah264enc',
+          'vah264lpenc',
+          'vaapih264enc',
+          'nvh264enc',
+          'x264enc',
+          'openh264enc',
+        ]);
+        final h265 = await _anyFactory(const [
+          'vah265enc',
+          'vah265lpenc',
+          'vaapih265enc',
+          'nvh265enc',
+          'x265enc',
+        ]);
+        final hardware = await _anyFactory(const [
+          'vah264enc',
+          'vah264lpenc',
+          'vaapih264enc',
+          'nvh264enc',
+          'vah265enc',
+          'vah265lpenc',
+          'vaapih265enc',
+          'nvh265enc',
+        ]);
+        if (h264) {
+          expect(video.codecs, contains(VideoCodec.h264));
+        }
+        if (h265) {
+          expect(video.codecs, contains(VideoCodec.h265));
+        }
+        expect(video.codecs, isNotEmpty);
+        if (hardware) {
+          expect(video.encoderName, 'GStreamerHW');
+        } else {
+          expect(video.encoderName, isNull);
+        }
+        expect(video.encoderName, isNot(contains('FFmpeg')));
+        expect(video.encoderName, isNot(contains('libav')));
+      },
+    );
 
     driverTest('image compress from path and bytes, with progress', () async {
       final output = '${temp.path}/out.jpg';
@@ -226,23 +288,28 @@ void registerLinuxDriverTests() {
       expect(webpResult.height, 120);
     });
 
-    driverTest('image maxDimension downscales and creates parent directories', () async {
-      final output = '${temp.path}/nested/deeper/scaled.jpg';
-      final session = XueHuaMediaCompression.image.compress(
-        source: MediaSource.path(pngPath),
-        destination: MediaDestination.path(output),
-        options: const ImageCompressOptions(quality: 80, maxDimension: 80),
-      );
-      final result = await _resultOf(session);
-      expect(File(output).existsSync(), isTrue);
-      expect(result.width, lessThanOrEqualTo(80));
-      expect(result.height, lessThanOrEqualTo(80));
-      expect(result.width, greaterThan(0));
-      expect(result.height, greaterThan(0));
-      final longest = result.width > result.height ? result.width : result.height;
-      expect(longest, lessThanOrEqualTo(80));
-      expect(result.width / result.height, closeTo(320 / 240, 0.05));
-    });
+    driverTest(
+      'image maxDimension downscales and creates parent directories',
+      () async {
+        final output = '${temp.path}/nested/deeper/scaled.jpg';
+        final session = XueHuaMediaCompression.image.compress(
+          source: MediaSource.path(pngPath),
+          destination: MediaDestination.path(output),
+          options: const ImageCompressOptions(quality: 80, maxDimension: 80),
+        );
+        final result = await _resultOf(session);
+        expect(File(output).existsSync(), isTrue);
+        expect(result.width, lessThanOrEqualTo(80));
+        expect(result.height, lessThanOrEqualTo(80));
+        expect(result.width, greaterThan(0));
+        expect(result.height, greaterThan(0));
+        final longest = result.width > result.height
+            ? result.width
+            : result.height;
+        expect(longest, lessThanOrEqualTo(80));
+        expect(result.width / result.height, closeTo(320 / 240, 0.05));
+      },
+    );
 
     driverTest('lower jpeg quality does not grow the file', () async {
       Future<int> encode(int quality) async {
@@ -261,74 +328,126 @@ void registerLinuxDriverTests() {
       expect(large, greaterThan(small));
     });
 
-    driverTest('gif input decodes and gif/avif/heic output is unsupported', () async {
-      const gif = <int>[
-        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
-        0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x21, 0xf9, 0x04, 0x01, 0x00,
-        0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-        0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
-      ];
-      final session = XueHuaMediaCompression.image.compress(
-        source: MediaSource.bytes(Uint8List.fromList(gif)),
-        destination: MediaDestination.bytes(),
-        options: const ImageCompressOptions(quality: 80),
-      );
-      final result = await _resultOf(session);
-      expect(result.width, greaterThan(0));
-      expect(result.height, greaterThan(0));
-      expect(result.bytes, isNotNull);
-
-      for (final format in const [
-        ImageFormat.gif,
-        ImageFormat.avif,
-        ImageFormat.heic,
-      ]) {
-        final rejected = XueHuaMediaCompression.image.compress(
-          source: MediaSource.path(jpegPath),
+    driverTest(
+      'gif input decodes and gif/avif/heic output is unsupported',
+      () async {
+        const gif = <int>[
+          0x47,
+          0x49,
+          0x46,
+          0x38,
+          0x39,
+          0x61,
+          0x01,
+          0x00,
+          0x01,
+          0x00,
+          0x80,
+          0x00,
+          0x00,
+          0xff,
+          0xff,
+          0xff,
+          0x00,
+          0x00,
+          0x00,
+          0x21,
+          0xf9,
+          0x04,
+          0x01,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x2c,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x01,
+          0x00,
+          0x01,
+          0x00,
+          0x00,
+          0x02,
+          0x02,
+          0x44,
+          0x01,
+          0x00,
+          0x3b,
+        ];
+        final session = XueHuaMediaCompression.image.compress(
+          source: MediaSource.bytes(Uint8List.fromList(gif)),
           destination: MediaDestination.bytes(),
-          options: ImageCompressOptions(format: format),
+          options: const ImageCompressOptions(quality: 80),
         );
-        await _expectCode(rejected, MediaCompressionException.unsupported);
-      }
-    });
+        final result = await _resultOf(session);
+        expect(result.width, greaterThan(0));
+        expect(result.height, greaterThan(0));
+        expect(result.bytes, isNotNull);
 
-    driverTest('missing, corrupt, and content URI image inputs fail cleanly', () async {
-      final missing = XueHuaMediaCompression.image.compress(
-        source: MediaSource.path('${temp.path}/no-such-image.jpg'),
-        destination: MediaDestination.bytes(),
-      );
-      await _expectCode(missing, MediaCompressionException.notFound);
+        for (final format in const [
+          ImageFormat.gif,
+          ImageFormat.avif,
+          ImageFormat.heic,
+        ]) {
+          final rejected = XueHuaMediaCompression.image.compress(
+            source: MediaSource.path(jpegPath),
+            destination: MediaDestination.bytes(),
+            options: ImageCompressOptions(format: format),
+          );
+          await _expectCode(rejected, MediaCompressionException.unsupported);
+        }
+      },
+    );
 
-      final corruptPath = '${temp.path}/corrupt.jpg';
-      await File(corruptPath).writeAsString('this is not a jpeg');
-      final corrupt = XueHuaMediaCompression.image.compress(
-        source: MediaSource.path(corruptPath),
-        destination: MediaDestination.bytes(),
-      );
-      await _expectCode(corrupt, MediaCompressionException.decode);
-
-      final content = XueHuaMediaCompression.image.compress(
-        source: MediaSource.path('content://media/external/images/1'),
-        destination: MediaDestination.bytes(),
-      );
-      await _expectCode(content, MediaCompressionException.unsupported);
-
-      expect(
-        () => XueHuaMediaCompression.image.compress(
-          source: MediaSource.path('   '),
+    driverTest(
+      'missing, corrupt, and content URI image inputs fail cleanly',
+      () async {
+        final missing = XueHuaMediaCompression.image.compress(
+          source: MediaSource.path('${temp.path}/no-such-image.jpg'),
           destination: MediaDestination.bytes(),
-        ),
-        throwsArgumentError,
-      );
-    });
+        );
+        await _expectCode(missing, MediaCompressionException.notFound);
+
+        final corruptPath = '${temp.path}/corrupt.jpg';
+        await File(corruptPath).writeAsString('this is not a jpeg');
+        final corrupt = XueHuaMediaCompression.image.compress(
+          source: MediaSource.path(corruptPath),
+          destination: MediaDestination.bytes(),
+        );
+        await _expectCode(corrupt, MediaCompressionException.decode);
+
+        final content = XueHuaMediaCompression.image.compress(
+          source: MediaSource.path('content://media/external/images/1'),
+          destination: MediaDestination.bytes(),
+        );
+        await _expectCode(content, MediaCompressionException.unsupported);
+
+        expect(
+          () => XueHuaMediaCompression.image.compress(
+            source: MediaSource.path('   '),
+            destination: MediaDestination.bytes(),
+          ),
+          throwsArgumentError,
+        );
+      },
+    );
 
     driverTest('image cancel discards the output file', () async {
       final big = '${temp.path}/big.png';
       await _gst([
-        'videotestsrc', 'num-buffers=1', 'pattern=smpte', '!',
-        'video/x-raw,width=3000,height=2000', '!',
-        'pngenc', 'compression-level=1', '!',
-        'filesink', 'location=$big',
+        'videotestsrc',
+        'num-buffers=1',
+        'pattern=smpte',
+        '!',
+        'video/x-raw,width=3000,height=2000',
+        '!',
+        'pngenc',
+        'compression-level=1',
+        '!',
+        'filesink',
+        'location=$big',
       ]);
       final output = '${temp.path}/cancelled-image.jpg';
       final session = XueHuaMediaCompression.image.compress(
@@ -343,81 +462,84 @@ void registerLinuxDriverTests() {
       expect(File(output).existsSync(), isFalse);
     });
 
-    driverTest('video compresses H.264 with progress and file:// paths', () async {
-      final caps = await XueHuaMediaCompression.video.queryCapabilities();
-      expect(caps.codecs, contains(VideoCodec.h264));
-      final output = '${temp.path}/h264.mp4';
-      final progress = <double>[];
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: 'file://$shortVideo',
-        outputPath: output,
-        options: const VideoCompressOptions(
-          codec: VideoCodec.h264,
-          bitrate: 400000,
-          keepAudio: false,
-        ),
-      );
-      final sub = session.progress.listen(progress.add);
-      final result = await _resultOf(session);
-      await sub.cancel();
-      expect(progress, isNotEmpty);
-      expect(progress.last, 1);
-      expect(progress, everyElement(inInclusiveRange(0, 1)));
-      expect(result.codec, VideoCodec.h264);
-      expect(result.width, 64);
-      expect(result.height, 64);
-      expect(result.width.isEven, isTrue);
-      expect(result.height.isEven, isTrue);
-      expect(result.sizeBytes, greaterThan(0));
-      expect(result.encoderName, startsWith('GStreamer:'));
-      expect(result.encoderName.toLowerCase(), isNot(contains('avdec')));
-      expect(result.encoderName.toLowerCase(), isNot(contains('ffmpeg')));
-      expect(await File(output).length(), result.sizeBytes);
-      final mp4 = _Mp4Probe.parse(await File(output).readAsBytes());
-      expect(mp4.hasVideo, isTrue);
-      expect(mp4.hasAudio, isFalse);
-      expect(mp4.width, result.width);
-      expect(mp4.height, result.height);
-      expect(mp4.containsTag('avc1'), isTrue);
-      await _assertDecodable(output);
-    });
+    driverTest(
+      'video compresses H.264 with progress and file:// paths',
+      () async {
+        final caps = await XueHuaMediaCompression.video.queryCapabilities();
+        expect(caps.codecs, contains(VideoCodec.h264));
+        final output = '${temp.path}/h264.mp4';
+        final progress = <double>[];
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: 'file://$shortVideo',
+          outputPath: output,
+          options: const VideoCompressOptions(
+            codec: VideoCodec.h264,
+            bitrate: 400000,
+            keepAudio: false,
+          ),
+        );
+        final sub = session.progress.listen(progress.add);
+        final result = await _resultOf(session);
+        await sub.cancel();
+        expect(progress, isNotEmpty);
+        expect(progress.last, 1);
+        expect(progress, everyElement(inInclusiveRange(0, 1)));
+        expect(result.codec, VideoCodec.h264);
+        expect(result.width, 64);
+        expect(result.height, 64);
+        expect(result.width.isEven, isTrue);
+        expect(result.height.isEven, isTrue);
+        expect(result.sizeBytes, greaterThan(0));
+        expect(result.encoderName, startsWith('GStreamer:'));
+        expect(result.encoderName.toLowerCase(), isNot(contains('avdec')));
+        expect(result.encoderName.toLowerCase(), isNot(contains('ffmpeg')));
+        expect(await File(output).length(), result.sizeBytes);
+        final mp4 = _Mp4Probe.parse(await File(output).readAsBytes());
+        expect(mp4.hasVideo, isTrue);
+        expect(mp4.hasAudio, isFalse);
+        expect(mp4.width, result.width);
+        expect(mp4.height, result.height);
+        expect(mp4.containsTag('avc1'), isTrue);
+        await _assertDecodable(output);
+      },
+    );
 
-    driverTest('video H.265 compresses when an encoder is advertised', () async {
-      final caps = await XueHuaMediaCompression.video.queryCapabilities();
-      if (!caps.codecs.contains(VideoCodec.h265)) {
-        return;
-      }
-      final output = '${temp.path}/h265.mp4';
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: shortVideo,
-        outputPath: output,
-        options: const VideoCompressOptions(
-          codec: VideoCodec.h265,
-          bitrate: 400000,
-          keepAudio: false,
-        ),
-      );
-      final result = await _resultOf(session);
-      expect(result.codec, VideoCodec.h265);
-      expect(result.width, 64);
-      expect(result.height, 64);
-      expect(result.encoderName, startsWith('GStreamer:'));
-      final mp4 = _Mp4Probe.parse(await File(output).readAsBytes());
-      expect(mp4.hasVideo, isTrue);
-      expect(mp4.hasAudio, isFalse);
-      expect(mp4.containsTag('hvc1') || mp4.containsTag('hev1'), isTrue);
-      await _assertDecodable(output);
-    });
+    driverTest(
+      'video H.265 compresses when an encoder is advertised',
+      () async {
+        final caps = await XueHuaMediaCompression.video.queryCapabilities();
+        if (!caps.codecs.contains(VideoCodec.h265)) {
+          return;
+        }
+        final output = '${temp.path}/h265.mp4';
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: shortVideo,
+          outputPath: output,
+          options: const VideoCompressOptions(
+            codec: VideoCodec.h265,
+            bitrate: 400000,
+            keepAudio: false,
+          ),
+        );
+        final result = await _resultOf(session);
+        expect(result.codec, VideoCodec.h265);
+        expect(result.width, 64);
+        expect(result.height, 64);
+        expect(result.encoderName, startsWith('GStreamer:'));
+        final mp4 = _Mp4Probe.parse(await File(output).readAsBytes());
+        expect(mp4.hasVideo, isTrue);
+        expect(mp4.hasAudio, isFalse);
+        expect(mp4.containsTag('hvc1') || mp4.containsTag('hev1'), isTrue);
+        await _assertDecodable(output);
+      },
+    );
 
     driverTest('keepAudio keeps an AAC track and false strips it', () async {
       final keptPath = '${temp.path}/audio-kept.mp4';
       final kept = XueHuaMediaCompression.video.compress(
         inputPath: audioVideo,
         outputPath: keptPath,
-        options: const VideoCompressOptions(
-          bitrate: 500000,
-          keepAudio: true,
-        ),
+        options: const VideoCompressOptions(bitrate: 500000, keepAudio: true),
       );
       final keptResult = await _resultOf(kept);
       expect(keptResult.width, 96);
@@ -498,76 +620,88 @@ void registerLinuxDriverTests() {
       expect(result.height, 64);
     });
 
-    driverTest('missing video, content URI, and empty path fail cleanly', () async {
-      final missing = XueHuaMediaCompression.video.compress(
-        inputPath: '${temp.path}/missing-video.mp4',
-        outputPath: '${temp.path}/missing-out.mp4',
-      );
-      await _expectCode(missing, MediaCompressionException.notFound);
-      expect(File('${temp.path}/missing-out.mp4').existsSync(), isFalse);
+    driverTest(
+      'missing video, content URI, and empty path fail cleanly',
+      () async {
+        final missing = XueHuaMediaCompression.video.compress(
+          inputPath: '${temp.path}/missing-video.mp4',
+          outputPath: '${temp.path}/missing-out.mp4',
+        );
+        await _expectCode(missing, MediaCompressionException.notFound);
+        expect(File('${temp.path}/missing-out.mp4').existsSync(), isFalse);
 
-      final content = XueHuaMediaCompression.video.compress(
-        inputPath: 'content://media/external/video/1',
-        outputPath: '${temp.path}/content-out.mp4',
-      );
-      await _expectCode(content, MediaCompressionException.unsupported);
+        final content = XueHuaMediaCompression.video.compress(
+          inputPath: 'content://media/external/video/1',
+          outputPath: '${temp.path}/content-out.mp4',
+        );
+        await _expectCode(content, MediaCompressionException.unsupported);
 
-      expect(
-        () => XueHuaMediaCompression.video.compress(
-          inputPath: '  ',
-          outputPath: '${temp.path}/empty.mp4',
-        ),
-        throwsArgumentError,
-      );
-      expect(
-        () => XueHuaMediaCompression.video.compress(
-          inputPath: shortVideo,
-          outputPath: '${temp.path}/bad.mp4',
-          options: const VideoCompressOptions(bitrate: 0),
-        ),
-        throwsArgumentError,
-      );
-    });
+        expect(
+          () => XueHuaMediaCompression.video.compress(
+            inputPath: '  ',
+            outputPath: '${temp.path}/empty.mp4',
+          ),
+          throwsArgumentError,
+        );
+        expect(
+          () => XueHuaMediaCompression.video.compress(
+            inputPath: shortVideo,
+            outputPath: '${temp.path}/bad.mp4',
+            options: const VideoCompressOptions(bitrate: 0),
+          ),
+          throwsArgumentError,
+        );
+      },
+    );
 
-    driverTest('long video reports mid-progress and cancel removes the output', () async {
-      final output = '${temp.path}/cancelled.mp4';
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: longVideo,
-        outputPath: output,
-        options: const VideoCompressOptions(bitrate: 2000000, keepAudio: false),
-      );
-      final progress = <double>[];
-      var cancelSent = false;
-      final sub = session.progress.listen((value) {
-        progress.add(value);
-        if (!cancelSent && value > 0 && value < 1) {
-          cancelSent = true;
-          unawaited(session.cancel());
-        }
-      });
-      await _expectCode(session, MediaCompressionException.cancelled);
-      await sub.cancel();
-      expect(cancelSent, isTrue, reason: 'progress was $progress');
-      expect(progress, isNotEmpty);
-      expect(File(output).existsSync(), isFalse);
-    });
+    driverTest(
+      'long video reports mid-progress and cancel removes the output',
+      () async {
+        final output = '${temp.path}/cancelled.mp4';
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: longVideo,
+          outputPath: output,
+          options: const VideoCompressOptions(
+            bitrate: 2000000,
+            keepAudio: false,
+          ),
+        );
+        final progress = <double>[];
+        var cancelSent = false;
+        final sub = session.progress.listen((value) {
+          progress.add(value);
+          if (!cancelSent && value > 0 && value < 1) {
+            cancelSent = true;
+            unawaited(session.cancel());
+          }
+        });
+        await _expectCode(session, MediaCompressionException.cancelled);
+        await sub.cancel();
+        expect(cancelSent, isTrue, reason: 'progress was $progress');
+        expect(progress, isNotEmpty);
+        expect(File(output).existsSync(), isFalse);
+      },
+    );
 
-    driverTest('cancel then dispose does not crash while a job is running', () async {
-      final output = '${temp.path}/dispose-race.mp4';
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: longVideo,
-        outputPath: output,
-        options: const VideoCompressOptions(
-          bitrate: 2500000,
-          keepAudio: false,
-        ),
-      );
-      unawaited(session.result.then<void>((_) {}, onError: (Object _) {}));
-      await session.cancel();
-      await session.dispose();
-      await session.dispose();
-      await session.cancel();
-    });
+    driverTest(
+      'cancel then dispose does not crash while a job is running',
+      () async {
+        final output = '${temp.path}/dispose-race.mp4';
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: longVideo,
+          outputPath: output,
+          options: const VideoCompressOptions(
+            bitrate: 2500000,
+            keepAudio: false,
+          ),
+        );
+        unawaited(session.result.then<void>((_) {}, onError: (Object _) {}));
+        await session.cancel();
+        await session.dispose();
+        await session.dispose();
+        await session.cancel();
+      },
+    );
 
     driverTest('dispose is idempotent and a second job still runs', () async {
       final output = '${temp.path}/second.mp4';
@@ -626,10 +760,7 @@ Future<T> _resultOf<T>(CompressionSession<T> session) async {
   }
 }
 
-Future<void> _expectCode<T>(
-  CompressionSession<T> session,
-  String code,
-) async {
+Future<void> _expectCode<T>(CompressionSession<T> session, String code) async {
   try {
     await expectLater(
       session.result,
@@ -647,11 +778,7 @@ Future<void> _expectCode<T>(
 }
 
 Future<void> _gst(List<String> pipeline) async {
-  final result = await Process.run('gst-launch-1.0', [
-    '-q',
-    '-e',
-    ...pipeline,
-  ]);
+  final result = await Process.run('gst-launch-1.0', ['-q', '-e', ...pipeline]);
   if (result.exitCode != 0) {
     fail(
       'gst-launch-1.0 failed (${result.exitCode}): ${pipeline.join(' ')}\n'
@@ -945,9 +1072,7 @@ int _sampleCount(ByteData data, int start, int end) {
         total += data.getUint32(cursor);
         cursor += 8;
       }
-    } else if (box.type == 'mdia' ||
-        box.type == 'minf' ||
-        box.type == 'stbl') {
+    } else if (box.type == 'mdia' || box.type == 'minf' || box.type == 'stbl') {
       total += _sampleCount(data, body, offset + box.size);
     }
     offset += box.size;

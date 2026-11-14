@@ -150,7 +150,10 @@ void main() {
           EventChannel('test/job_events_7'),
           MockStreamHandler.inline(
             onListen: (Object? arguments, MockStreamHandlerEventSink sink) {
-              sink.success(<String, Object?>{'type': 'progress', 'value': 0.25});
+              sink.success(<String, Object?>{
+                'type': 'progress',
+                'value': 0.25,
+              });
               sink.success(<String, Object?>{'type': 'progress', 'value': 0.5});
               sink.success(<String, Object?>{
                 'type': 'completed',

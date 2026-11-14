@@ -94,7 +94,8 @@ void main() {
       expect(
         cache.path.endsWith('/cache') || cache.path.contains('/cache/'),
         isTrue,
-        reason: 'expected the app cache dir, got ${cache.path} (systemTemp=${systemTemp.path})',
+        reason:
+            'expected the app cache dir, got ${cache.path} (systemTemp=${systemTemp.path})',
       );
       temp = owned = Directory(
         '${cache.path}/xh_android_driver_${DateTime.now().millisecondsSinceEpoch}',
@@ -787,7 +788,9 @@ void main() {
       // Prefer `cat` because File I/O on /proc/*/maps often truncates (st_size=0).
       var maps = '';
       try {
-        final cat = await Process.run('/system/bin/cat', <String>['/proc/self/maps']);
+        final cat = await Process.run('/system/bin/cat', <String>[
+          '/proc/self/maps',
+        ]);
         if (cat.exitCode == 0) {
           maps = cat.stdout is String
               ? cat.stdout as String
@@ -796,7 +799,11 @@ void main() {
       } catch (_) {}
       if (maps.isEmpty) {
         final mapsFile = File('/proc/self/maps');
-        expect(mapsFile.existsSync(), isTrue, reason: 'cannot read /proc/self/maps');
+        expect(
+          mapsFile.existsSync(),
+          isTrue,
+          reason: 'cannot read /proc/self/maps',
+        );
         maps = await mapsFile.openRead().transform(utf8.decoder).join();
       }
       expect(maps, isNotEmpty, reason: 'empty /proc/self/maps');
@@ -815,7 +822,12 @@ void main() {
         // Some API 30 images omit .so paths in maps; forbidden-lib scan above still applies.
         return;
       }
-      final libraryPath = libLine.trim().split(RegExp(r'\s+')).last.split('!').first;
+      final libraryPath = libLine
+          .trim()
+          .split(RegExp(r'\s+'))
+          .last
+          .split('!')
+          .first;
       final directory = File(libraryPath).parent;
       if (!directory.existsSync()) {
         return;

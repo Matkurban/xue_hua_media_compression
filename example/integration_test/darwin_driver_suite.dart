@@ -280,44 +280,86 @@ void runDarwinDriver() {
       expect(large, greaterThan(small));
     });
 
-    driverTest('gif input decodes and gif/avif output is unsupported', () async {
-      const gif = <int>[
-        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
-        0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x21, 0xf9, 0x04, 0x01, 0x00,
-        0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-        0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
-      ];
-      final session = XueHuaMediaCompression.image.compress(
-        source: MediaSource.bytes(Uint8List.fromList(gif)),
-        destination: MediaDestination.bytes(),
-        options: const ImageCompressOptions(quality: 80),
-      );
-      final result = await _resultOf(session);
-      expect(result.width, greaterThan(0));
-      expect(result.height, greaterThan(0));
-      expect(result.bytes, isNotNull);
+    driverTest(
+      'gif input decodes and gif/avif output is unsupported',
+      () async {
+        const gif = <int>[
+          0x47,
+          0x49,
+          0x46,
+          0x38,
+          0x39,
+          0x61,
+          0x01,
+          0x00,
+          0x01,
+          0x00,
+          0x80,
+          0x00,
+          0x00,
+          0xff,
+          0xff,
+          0xff,
+          0x00,
+          0x00,
+          0x00,
+          0x21,
+          0xf9,
+          0x04,
+          0x01,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x2c,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x01,
+          0x00,
+          0x01,
+          0x00,
+          0x00,
+          0x02,
+          0x02,
+          0x44,
+          0x01,
+          0x00,
+          0x3b,
+        ];
+        final session = XueHuaMediaCompression.image.compress(
+          source: MediaSource.bytes(Uint8List.fromList(gif)),
+          destination: MediaDestination.bytes(),
+          options: const ImageCompressOptions(quality: 80),
+        );
+        final result = await _resultOf(session);
+        expect(result.width, greaterThan(0));
+        expect(result.height, greaterThan(0));
+        expect(result.bytes, isNotNull);
 
-      final caps = await XueHuaMediaCompression.image.queryCapabilities();
-      for (final format in const <ImageFormat>[
-        ImageFormat.gif,
-        ImageFormat.avif,
-      ]) {
-        final rejected = XueHuaMediaCompression.image.compress(
-          source: MediaSource.path(jpegPath),
-          destination: MediaDestination.bytes(),
-          options: ImageCompressOptions(format: format),
-        );
-        await _expectCode(rejected, MediaCompressionException.unsupported);
-      }
-      if (!caps.outputFormats.contains(ImageFormat.heic)) {
-        final rejected = XueHuaMediaCompression.image.compress(
-          source: MediaSource.path(jpegPath),
-          destination: MediaDestination.bytes(),
-          options: const ImageCompressOptions(format: ImageFormat.heic),
-        );
-        await _expectCode(rejected, MediaCompressionException.unsupported);
-      }
-    });
+        final caps = await XueHuaMediaCompression.image.queryCapabilities();
+        for (final format in const <ImageFormat>[
+          ImageFormat.gif,
+          ImageFormat.avif,
+        ]) {
+          final rejected = XueHuaMediaCompression.image.compress(
+            source: MediaSource.path(jpegPath),
+            destination: MediaDestination.bytes(),
+            options: ImageCompressOptions(format: format),
+          );
+          await _expectCode(rejected, MediaCompressionException.unsupported);
+        }
+        if (!caps.outputFormats.contains(ImageFormat.heic)) {
+          final rejected = XueHuaMediaCompression.image.compress(
+            source: MediaSource.path(jpegPath),
+            destination: MediaDestination.bytes(),
+            options: const ImageCompressOptions(format: ImageFormat.heic),
+          );
+          await _expectCode(rejected, MediaCompressionException.unsupported);
+        }
+      },
+    );
 
     driverTest(
       'missing, corrupt, directory, and content URI images fail cleanly',
@@ -399,68 +441,74 @@ void runDarwinDriver() {
       expect(File(output).existsSync(), isFalse);
     });
 
-    driverTest('video compresses H.264 with progress and file:// paths', () async {
-      final caps = await XueHuaMediaCompression.video.queryCapabilities();
-      expect(caps.codecs, contains(VideoCodec.h264));
-      final output = _join(temp.path, 'h264.mp4');
-      final progress = <double>[];
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: Uri.file(shortVideo).toString(),
-        outputPath: output,
-        options: const VideoCompressOptions(
-          codec: VideoCodec.h264,
-          bitrate: 400000,
-          keepAudio: false,
-        ),
-      );
-      final sub = session.progress.listen(progress.add);
-      final result = await _resultOf(session);
-      await sub.cancel();
-      expect(progress, isNotEmpty);
-      expect(progress.last, 1);
-      expect(progress, everyElement(inInclusiveRange(0, 1)));
-      expect(progress.any((double value) => value > 0 && value < 1), isTrue);
-      expect(result.codec, VideoCodec.h264);
-      expect(result.width, 64);
-      expect(result.height, 64);
-      expect(result.width.isEven, isTrue);
-      expect(result.height.isEven, isTrue);
-      expect(result.sizeBytes, greaterThan(0));
-      _expectToolbox(result.encoderName, 'H264');
-      expect(await File(output).length(), result.sizeBytes);
-      final mp4 = Mp4Probe.parse(await File(output).readAsBytes());
-      expect(mp4.hasVideo, isTrue);
-      expect(mp4.hasAudio, isFalse);
-      expect(mp4.width, result.width);
-      expect(mp4.height, result.height);
-      expect(mp4.containsTag('avc1'), isTrue);
-    });
+    driverTest(
+      'video compresses H.264 with progress and file:// paths',
+      () async {
+        final caps = await XueHuaMediaCompression.video.queryCapabilities();
+        expect(caps.codecs, contains(VideoCodec.h264));
+        final output = _join(temp.path, 'h264.mp4');
+        final progress = <double>[];
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: Uri.file(shortVideo).toString(),
+          outputPath: output,
+          options: const VideoCompressOptions(
+            codec: VideoCodec.h264,
+            bitrate: 400000,
+            keepAudio: false,
+          ),
+        );
+        final sub = session.progress.listen(progress.add);
+        final result = await _resultOf(session);
+        await sub.cancel();
+        expect(progress, isNotEmpty);
+        expect(progress.last, 1);
+        expect(progress, everyElement(inInclusiveRange(0, 1)));
+        expect(progress.any((double value) => value > 0 && value < 1), isTrue);
+        expect(result.codec, VideoCodec.h264);
+        expect(result.width, 64);
+        expect(result.height, 64);
+        expect(result.width.isEven, isTrue);
+        expect(result.height.isEven, isTrue);
+        expect(result.sizeBytes, greaterThan(0));
+        _expectToolbox(result.encoderName, 'H264');
+        expect(await File(output).length(), result.sizeBytes);
+        final mp4 = Mp4Probe.parse(await File(output).readAsBytes());
+        expect(mp4.hasVideo, isTrue);
+        expect(mp4.hasAudio, isFalse);
+        expect(mp4.width, result.width);
+        expect(mp4.height, result.height);
+        expect(mp4.containsTag('avc1'), isTrue);
+      },
+    );
 
-    driverTest('video H.265 compresses when an encoder is advertised', () async {
-      final caps = await XueHuaMediaCompression.video.queryCapabilities();
-      if (!caps.codecs.contains(VideoCodec.h265)) {
-        return;
-      }
-      final output = _join(temp.path, 'h265.mp4');
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: shortVideo,
-        outputPath: output,
-        options: const VideoCompressOptions(
-          codec: VideoCodec.h265,
-          bitrate: 400000,
-          keepAudio: false,
-        ),
-      );
-      final result = await _resultOf(session);
-      expect(result.codec, VideoCodec.h265);
-      expect(result.width, 64);
-      expect(result.height, 64);
-      _expectToolbox(result.encoderName, 'H265');
-      final mp4 = Mp4Probe.parse(await File(output).readAsBytes());
-      expect(mp4.hasVideo, isTrue);
-      expect(mp4.hasAudio, isFalse);
-      expect(mp4.containsTag('hvc1') || mp4.containsTag('hev1'), isTrue);
-    });
+    driverTest(
+      'video H.265 compresses when an encoder is advertised',
+      () async {
+        final caps = await XueHuaMediaCompression.video.queryCapabilities();
+        if (!caps.codecs.contains(VideoCodec.h265)) {
+          return;
+        }
+        final output = _join(temp.path, 'h265.mp4');
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: shortVideo,
+          outputPath: output,
+          options: const VideoCompressOptions(
+            codec: VideoCodec.h265,
+            bitrate: 400000,
+            keepAudio: false,
+          ),
+        );
+        final result = await _resultOf(session);
+        expect(result.codec, VideoCodec.h265);
+        expect(result.width, 64);
+        expect(result.height, 64);
+        _expectToolbox(result.encoderName, 'H265');
+        final mp4 = Mp4Probe.parse(await File(output).readAsBytes());
+        expect(mp4.hasVideo, isTrue);
+        expect(mp4.hasAudio, isFalse);
+        expect(mp4.containsTag('hvc1') || mp4.containsTag('hev1'), isTrue);
+      },
+    );
 
     driverTest('keepAudio keeps an AAC track and false strips it', () async {
       final keptPath = _join(temp.path, 'audio-kept.mp4');
@@ -633,10 +681,7 @@ void runDarwinDriver() {
       final session = XueHuaMediaCompression.video.compress(
         inputPath: longVideo,
         outputPath: output,
-        options: const VideoCompressOptions(
-          bitrate: 2000000,
-          keepAudio: false,
-        ),
+        options: const VideoCompressOptions(bitrate: 2000000, keepAudio: false),
       );
       final progress = <double>[];
       final sub = session.progress.listen(progress.add);
@@ -655,19 +700,25 @@ void runDarwinDriver() {
       expect(File(output).existsSync(), isFalse);
     });
 
-    driverTest('cancel then dispose does not crash while a job is running', () async {
-      final output = _join(temp.path, 'dispose-race.mp4');
-      final session = XueHuaMediaCompression.video.compress(
-        inputPath: longVideo,
-        outputPath: output,
-        options: const VideoCompressOptions(bitrate: 2500000, keepAudio: false),
-      );
-      unawaited(session.result.then<void>((_) {}, onError: (Object _) {}));
-      await session.cancel().timeout(const Duration(seconds: 20));
-      await session.dispose().timeout(const Duration(seconds: 20));
-      await session.dispose().timeout(const Duration(seconds: 20));
-      await session.cancel().timeout(const Duration(seconds: 20));
-    });
+    driverTest(
+      'cancel then dispose does not crash while a job is running',
+      () async {
+        final output = _join(temp.path, 'dispose-race.mp4');
+        final session = XueHuaMediaCompression.video.compress(
+          inputPath: longVideo,
+          outputPath: output,
+          options: const VideoCompressOptions(
+            bitrate: 2500000,
+            keepAudio: false,
+          ),
+        );
+        unawaited(session.result.then<void>((_) {}, onError: (Object _) {}));
+        await session.cancel().timeout(const Duration(seconds: 20));
+        await session.dispose().timeout(const Duration(seconds: 20));
+        await session.dispose().timeout(const Duration(seconds: 20));
+        await session.cancel().timeout(const Duration(seconds: 20));
+      },
+    );
 
     driverTest('dispose is idempotent and a later job still runs', () async {
       final output = _join(temp.path, 'second.mp4');
@@ -711,7 +762,12 @@ void runDarwinDriver() {
           sawToolbox = true;
         }
       }
-      expect(sawToolbox, isTrue, reason: 'VideoToolbox was not in ${binaries.map((File file) => file.path).join(', ')}');
+      expect(
+        sawToolbox,
+        isTrue,
+        reason:
+            'VideoToolbox was not in ${binaries.map((File file) => file.path).join(', ')}',
+      );
     });
   });
 }
@@ -738,7 +794,18 @@ bool _containsAscii(String text, List<int> codes) {
 const _ffmpeg = <int>[0x66, 0x66, 0x6d, 0x70, 0x65, 0x67];
 const _libav = <int>[0x6c, 0x69, 0x62, 0x61, 0x76];
 const _videoToolbox = <int>[
-  0x76, 0x69, 0x64, 0x65, 0x6f, 0x74, 0x6f, 0x6f, 0x6c, 0x62, 0x6f, 0x78,
+  0x76,
+  0x69,
+  0x64,
+  0x65,
+  0x6f,
+  0x74,
+  0x6f,
+  0x6f,
+  0x6c,
+  0x62,
+  0x6f,
+  0x78,
 ];
 const _forbiddenLibraries = <List<int>>[
   [0x6c, 0x69, 0x62, 0x61, 0x76, 0x63, 0x6f, 0x64, 0x65, 0x63],
@@ -747,7 +814,21 @@ const _forbiddenLibraries = <List<int>>[
   [0x6c, 0x69, 0x62, 0x61, 0x76, 0x66, 0x69, 0x6c, 0x74, 0x65, 0x72],
   [0x6c, 0x69, 0x62, 0x61, 0x76, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65],
   [0x6c, 0x69, 0x62, 0x73, 0x77, 0x73, 0x63, 0x61, 0x6c, 0x65],
-  [0x6c, 0x69, 0x62, 0x73, 0x77, 0x72, 0x65, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65],
+  [
+    0x6c,
+    0x69,
+    0x62,
+    0x73,
+    0x77,
+    0x72,
+    0x65,
+    0x73,
+    0x61,
+    0x6d,
+    0x70,
+    0x6c,
+    0x65,
+  ],
   [0x6c, 0x69, 0x62, 0x70, 0x6f, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x63],
   [0x67, 0x73, 0x74, 0x2d, 0x6c, 0x69, 0x62, 0x61, 0x76],
   [0x61, 0x76, 0x64, 0x65, 0x63, 0x5f],
