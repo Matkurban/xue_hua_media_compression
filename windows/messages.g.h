@@ -51,6 +51,7 @@ template<class T> class ErrorOr {
 
  private:
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   ErrorOr() = default;
   T TakeValue() && { return std::get<T>(std::move(v_)); }
 
@@ -96,6 +97,7 @@ class SourceMsg {
   static SourceMsg FromEncodableList(const ::flutter::EncodableList& list);
   ::flutter::EncodableList ToEncodableList() const;
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   friend class PigeonInternalCodecSerializer;
   int64_t kind_;
   std::optional<std::vector<uint8_t>> bytes_;
@@ -135,6 +137,7 @@ class DestinationMsg {
   static DestinationMsg FromEncodableList(const ::flutter::EncodableList& list);
   ::flutter::EncodableList ToEncodableList() const;
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   friend class PigeonInternalCodecSerializer;
   int64_t kind_;
   std::optional<std::string> path_;
@@ -180,6 +183,7 @@ class ImageOptionsMsg {
   static ImageOptionsMsg FromEncodableList(const ::flutter::EncodableList& list);
   ::flutter::EncodableList ToEncodableList() const;
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   friend class PigeonInternalCodecSerializer;
   std::string format_;
   int64_t quality_;
@@ -237,6 +241,7 @@ class VideoOptionsMsg {
   static VideoOptionsMsg FromEncodableList(const ::flutter::EncodableList& list);
   ::flutter::EncodableList ToEncodableList() const;
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   friend class PigeonInternalCodecSerializer;
   std::string codec_;
   int64_t bitrate_;
@@ -271,6 +276,7 @@ class ImageCapabilitiesMsg {
   static ImageCapabilitiesMsg FromEncodableList(const ::flutter::EncodableList& list);
   ::flutter::EncodableList ToEncodableList() const;
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   friend class PigeonInternalCodecSerializer;
   ::flutter::EncodableList input_formats_;
   ::flutter::EncodableList output_formats_;
@@ -311,10 +317,122 @@ class VideoCapabilitiesMsg {
   static VideoCapabilitiesMsg FromEncodableList(const ::flutter::EncodableList& list);
   ::flutter::EncodableList ToEncodableList() const;
   friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
   friend class PigeonInternalCodecSerializer;
   std::optional<std::string> encoder_name_;
   ::flutter::EncodableList codecs_;
   bool accepts_content_uri_;
+};
+
+
+// Generated class from Pigeon that represents data sent in messages.
+class ImageCompressResultMsg {
+ public:
+  // Constructs an object setting all non-nullable fields.
+  explicit ImageCompressResultMsg(
+    int64_t size_bytes,
+    const std::string& format,
+    int64_t width,
+    int64_t height);
+
+  // Constructs an object setting all fields.
+  explicit ImageCompressResultMsg(
+    const std::vector<uint8_t>* bytes,
+    const std::string* output_path,
+    int64_t size_bytes,
+    const std::string& format,
+    int64_t width,
+    int64_t height);
+
+  const std::vector<uint8_t>* bytes() const;
+  void set_bytes(const std::vector<uint8_t>* value_arg);
+  void set_bytes(const std::vector<uint8_t>& value_arg);
+
+  const std::string* output_path() const;
+  void set_output_path(const std::string_view* value_arg);
+  void set_output_path(std::string_view value_arg);
+
+  int64_t size_bytes() const;
+  void set_size_bytes(int64_t value_arg);
+
+  const std::string& format() const;
+  void set_format(std::string_view value_arg);
+
+  int64_t width() const;
+  void set_width(int64_t value_arg);
+
+  int64_t height() const;
+  void set_height(int64_t value_arg);
+
+  bool operator==(const ImageCompressResultMsg& other) const;
+  bool operator!=(const ImageCompressResultMsg& other) const;
+  /// Returns a hash code value for the object. This method is supported for the benefit of hash tables.
+  size_t Hash() const;
+  /// Stream output operator for formatted string representation.
+  friend std::ostream& operator<<(std::ostream& os, const ImageCompressResultMsg& obj);
+ private:
+  static ImageCompressResultMsg FromEncodableList(const ::flutter::EncodableList& list);
+  ::flutter::EncodableList ToEncodableList() const;
+  friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
+  friend class PigeonInternalCodecSerializer;
+  std::optional<std::vector<uint8_t>> bytes_;
+  std::optional<std::string> output_path_;
+  int64_t size_bytes_;
+  std::string format_;
+  int64_t width_;
+  int64_t height_;
+};
+
+
+// Generated class from Pigeon that represents data sent in messages.
+class VideoCompressResultMsg {
+ public:
+  // Constructs an object setting all fields.
+  explicit VideoCompressResultMsg(
+    const std::string& output_path,
+    int64_t size_bytes,
+    const std::string& encoder_name,
+    const std::string& codec,
+    int64_t width,
+    int64_t height);
+
+  const std::string& output_path() const;
+  void set_output_path(std::string_view value_arg);
+
+  int64_t size_bytes() const;
+  void set_size_bytes(int64_t value_arg);
+
+  const std::string& encoder_name() const;
+  void set_encoder_name(std::string_view value_arg);
+
+  const std::string& codec() const;
+  void set_codec(std::string_view value_arg);
+
+  int64_t width() const;
+  void set_width(int64_t value_arg);
+
+  int64_t height() const;
+  void set_height(int64_t value_arg);
+
+  bool operator==(const VideoCompressResultMsg& other) const;
+  bool operator!=(const VideoCompressResultMsg& other) const;
+  /// Returns a hash code value for the object. This method is supported for the benefit of hash tables.
+  size_t Hash() const;
+  /// Stream output operator for formatted string representation.
+  friend std::ostream& operator<<(std::ostream& os, const VideoCompressResultMsg& obj);
+ private:
+  static VideoCompressResultMsg FromEncodableList(const ::flutter::EncodableList& list);
+  ::flutter::EncodableList ToEncodableList() const;
+  friend class MediaCompressionHostApi;
+  friend class MediaCompressionFlutterApi;
+  friend class PigeonInternalCodecSerializer;
+  std::string output_path_;
+  int64_t size_bytes_;
+  std::string encoder_name_;
+  std::string codec_;
+  int64_t width_;
+  int64_t height_;
 };
 
 
@@ -342,14 +460,14 @@ class MediaCompressionHostApi {
   MediaCompressionHostApi& operator=(const MediaCompressionHostApi&) = delete;
   virtual ~MediaCompressionHostApi() {}
   virtual ErrorOr<int64_t> CreateJob() = 0;
-  virtual ErrorOr<ImageCapabilitiesMsg> QueryImageCapabilities() = 0;
+  virtual void QueryImageCapabilities(std::function<void(ErrorOr<ImageCapabilitiesMsg> reply)> result) = 0;
   virtual void StartImageCompress(
     int64_t id,
     const SourceMsg& source,
     const DestinationMsg& destination,
     const ImageOptionsMsg& options,
     std::function<void(std::optional<FlutterError> reply)> result) = 0;
-  virtual ErrorOr<VideoCapabilitiesMsg> QueryVideoCapabilities() = 0;
+  virtual void QueryVideoCapabilities(std::function<void(ErrorOr<VideoCapabilitiesMsg> reply)> result) = 0;
   virtual void StartVideoCompress(
     int64_t id,
     const std::string& input_path,
@@ -374,5 +492,35 @@ class MediaCompressionHostApi {
  protected:
   MediaCompressionHostApi() = default;
 };
+// Generated class from Pigeon that represents Flutter messages that can be called from C++.
+class MediaCompressionFlutterApi {
+ public:
+  MediaCompressionFlutterApi(::flutter::BinaryMessenger* binary_messenger);
+  MediaCompressionFlutterApi(
+    ::flutter::BinaryMessenger* binary_messenger,
+    const std::string& message_channel_suffix);
+  static const ::flutter::StandardMessageCodec& GetCodec();
+  void OnProgress(
+    double value,
+    std::function<void(void)>&& on_success,
+    std::function<void(const FlutterError&)>&& on_error);
+  void OnImageCompleted(
+    const ImageCompressResultMsg& result,
+    std::function<void(void)>&& on_success,
+    std::function<void(const FlutterError&)>&& on_error);
+  void OnVideoCompleted(
+    const VideoCompressResultMsg& result,
+    std::function<void(void)>&& on_success,
+    std::function<void(const FlutterError&)>&& on_error);
+  void OnError(
+    const std::string& code,
+    const std::string& message,
+    std::function<void(void)>&& on_success,
+    std::function<void(const FlutterError&)>&& on_error);
+ private:
+  ::flutter::BinaryMessenger* binary_messenger_;
+  std::string message_channel_suffix_;
+};
+
 }  // namespace xue_hua_media_compression
 #endif  // PIGEON_MESSAGES_G_H_

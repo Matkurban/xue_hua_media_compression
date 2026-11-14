@@ -17,7 +17,7 @@ void CompressVideoWindows(
     const VideoOptionsMsg& options, const std::atomic<bool>& cancelled,
     std::atomic<bool>* output_opened,
     const std::function<void(double)>& on_progress,
-    const std::function<void(const flutter::EncodableMap&)>& on_completed,
+    const std::function<void(const VideoCompressResultMsg&)>& on_completed,
     const std::function<void(const std::string&, const std::string&)>& on_error);
 
 VideoCapabilitiesMsg QueryVideoCapabilitiesWin();

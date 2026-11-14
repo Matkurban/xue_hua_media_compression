@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 
 import 'src/capabilities.dart';
 import 'src/compression_session.dart';
@@ -16,24 +17,94 @@ import 'src/results.dart';
 import 'src/video_codec.dart';
 import 'xue_hua_media_compression_platform_interface.dart';
 
-/// 默认 Pigeon 客户端。五端原生共用。
+/// 注册和注销按 job 隔离的 [MediaCompressionFlutterApi] 回调的签名。
 ///
-/// Default Pigeon client shared by the five native platforms.
+/// Callback registration signature for per-job [MediaCompressionFlutterApi].
+typedef FlutterApiRegister =
+    void Function(MediaCompressionFlutterApi api, String suffix);
+
+/// 注销按 job 隔离的 [MediaCompressionFlutterApi] 回调的签名。
+///
+/// Callback unregistration signature for per-job [MediaCompressionFlutterApi].
+typedef FlutterApiUnregister =
+    void Function(MediaCompressionFlutterApi api, String suffix);
+
+/// 默认 Pigeon 客户端。五端原生共用：Android / iOS / macOS 走 Native Interop，
+/// Windows / Linux 走 Pigeon Platform Channel。
+///
+/// Default Pigeon client shared by the five native platforms: Native Interop on
+/// Android / iOS / macOS, and Platform Channels on Windows / Linux.
 final class MethodChannelMediaCompression extends MediaCompressionPlatform {
-  /// 使用可选的 HostApi（测试可注入）。
+  /// 使用可选的 HostApi 与 FlutterApi 注册钩子（测试可注入）。
   ///
-  /// Optional HostApi for tests.
-  MethodChannelMediaCompression({MediaCompressionHostApi? api})
-    : _api = api ?? MediaCompressionHostApi();
+  /// Optional HostApi and FlutterApi registration hooks for tests.
+  MethodChannelMediaCompression({
+    MediaCompressionHostApi? api,
+    @visibleForTesting FlutterApiRegister? registerFlutterApi,
+    @visibleForTesting FlutterApiUnregister? unregisterFlutterApi,
+  }) : _apiOverride = api,
+       _registerFlutterApi =
+           registerFlutterApi ??
+           (api != null ? _noopFlutterApiRegister : _defaultFlutterApiRegister),
+       _unregisterFlutterApi =
+           unregisterFlutterApi ??
+           (api != null
+               ? _noopFlutterApiUnregister
+               : _defaultFlutterApiUnregister);
 
-  final MediaCompressionHostApi _api;
+  final MediaCompressionHostApi? _apiOverride;
+  final FlutterApiRegister _registerFlutterApi;
+  final FlutterApiUnregister _unregisterFlutterApi;
 
-  /// 测试或自定义 EventChannel 工厂。
-  ///
-  /// Factory for EventChannels, overridable in tests.
-  EventChannel Function(int id) eventChannelFor = (int id) {
-    return EventChannel('$jobEventChannelPrefix$id');
-  };
+  late final MediaCompressionHostApi _api = _resolveHostApi();
+
+  static bool get _usesNativeInterop =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
+
+  MediaCompressionHostApi _resolveHostApi() {
+    final override = _apiOverride;
+    if (override != null) {
+      return override;
+    }
+    if (_usesNativeInterop) {
+      return MediaCompressionHostApi.createWithNativeInteropApi();
+    }
+    return MediaCompressionHostApi();
+  }
+
+  static void _defaultFlutterApiRegister(
+    MediaCompressionFlutterApi api,
+    String suffix,
+  ) {
+    if (_usesNativeInterop) {
+      // Use the Native Interop registrar directly so background isolates
+      // without an initialized ServicesBinding can receive @FlutterApi calls.
+      MediaCompressionFlutterApiRegistrar().register(api, name: suffix);
+      return;
+    }
+    MediaCompressionFlutterApi.setUp(api, messageChannelSuffix: suffix);
+  }
+
+  static void _defaultFlutterApiUnregister(
+    MediaCompressionFlutterApi api,
+    String suffix,
+  ) {
+    if (_usesNativeInterop) {
+      MediaCompressionFlutterApiRegistrar().unregister(api, name: suffix);
+      return;
+    }
+    MediaCompressionFlutterApi.setUp(null, messageChannelSuffix: suffix);
+  }
+
+  static void _noopFlutterApiRegister(
+    MediaCompressionFlutterApi api,
+    String suffix,
+  ) {}
+
+  static void _noopFlutterApiUnregister(
+    MediaCompressionFlutterApi api,
+    String suffix,
+  ) {}
 
   @override
   Future<ImageCompressionCapabilities> queryImageCapabilities() async {
@@ -61,7 +132,8 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
     );
     return _PigeonCompressionSession<ImageCompressResult>(
       api: _api,
-      eventChannelFor: eventChannelFor,
+      registerFlutterApi: _registerFlutterApi,
+      unregisterFlutterApi: _unregisterFlutterApi,
       start: (int id) {
         return _api.startImageCompress(
           id,
@@ -75,7 +147,7 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
           ),
         );
       },
-      parseResult: imageResultFromMap,
+      parseImageResult: imageResultFromMsg,
     );
   }
 
@@ -108,7 +180,8 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
     final normalizedOutput = normalizeInputPath(outputPath);
     return _PigeonCompressionSession<VideoCompressResult>(
       api: _api,
-      eventChannelFor: eventChannelFor,
+      registerFlutterApi: _registerFlutterApi,
+      unregisterFlutterApi: _unregisterFlutterApi,
       start: (int id) {
         return _api.startVideoCompress(
           id,
@@ -124,7 +197,7 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
           ),
         );
       },
-      parseResult: videoResultFromMap,
+      parseVideoResult: videoResultFromMsg,
     );
   }
 
@@ -150,27 +223,32 @@ final class MethodChannelMediaCompression extends MediaCompressionPlatform {
 }
 
 final class _PigeonCompressionSession<TResult>
-    implements CompressionSession<TResult> {
+    implements CompressionSession<TResult>, MediaCompressionFlutterApi {
   _PigeonCompressionSession({
     required this._api,
-    required EventChannel Function(int id) eventChannelFor,
+    required this._registerFlutterApi,
+    required this._unregisterFlutterApi,
     required Future<void> Function(int id) start,
-    required this._parseResult,
+    this._parseImageResult,
+    this._parseVideoResult,
   }) {
-    _idFuture = _start(eventChannelFor, start);
+    _idFuture = _start(start);
   }
 
   final MediaCompressionHostApi _api;
-  final TResult Function(Map<Object?, Object?>) _parseResult;
+  final FlutterApiRegister _registerFlutterApi;
+  final FlutterApiUnregister _unregisterFlutterApi;
+  final TResult Function(ImageCompressResultMsg)? _parseImageResult;
+  final TResult Function(VideoCompressResultMsg)? _parseVideoResult;
   final StreamController<double> _progressController =
       StreamController<double>.broadcast();
   final Completer<TResult> _resultCompleter = Completer<TResult>();
   double? _latestProgress;
 
   late final Future<int> _idFuture;
-  StreamSubscription<dynamic>? _eventSub;
   bool _disposed = false;
   int? _id;
+  String? _registeredSuffix;
 
   @override
   Stream<double> get progress {
@@ -201,60 +279,76 @@ final class _PigeonCompressionSession<TResult>
   @override
   Future<TResult> get result => _resultCompleter.future;
 
-  Future<int> _start(
-    EventChannel Function(int id) eventChannelFor,
-    Future<void> Function(int id) start,
-  ) async {
+  Future<int> _start(Future<void> Function(int id) start) async {
     try {
       final id = await _api.createJob();
       _id = id;
-      _eventSub = eventChannelFor(id).receiveBroadcastStream().listen(
-        _onEvent,
-        onError: (Object error, StackTrace stackTrace) {
-          _fail(exceptionFromPlatform(error));
-        },
-      );
+      if (_disposed) {
+        unawaited(_safeDisposeNative(id));
+        return id;
+      }
+      final suffix = jobFlutterApiSuffix(id);
+      _registerFlutterApi(this, suffix);
+      _registeredSuffix = suffix;
       await start(id);
       return id;
     } catch (error) {
+      _unregisterIfNeeded();
       _fail(exceptionFromPlatform(error));
       return _id ?? -1;
     }
   }
 
-  void _onEvent(dynamic event) {
-    if (event is! Map) {
+  @override
+  Future<void> onProgress(double value) async {
+    if (_disposed) {
       return;
     }
-    final map = Map<Object?, Object?>.from(event);
-    final type = map['type'] as String?;
-    switch (type) {
-      case 'progress':
-        final value = (map['value'] as num?)?.toDouble();
-        if (value != null) {
-          _emitProgress(value);
-        }
-      case 'completed':
-        final payload = map['result'];
-        if (payload is Map) {
-          _succeed(_parseResult(Map<Object?, Object?>.from(payload)));
-        } else {
-          _fail(
-            const MediaCompressionException(
-              MediaCompressionException.encode,
-              'Missing completion payload',
-            ),
-          );
-        }
-      case 'error':
-        _fail(
-          MediaCompressionException(
-            map['code'] as String? ?? MediaCompressionException.encode,
-            map['message'] as String? ?? 'Native error',
-            details: map['details'] as String?,
-          ),
-        );
+    _emitProgress(value);
+  }
+
+  @override
+  Future<void> onImageCompleted(ImageCompressResultMsg result) async {
+    if (_disposed) {
+      return;
     }
+    final parser = _parseImageResult;
+    if (parser == null) {
+      _fail(
+        const MediaCompressionException(
+          MediaCompressionException.encode,
+          'Unexpected image completion for non-image job',
+        ),
+      );
+      return;
+    }
+    _succeed(parser(result));
+  }
+
+  @override
+  Future<void> onVideoCompleted(VideoCompressResultMsg result) async {
+    if (_disposed) {
+      return;
+    }
+    final parser = _parseVideoResult;
+    if (parser == null) {
+      _fail(
+        const MediaCompressionException(
+          MediaCompressionException.encode,
+          'Unexpected video completion for non-video job',
+        ),
+      );
+      return;
+    }
+    _succeed(parser(result));
+  }
+
+  @override
+  Future<void> onError(String code, String message) async {
+    if (_disposed) {
+      return;
+    }
+    _fail(MediaCompressionException(code, message));
   }
 
   void _succeed(TResult value) {
@@ -276,6 +370,27 @@ final class _PigeonCompressionSession<TResult>
     }
   }
 
+  void _unregisterIfNeeded() {
+    final suffix = _registeredSuffix;
+    if (suffix == null) {
+      return;
+    }
+    _registeredSuffix = null;
+    try {
+      _unregisterFlutterApi(this, suffix);
+    } catch (_) {
+      // Unregister is idempotent during teardown.
+    }
+  }
+
+  Future<void> _safeDisposeNative(int id) async {
+    try {
+      await _api.disposeJob(id);
+    } catch (_) {
+      // Dispose is idempotent; swallow native errors after teardown.
+    }
+  }
+
   @override
   Future<void> cancel() async {
     if (_disposed) {
@@ -283,6 +398,9 @@ final class _PigeonCompressionSession<TResult>
     }
     try {
       final id = await _idFuture;
+      if (id < 0 || _disposed) {
+        return;
+      }
       await _api.cancelJob(id);
     } on MediaCompressionException catch (error) {
       if (error.code == MediaCompressionException.instanceNotFound) {
@@ -294,7 +412,7 @@ final class _PigeonCompressionSession<TResult>
       if (translated.code == MediaCompressionException.instanceNotFound) {
         return;
       }
-      // Native may complete the job via the event stream with `cancelled`.
+      // Native may complete the job via FlutterApi with `cancelled`.
     }
   }
 
@@ -304,19 +422,16 @@ final class _PigeonCompressionSession<TResult>
       return;
     }
     _disposed = true;
-    await _eventSub?.cancel();
-    _eventSub = null;
     if (!_progressController.isClosed) {
       await _progressController.close();
     }
     final id = _id;
-    if (id == null) {
-      return;
-    }
     try {
-      await _api.disposeJob(id);
-    } catch (_) {
-      // Dispose is idempotent; swallow native errors after teardown.
+      if (id != null && id >= 0) {
+        await _safeDisposeNative(id);
+      }
+    } finally {
+      _unregisterIfNeeded();
     }
   }
 }

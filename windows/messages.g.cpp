@@ -1004,6 +1004,312 @@ size_t PigeonInternalDeepHash(const VideoCapabilitiesMsg& v) {
   return v.Hash();
 }
 
+// ImageCompressResultMsg
+
+ImageCompressResultMsg::ImageCompressResultMsg(
+  int64_t size_bytes,
+  const std::string& format,
+  int64_t width,
+  int64_t height)
+ : size_bytes_(size_bytes),
+    format_(format),
+    width_(width),
+    height_(height) {}
+
+ImageCompressResultMsg::ImageCompressResultMsg(
+  const std::vector<uint8_t>* bytes,
+  const std::string* output_path,
+  int64_t size_bytes,
+  const std::string& format,
+  int64_t width,
+  int64_t height)
+ : bytes_(bytes ? std::optional<std::vector<uint8_t>>(*bytes) : std::nullopt),
+    output_path_(output_path ? std::optional<std::string>(*output_path) : std::nullopt),
+    size_bytes_(size_bytes),
+    format_(format),
+    width_(width),
+    height_(height) {}
+
+const std::vector<uint8_t>* ImageCompressResultMsg::bytes() const {
+  return bytes_ ? &(*bytes_) : nullptr;
+}
+
+void ImageCompressResultMsg::set_bytes(const std::vector<uint8_t>* value_arg) {
+  bytes_ = value_arg ? std::optional<std::vector<uint8_t>>(*value_arg) : std::nullopt;
+}
+
+void ImageCompressResultMsg::set_bytes(const std::vector<uint8_t>& value_arg) {
+  bytes_ = value_arg;
+}
+
+
+const std::string* ImageCompressResultMsg::output_path() const {
+  return output_path_ ? &(*output_path_) : nullptr;
+}
+
+void ImageCompressResultMsg::set_output_path(const std::string_view* value_arg) {
+  output_path_ = value_arg ? std::optional<std::string>(*value_arg) : std::nullopt;
+}
+
+void ImageCompressResultMsg::set_output_path(std::string_view value_arg) {
+  output_path_ = value_arg;
+}
+
+
+int64_t ImageCompressResultMsg::size_bytes() const {
+  return size_bytes_;
+}
+
+void ImageCompressResultMsg::set_size_bytes(int64_t value_arg) {
+  size_bytes_ = value_arg;
+}
+
+
+const std::string& ImageCompressResultMsg::format() const {
+  return format_;
+}
+
+void ImageCompressResultMsg::set_format(std::string_view value_arg) {
+  format_ = value_arg;
+}
+
+
+int64_t ImageCompressResultMsg::width() const {
+  return width_;
+}
+
+void ImageCompressResultMsg::set_width(int64_t value_arg) {
+  width_ = value_arg;
+}
+
+
+int64_t ImageCompressResultMsg::height() const {
+  return height_;
+}
+
+void ImageCompressResultMsg::set_height(int64_t value_arg) {
+  height_ = value_arg;
+}
+
+
+EncodableList ImageCompressResultMsg::ToEncodableList() const {
+  EncodableList list;
+  list.reserve(6);
+  list.push_back(bytes_ ? EncodableValue(*bytes_) : EncodableValue());
+  list.push_back(output_path_ ? EncodableValue(*output_path_) : EncodableValue());
+  list.push_back(EncodableValue(size_bytes_));
+  list.push_back(EncodableValue(format_));
+  list.push_back(EncodableValue(width_));
+  list.push_back(EncodableValue(height_));
+  return list;
+}
+
+ImageCompressResultMsg ImageCompressResultMsg::FromEncodableList(const EncodableList& list) {
+  ImageCompressResultMsg decoded(
+    std::get<int64_t>(list[2]),
+    std::get<std::string>(list[3]),
+    std::get<int64_t>(list[4]),
+    std::get<int64_t>(list[5]));
+  auto& encodable_bytes = list[0];
+  if (!encodable_bytes.IsNull()) {
+    decoded.set_bytes(std::get<std::vector<uint8_t>>(encodable_bytes));
+  }
+  auto& encodable_output_path = list[1];
+  if (!encodable_output_path.IsNull()) {
+    decoded.set_output_path(std::get<std::string>(encodable_output_path));
+  }
+  return decoded;
+}
+
+bool ImageCompressResultMsg::operator==(const ImageCompressResultMsg& other) const {
+  return PigeonInternalDeepEquals(bytes_, other.bytes_) && PigeonInternalDeepEquals(output_path_, other.output_path_) && PigeonInternalDeepEquals(size_bytes_, other.size_bytes_) && PigeonInternalDeepEquals(format_, other.format_) && PigeonInternalDeepEquals(width_, other.width_) && PigeonInternalDeepEquals(height_, other.height_);
+}
+
+bool ImageCompressResultMsg::operator!=(const ImageCompressResultMsg& other) const {
+  return !(*this == other);
+}
+
+size_t ImageCompressResultMsg::Hash() const {
+  size_t result = 1;
+  result = result * 31 + PigeonInternalDeepHash(bytes_);
+  result = result * 31 + PigeonInternalDeepHash(output_path_);
+  result = result * 31 + PigeonInternalDeepHash(size_bytes_);
+  result = result * 31 + PigeonInternalDeepHash(format_);
+  result = result * 31 + PigeonInternalDeepHash(width_);
+  result = result * 31 + PigeonInternalDeepHash(height_);
+  return result;
+}
+
+std::ostream& operator<<(
+  std::ostream& os,
+  const ImageCompressResultMsg& obj) {
+  os << "ImageCompressResultMsg(";
+  os << "bytes: ";
+  if (obj.bytes_) {
+    os << PigeonInternalToString(*obj.bytes_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", output_path: ";
+  if (obj.output_path_) {
+    os << PigeonInternalToString(*obj.output_path_);
+  }
+  else {
+    os << "null";
+  }
+  os << ", size_bytes: ";
+  os << PigeonInternalToString(obj.size_bytes_);
+  os << ", format: ";
+  os << PigeonInternalToString(obj.format_);
+  os << ", width: ";
+  os << PigeonInternalToString(obj.width_);
+  os << ", height: ";
+  os << PigeonInternalToString(obj.height_);
+  os << ")";
+  return os;
+}
+
+size_t PigeonInternalDeepHash(const ImageCompressResultMsg& v) {
+  return v.Hash();
+}
+
+// VideoCompressResultMsg
+
+VideoCompressResultMsg::VideoCompressResultMsg(
+  const std::string& output_path,
+  int64_t size_bytes,
+  const std::string& encoder_name,
+  const std::string& codec,
+  int64_t width,
+  int64_t height)
+ : output_path_(output_path),
+    size_bytes_(size_bytes),
+    encoder_name_(encoder_name),
+    codec_(codec),
+    width_(width),
+    height_(height) {}
+
+const std::string& VideoCompressResultMsg::output_path() const {
+  return output_path_;
+}
+
+void VideoCompressResultMsg::set_output_path(std::string_view value_arg) {
+  output_path_ = value_arg;
+}
+
+
+int64_t VideoCompressResultMsg::size_bytes() const {
+  return size_bytes_;
+}
+
+void VideoCompressResultMsg::set_size_bytes(int64_t value_arg) {
+  size_bytes_ = value_arg;
+}
+
+
+const std::string& VideoCompressResultMsg::encoder_name() const {
+  return encoder_name_;
+}
+
+void VideoCompressResultMsg::set_encoder_name(std::string_view value_arg) {
+  encoder_name_ = value_arg;
+}
+
+
+const std::string& VideoCompressResultMsg::codec() const {
+  return codec_;
+}
+
+void VideoCompressResultMsg::set_codec(std::string_view value_arg) {
+  codec_ = value_arg;
+}
+
+
+int64_t VideoCompressResultMsg::width() const {
+  return width_;
+}
+
+void VideoCompressResultMsg::set_width(int64_t value_arg) {
+  width_ = value_arg;
+}
+
+
+int64_t VideoCompressResultMsg::height() const {
+  return height_;
+}
+
+void VideoCompressResultMsg::set_height(int64_t value_arg) {
+  height_ = value_arg;
+}
+
+
+EncodableList VideoCompressResultMsg::ToEncodableList() const {
+  EncodableList list;
+  list.reserve(6);
+  list.push_back(EncodableValue(output_path_));
+  list.push_back(EncodableValue(size_bytes_));
+  list.push_back(EncodableValue(encoder_name_));
+  list.push_back(EncodableValue(codec_));
+  list.push_back(EncodableValue(width_));
+  list.push_back(EncodableValue(height_));
+  return list;
+}
+
+VideoCompressResultMsg VideoCompressResultMsg::FromEncodableList(const EncodableList& list) {
+  VideoCompressResultMsg decoded(
+    std::get<std::string>(list[0]),
+    std::get<int64_t>(list[1]),
+    std::get<std::string>(list[2]),
+    std::get<std::string>(list[3]),
+    std::get<int64_t>(list[4]),
+    std::get<int64_t>(list[5]));
+  return decoded;
+}
+
+bool VideoCompressResultMsg::operator==(const VideoCompressResultMsg& other) const {
+  return PigeonInternalDeepEquals(output_path_, other.output_path_) && PigeonInternalDeepEquals(size_bytes_, other.size_bytes_) && PigeonInternalDeepEquals(encoder_name_, other.encoder_name_) && PigeonInternalDeepEquals(codec_, other.codec_) && PigeonInternalDeepEquals(width_, other.width_) && PigeonInternalDeepEquals(height_, other.height_);
+}
+
+bool VideoCompressResultMsg::operator!=(const VideoCompressResultMsg& other) const {
+  return !(*this == other);
+}
+
+size_t VideoCompressResultMsg::Hash() const {
+  size_t result = 1;
+  result = result * 31 + PigeonInternalDeepHash(output_path_);
+  result = result * 31 + PigeonInternalDeepHash(size_bytes_);
+  result = result * 31 + PigeonInternalDeepHash(encoder_name_);
+  result = result * 31 + PigeonInternalDeepHash(codec_);
+  result = result * 31 + PigeonInternalDeepHash(width_);
+  result = result * 31 + PigeonInternalDeepHash(height_);
+  return result;
+}
+
+std::ostream& operator<<(
+  std::ostream& os,
+  const VideoCompressResultMsg& obj) {
+  os << "VideoCompressResultMsg(";
+  os << "output_path: ";
+  os << PigeonInternalToString(obj.output_path_);
+  os << ", size_bytes: ";
+  os << PigeonInternalToString(obj.size_bytes_);
+  os << ", encoder_name: ";
+  os << PigeonInternalToString(obj.encoder_name_);
+  os << ", codec: ";
+  os << PigeonInternalToString(obj.codec_);
+  os << ", width: ";
+  os << PigeonInternalToString(obj.width_);
+  os << ", height: ";
+  os << PigeonInternalToString(obj.height_);
+  os << ")";
+  return os;
+}
+
+size_t PigeonInternalDeepHash(const VideoCompressResultMsg& v) {
+  return v.Hash();
+}
+
 
 PigeonInternalCodecSerializer::PigeonInternalCodecSerializer() {}
 
@@ -1028,6 +1334,12 @@ EncodableValue PigeonInternalCodecSerializer::ReadValueOfType(
       }
     case 134: {
         return CustomEncodableValue(VideoCapabilitiesMsg::FromEncodableList(std::get<EncodableList>(ReadValue(stream))));
+      }
+    case 135: {
+        return CustomEncodableValue(ImageCompressResultMsg::FromEncodableList(std::get<EncodableList>(ReadValue(stream))));
+      }
+    case 136: {
+        return CustomEncodableValue(VideoCompressResultMsg::FromEncodableList(std::get<EncodableList>(ReadValue(stream))));
       }
     default:
       return ::flutter::StandardCodecSerializer::ReadValueOfType(type, stream);
@@ -1066,6 +1378,16 @@ void PigeonInternalCodecSerializer::WriteValue(
     if (custom_value->type() == typeid(VideoCapabilitiesMsg)) {
       stream->WriteByte(134);
       WriteValue(EncodableValue(std::any_cast<VideoCapabilitiesMsg>(*custom_value).ToEncodableList()), stream);
+      return;
+    }
+    if (custom_value->type() == typeid(ImageCompressResultMsg)) {
+      stream->WriteByte(135);
+      WriteValue(EncodableValue(std::any_cast<ImageCompressResultMsg>(*custom_value).ToEncodableList()), stream);
+      return;
+    }
+    if (custom_value->type() == typeid(VideoCompressResultMsg)) {
+      stream->WriteByte(136);
+      WriteValue(EncodableValue(std::any_cast<VideoCompressResultMsg>(*custom_value).ToEncodableList()), stream);
       return;
     }
   }
@@ -1115,14 +1437,15 @@ void MediaCompressionHostApi::SetUp(
     if (api != nullptr) {
       channel.SetMessageHandler([api](const EncodableValue& message, const ::flutter::MessageReply<EncodableValue>& reply) {
         try {
-          ErrorOr<ImageCapabilitiesMsg> output = api->QueryImageCapabilities();
-          if (output.has_error()) {
-            reply(WrapError(output.error()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
-          reply(EncodableValue(std::move(wrapped)));
+          api->QueryImageCapabilities([reply](ErrorOr<ImageCapabilitiesMsg>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
@@ -1183,14 +1506,15 @@ void MediaCompressionHostApi::SetUp(
     if (api != nullptr) {
       channel.SetMessageHandler([api](const EncodableValue& message, const ::flutter::MessageReply<EncodableValue>& reply) {
         try {
-          ErrorOr<VideoCapabilitiesMsg> output = api->QueryVideoCapabilities();
-          if (output.has_error()) {
-            reply(WrapError(output.error()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
-          reply(EncodableValue(std::move(wrapped)));
+          api->QueryVideoCapabilities([reply](ErrorOr<VideoCapabilitiesMsg>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
@@ -1317,6 +1641,123 @@ EncodableValue MediaCompressionHostApi::WrapError(const FlutterError& error) {
     EncodableValue(error.code()),
     EncodableValue(error.message()),
     error.details()
+  });
+}
+
+// Generated class from Pigeon that represents Flutter messages that can be called from C++.
+MediaCompressionFlutterApi::MediaCompressionFlutterApi(::flutter::BinaryMessenger* binary_messenger)
+ : binary_messenger_(binary_messenger),
+    message_channel_suffix_("") {}
+
+MediaCompressionFlutterApi::MediaCompressionFlutterApi(
+  ::flutter::BinaryMessenger* binary_messenger,
+  const std::string& message_channel_suffix)
+ : binary_messenger_(binary_messenger),
+    message_channel_suffix_(message_channel_suffix.length() > 0 ? std::string(".") + message_channel_suffix : "") {}
+
+const ::flutter::StandardMessageCodec& MediaCompressionFlutterApi::GetCodec() {
+  return ::flutter::StandardMessageCodec::GetInstance(&PigeonInternalCodecSerializer::GetInstance());
+}
+
+void MediaCompressionFlutterApi::OnProgress(
+  double value_arg,
+  std::function<void(void)>&& on_success,
+  std::function<void(const FlutterError&)>&& on_error) {
+  const std::string channel_name = "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onProgress" + message_channel_suffix_;
+  BasicMessageChannel<> channel(binary_messenger_, channel_name, &GetCodec());
+  EncodableValue encoded_api_arguments = EncodableValue(EncodableList{
+    EncodableValue(value_arg),
+  });
+  channel.Send(encoded_api_arguments, [channel_name, on_success = std::move(on_success), on_error = std::move(on_error)](const uint8_t* reply, size_t reply_size) {
+    std::unique_ptr<EncodableValue> response = GetCodec().DecodeMessage(reply, reply_size);
+    const auto& encodable_return_value = *response;
+    const auto* list_return_value = std::get_if<EncodableList>(&encodable_return_value);
+    if (list_return_value) {
+      if (list_return_value->size() > 1) {
+        on_error(FlutterError(std::get<std::string>(list_return_value->at(0)), std::get<std::string>(list_return_value->at(1)), list_return_value->at(2)));
+      } else {
+        on_success();
+      }
+    } else {
+      on_error(CreateConnectionError(channel_name));
+    } 
+  });
+}
+
+void MediaCompressionFlutterApi::OnImageCompleted(
+  const ImageCompressResultMsg& result_arg,
+  std::function<void(void)>&& on_success,
+  std::function<void(const FlutterError&)>&& on_error) {
+  const std::string channel_name = "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onImageCompleted" + message_channel_suffix_;
+  BasicMessageChannel<> channel(binary_messenger_, channel_name, &GetCodec());
+  EncodableValue encoded_api_arguments = EncodableValue(EncodableList{
+    CustomEncodableValue(result_arg),
+  });
+  channel.Send(encoded_api_arguments, [channel_name, on_success = std::move(on_success), on_error = std::move(on_error)](const uint8_t* reply, size_t reply_size) {
+    std::unique_ptr<EncodableValue> response = GetCodec().DecodeMessage(reply, reply_size);
+    const auto& encodable_return_value = *response;
+    const auto* list_return_value = std::get_if<EncodableList>(&encodable_return_value);
+    if (list_return_value) {
+      if (list_return_value->size() > 1) {
+        on_error(FlutterError(std::get<std::string>(list_return_value->at(0)), std::get<std::string>(list_return_value->at(1)), list_return_value->at(2)));
+      } else {
+        on_success();
+      }
+    } else {
+      on_error(CreateConnectionError(channel_name));
+    } 
+  });
+}
+
+void MediaCompressionFlutterApi::OnVideoCompleted(
+  const VideoCompressResultMsg& result_arg,
+  std::function<void(void)>&& on_success,
+  std::function<void(const FlutterError&)>&& on_error) {
+  const std::string channel_name = "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onVideoCompleted" + message_channel_suffix_;
+  BasicMessageChannel<> channel(binary_messenger_, channel_name, &GetCodec());
+  EncodableValue encoded_api_arguments = EncodableValue(EncodableList{
+    CustomEncodableValue(result_arg),
+  });
+  channel.Send(encoded_api_arguments, [channel_name, on_success = std::move(on_success), on_error = std::move(on_error)](const uint8_t* reply, size_t reply_size) {
+    std::unique_ptr<EncodableValue> response = GetCodec().DecodeMessage(reply, reply_size);
+    const auto& encodable_return_value = *response;
+    const auto* list_return_value = std::get_if<EncodableList>(&encodable_return_value);
+    if (list_return_value) {
+      if (list_return_value->size() > 1) {
+        on_error(FlutterError(std::get<std::string>(list_return_value->at(0)), std::get<std::string>(list_return_value->at(1)), list_return_value->at(2)));
+      } else {
+        on_success();
+      }
+    } else {
+      on_error(CreateConnectionError(channel_name));
+    } 
+  });
+}
+
+void MediaCompressionFlutterApi::OnError(
+  const std::string& code_arg,
+  const std::string& message_arg,
+  std::function<void(void)>&& on_success,
+  std::function<void(const FlutterError&)>&& on_error) {
+  const std::string channel_name = "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onError" + message_channel_suffix_;
+  BasicMessageChannel<> channel(binary_messenger_, channel_name, &GetCodec());
+  EncodableValue encoded_api_arguments = EncodableValue(EncodableList{
+    EncodableValue(code_arg),
+    EncodableValue(message_arg),
+  });
+  channel.Send(encoded_api_arguments, [channel_name, on_success = std::move(on_success), on_error = std::move(on_error)](const uint8_t* reply, size_t reply_size) {
+    std::unique_ptr<EncodableValue> response = GetCodec().DecodeMessage(reply, reply_size);
+    const auto& encodable_return_value = *response;
+    const auto* list_return_value = std::get_if<EncodableList>(&encodable_return_value);
+    if (list_return_value) {
+      if (list_return_value->size() > 1) {
+        on_error(FlutterError(std::get<std::string>(list_return_value->at(0)), std::get<std::string>(list_return_value->at(1)), list_return_value->at(2)));
+      } else {
+        on_success();
+      }
+    } else {
+      on_error(CreateConnectionError(channel_name));
+    } 
   });
 }
 

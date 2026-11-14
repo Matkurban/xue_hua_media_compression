@@ -519,6 +519,234 @@ guint xh_mc_video_capabilities_msg_hash(XhMcVideoCapabilitiesMsg* object);
  */
 gchar* xh_mc_video_capabilities_msg_to_string(XhMcVideoCapabilitiesMsg* object);
 
+/**
+ * XhMcImageCompressResultMsg:
+ *
+ */
+
+G_DECLARE_FINAL_TYPE(XhMcImageCompressResultMsg, xh_mc_image_compress_result_msg, XH_MC, IMAGE_COMPRESS_RESULT_MSG, GObject)
+
+/**
+ * xh_mc_image_compress_result_msg_new:
+ * bytes: field in this object.
+ * bytes_length: length of @bytes.
+ * output_path: field in this object.
+ * size_bytes: field in this object.
+ * format: field in this object.
+ * width: field in this object.
+ * height: field in this object.
+ *
+ * Creates a new #ImageCompressResultMsg object.
+ *
+ * Returns: a new #XhMcImageCompressResultMsg
+ */
+XhMcImageCompressResultMsg* xh_mc_image_compress_result_msg_new(const uint8_t* bytes, size_t bytes_length, const gchar* output_path, int64_t size_bytes, const gchar* format, int64_t width, int64_t height);
+
+/**
+ * xh_mc_image_compress_result_msg_get_bytes
+ * @object: a #XhMcImageCompressResultMsg.
+ * @length: location to write the length of this value.
+ *
+ * Gets the value of the bytes field of @object.
+ *
+ * Returns: the field value.
+ */
+const uint8_t* xh_mc_image_compress_result_msg_get_bytes(XhMcImageCompressResultMsg* object, size_t* length);
+
+/**
+ * xh_mc_image_compress_result_msg_get_output_path
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Gets the value of the outputPath field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* xh_mc_image_compress_result_msg_get_output_path(XhMcImageCompressResultMsg* object);
+
+/**
+ * xh_mc_image_compress_result_msg_get_size_bytes
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Gets the value of the sizeBytes field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t xh_mc_image_compress_result_msg_get_size_bytes(XhMcImageCompressResultMsg* object);
+
+/**
+ * xh_mc_image_compress_result_msg_get_format
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Gets the value of the format field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* xh_mc_image_compress_result_msg_get_format(XhMcImageCompressResultMsg* object);
+
+/**
+ * xh_mc_image_compress_result_msg_get_width
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Gets the value of the width field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t xh_mc_image_compress_result_msg_get_width(XhMcImageCompressResultMsg* object);
+
+/**
+ * xh_mc_image_compress_result_msg_get_height
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Gets the value of the height field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t xh_mc_image_compress_result_msg_get_height(XhMcImageCompressResultMsg* object);
+
+/**
+ * xh_mc_image_compress_result_msg_equals:
+ * @a: a #XhMcImageCompressResultMsg.
+ * @b: another #XhMcImageCompressResultMsg.
+ *
+ * Checks if two #XhMcImageCompressResultMsg objects are equal.
+ *
+ * Returns: TRUE if @a and @b are equal.
+ */
+gboolean xh_mc_image_compress_result_msg_equals(XhMcImageCompressResultMsg* a, XhMcImageCompressResultMsg* b);
+
+/**
+ * xh_mc_image_compress_result_msg_hash:
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Calculates a hash code for a #XhMcImageCompressResultMsg object.
+ *
+ * Returns: the hash code.
+ */
+guint xh_mc_image_compress_result_msg_hash(XhMcImageCompressResultMsg* object);
+
+/**
+ * xh_mc_image_compress_result_msg_to_string:
+ * @object: a #XhMcImageCompressResultMsg.
+ *
+ * Returns a string representation of a #XhMcImageCompressResultMsg object.
+ *
+ * Returns: (transfer full): a new string, free with g_free().
+ */
+gchar* xh_mc_image_compress_result_msg_to_string(XhMcImageCompressResultMsg* object);
+
+/**
+ * XhMcVideoCompressResultMsg:
+ *
+ */
+
+G_DECLARE_FINAL_TYPE(XhMcVideoCompressResultMsg, xh_mc_video_compress_result_msg, XH_MC, VIDEO_COMPRESS_RESULT_MSG, GObject)
+
+/**
+ * xh_mc_video_compress_result_msg_new:
+ * output_path: field in this object.
+ * size_bytes: field in this object.
+ * encoder_name: field in this object.
+ * codec: field in this object.
+ * width: field in this object.
+ * height: field in this object.
+ *
+ * Creates a new #VideoCompressResultMsg object.
+ *
+ * Returns: a new #XhMcVideoCompressResultMsg
+ */
+XhMcVideoCompressResultMsg* xh_mc_video_compress_result_msg_new(const gchar* output_path, int64_t size_bytes, const gchar* encoder_name, const gchar* codec, int64_t width, int64_t height);
+
+/**
+ * xh_mc_video_compress_result_msg_get_output_path
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Gets the value of the outputPath field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* xh_mc_video_compress_result_msg_get_output_path(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_get_size_bytes
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Gets the value of the sizeBytes field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t xh_mc_video_compress_result_msg_get_size_bytes(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_get_encoder_name
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Gets the value of the encoderName field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* xh_mc_video_compress_result_msg_get_encoder_name(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_get_codec
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Gets the value of the codec field of @object.
+ *
+ * Returns: the field value.
+ */
+const gchar* xh_mc_video_compress_result_msg_get_codec(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_get_width
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Gets the value of the width field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t xh_mc_video_compress_result_msg_get_width(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_get_height
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Gets the value of the height field of @object.
+ *
+ * Returns: the field value.
+ */
+int64_t xh_mc_video_compress_result_msg_get_height(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_equals:
+ * @a: a #XhMcVideoCompressResultMsg.
+ * @b: another #XhMcVideoCompressResultMsg.
+ *
+ * Checks if two #XhMcVideoCompressResultMsg objects are equal.
+ *
+ * Returns: TRUE if @a and @b are equal.
+ */
+gboolean xh_mc_video_compress_result_msg_equals(XhMcVideoCompressResultMsg* a, XhMcVideoCompressResultMsg* b);
+
+/**
+ * xh_mc_video_compress_result_msg_hash:
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Calculates a hash code for a #XhMcVideoCompressResultMsg object.
+ *
+ * Returns: the hash code.
+ */
+guint xh_mc_video_compress_result_msg_hash(XhMcVideoCompressResultMsg* object);
+
+/**
+ * xh_mc_video_compress_result_msg_to_string:
+ * @object: a #XhMcVideoCompressResultMsg.
+ *
+ * Returns a string representation of a #XhMcVideoCompressResultMsg object.
+ *
+ * Returns: (transfer full): a new string, free with g_free().
+ */
+gchar* xh_mc_video_compress_result_msg_to_string(XhMcVideoCompressResultMsg* object);
+
 G_DECLARE_FINAL_TYPE(XhMcMessageCodec, xh_mc_message_codec, XH_MC, MESSAGE_CODEC, FlStandardMessageCodec)
 
 /**
@@ -534,6 +762,8 @@ extern const int xh_mc_image_options_msg_type_id;
 extern const int xh_mc_video_options_msg_type_id;
 extern const int xh_mc_image_capabilities_msg_type_id;
 extern const int xh_mc_video_capabilities_msg_type_id;
+extern const int xh_mc_image_compress_result_msg_type_id;
+extern const int xh_mc_video_compress_result_msg_type_id;
 
 G_DECLARE_FINAL_TYPE(XhMcMediaCompressionHostApi, xh_mc_media_compression_host_api, XH_MC, MEDIA_COMPRESSION_HOST_API, GObject)
 
@@ -561,52 +791,6 @@ XhMcMediaCompressionHostApiCreateJobResponse* xh_mc_media_compression_host_api_c
  * Returns: a new #XhMcMediaCompressionHostApiCreateJobResponse
  */
 XhMcMediaCompressionHostApiCreateJobResponse* xh_mc_media_compression_host_api_create_job_response_new_error(const gchar* code, const gchar* message, FlValue* details);
-
-G_DECLARE_FINAL_TYPE(XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse, xh_mc_media_compression_host_api_query_image_capabilities_response, XH_MC, MEDIA_COMPRESSION_HOST_API_QUERY_IMAGE_CAPABILITIES_RESPONSE, GObject)
-
-/**
- * xh_mc_media_compression_host_api_query_image_capabilities_response_new:
- *
- * Creates a new response to MediaCompressionHostApi.queryImageCapabilities.
- *
- * Returns: a new #XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse
- */
-XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* xh_mc_media_compression_host_api_query_image_capabilities_response_new(XhMcImageCapabilitiesMsg* return_value);
-
-/**
- * xh_mc_media_compression_host_api_query_image_capabilities_response_new_error:
- * @code: error code.
- * @message: error message.
- * @details: (allow-none): error details or %NULL.
- *
- * Creates a new error response to MediaCompressionHostApi.queryImageCapabilities.
- *
- * Returns: a new #XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse
- */
-XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* xh_mc_media_compression_host_api_query_image_capabilities_response_new_error(const gchar* code, const gchar* message, FlValue* details);
-
-G_DECLARE_FINAL_TYPE(XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse, xh_mc_media_compression_host_api_query_video_capabilities_response, XH_MC, MEDIA_COMPRESSION_HOST_API_QUERY_VIDEO_CAPABILITIES_RESPONSE, GObject)
-
-/**
- * xh_mc_media_compression_host_api_query_video_capabilities_response_new:
- *
- * Creates a new response to MediaCompressionHostApi.queryVideoCapabilities.
- *
- * Returns: a new #XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse
- */
-XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* xh_mc_media_compression_host_api_query_video_capabilities_response_new(XhMcVideoCapabilitiesMsg* return_value);
-
-/**
- * xh_mc_media_compression_host_api_query_video_capabilities_response_new_error:
- * @code: error code.
- * @message: error message.
- * @details: (allow-none): error details or %NULL.
- *
- * Creates a new error response to MediaCompressionHostApi.queryVideoCapabilities.
- *
- * Returns: a new #XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse
- */
-XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* xh_mc_media_compression_host_api_query_video_capabilities_response_new_error(const gchar* code, const gchar* message, FlValue* details);
 
 G_DECLARE_FINAL_TYPE(XhMcMediaCompressionHostApiCancelJobResponse, xh_mc_media_compression_host_api_cancel_job_response, XH_MC, MEDIA_COMPRESSION_HOST_API_CANCEL_JOB_RESPONSE, GObject)
 
@@ -661,9 +845,9 @@ XhMcMediaCompressionHostApiDisposeJobResponse* xh_mc_media_compression_host_api_
  */
 typedef struct {
   XhMcMediaCompressionHostApiCreateJobResponse* (*create_job)(gpointer user_data);
-  XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* (*query_image_capabilities)(gpointer user_data);
+  void (*query_image_capabilities)(XhMcMediaCompressionHostApiResponseHandle* response_handle, gpointer user_data);
   void (*start_image_compress)(int64_t id, XhMcSourceMsg* source, XhMcDestinationMsg* destination, XhMcImageOptionsMsg* options, XhMcMediaCompressionHostApiResponseHandle* response_handle, gpointer user_data);
-  XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* (*query_video_capabilities)(gpointer user_data);
+  void (*query_video_capabilities)(XhMcMediaCompressionHostApiResponseHandle* response_handle, gpointer user_data);
   void (*start_video_compress)(int64_t id, const gchar* input_path, const gchar* output_path, XhMcVideoOptionsMsg* options, XhMcMediaCompressionHostApiResponseHandle* response_handle, gpointer user_data);
   XhMcMediaCompressionHostApiCancelJobResponse* (*cancel_job)(int64_t id, gpointer user_data);
   XhMcMediaCompressionHostApiDisposeJobResponse* (*dispose_job)(int64_t id, gpointer user_data);
@@ -693,6 +877,26 @@ void xh_mc_media_compression_host_api_set_method_handlers(FlBinaryMessenger* mes
 void xh_mc_media_compression_host_api_clear_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix);
 
 /**
+ * xh_mc_media_compression_host_api_respond_query_image_capabilities:
+ * @response_handle: a #XhMcMediaCompressionHostApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
+ *
+ * Responds to MediaCompressionHostApi.queryImageCapabilities. 
+ */
+void xh_mc_media_compression_host_api_respond_query_image_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, XhMcImageCapabilitiesMsg* return_value);
+
+/**
+ * xh_mc_media_compression_host_api_respond_error_query_image_capabilities:
+ * @response_handle: a #XhMcMediaCompressionHostApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to MediaCompressionHostApi.queryImageCapabilities. 
+ */
+void xh_mc_media_compression_host_api_respond_error_query_image_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
  * xh_mc_media_compression_host_api_respond_start_image_compress:
  * @response_handle: a #XhMcMediaCompressionHostApiResponseHandle.
  *
@@ -712,6 +916,26 @@ void xh_mc_media_compression_host_api_respond_start_image_compress(XhMcMediaComp
 void xh_mc_media_compression_host_api_respond_error_start_image_compress(XhMcMediaCompressionHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
 
 /**
+ * xh_mc_media_compression_host_api_respond_query_video_capabilities:
+ * @response_handle: a #XhMcMediaCompressionHostApiResponseHandle.
+ * @return_value: location to write the value returned by this method.
+ *
+ * Responds to MediaCompressionHostApi.queryVideoCapabilities. 
+ */
+void xh_mc_media_compression_host_api_respond_query_video_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, XhMcVideoCapabilitiesMsg* return_value);
+
+/**
+ * xh_mc_media_compression_host_api_respond_error_query_video_capabilities:
+ * @response_handle: a #XhMcMediaCompressionHostApiResponseHandle.
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Responds with an error to MediaCompressionHostApi.queryVideoCapabilities. 
+ */
+void xh_mc_media_compression_host_api_respond_error_query_video_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+/**
  * xh_mc_media_compression_host_api_respond_start_video_compress:
  * @response_handle: a #XhMcMediaCompressionHostApiResponseHandle.
  *
@@ -729,6 +953,285 @@ void xh_mc_media_compression_host_api_respond_start_video_compress(XhMcMediaComp
  * Responds with an error to MediaCompressionHostApi.startVideoCompress. 
  */
 void xh_mc_media_compression_host_api_respond_error_start_video_compress(XhMcMediaCompressionHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details);
+
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionFlutterApiOnProgressResponse, xh_mc_media_compression_flutter_api_on_progress_response, XH_MC, MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE, GObject)
+
+/**
+ * xh_mc_media_compression_flutter_api_on_progress_response_is_error:
+ * @response: a #XhMcMediaCompressionFlutterApiOnProgressResponse.
+ *
+ * Checks if a response to MediaCompressionFlutterApi.onProgress is an error.
+ *
+ * Returns: a %TRUE if this response is an error.
+ */
+gboolean xh_mc_media_compression_flutter_api_on_progress_response_is_error(XhMcMediaCompressionFlutterApiOnProgressResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_progress_response_get_error_code:
+ * @response: a #XhMcMediaCompressionFlutterApiOnProgressResponse.
+ *
+ * Get the error code for this response.
+ *
+ * Returns: an error code or %NULL if not an error.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_progress_response_get_error_code(XhMcMediaCompressionFlutterApiOnProgressResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_progress_response_get_error_message:
+ * @response: a #XhMcMediaCompressionFlutterApiOnProgressResponse.
+ *
+ * Get the error message for this response.
+ *
+ * Returns: an error message.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_progress_response_get_error_message(XhMcMediaCompressionFlutterApiOnProgressResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_progress_response_get_error_details:
+ * @response: a #XhMcMediaCompressionFlutterApiOnProgressResponse.
+ *
+ * Get the error details for this response.
+ *
+ * Returns: (allow-none): an error details or %NULL.
+ */
+FlValue* xh_mc_media_compression_flutter_api_on_progress_response_get_error_details(XhMcMediaCompressionFlutterApiOnProgressResponse* response);
+
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionFlutterApiOnImageCompletedResponse, xh_mc_media_compression_flutter_api_on_image_completed_response, XH_MC, MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE, GObject)
+
+/**
+ * xh_mc_media_compression_flutter_api_on_image_completed_response_is_error:
+ * @response: a #XhMcMediaCompressionFlutterApiOnImageCompletedResponse.
+ *
+ * Checks if a response to MediaCompressionFlutterApi.onImageCompleted is an error.
+ *
+ * Returns: a %TRUE if this response is an error.
+ */
+gboolean xh_mc_media_compression_flutter_api_on_image_completed_response_is_error(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_code:
+ * @response: a #XhMcMediaCompressionFlutterApiOnImageCompletedResponse.
+ *
+ * Get the error code for this response.
+ *
+ * Returns: an error code or %NULL if not an error.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_code(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_message:
+ * @response: a #XhMcMediaCompressionFlutterApiOnImageCompletedResponse.
+ *
+ * Get the error message for this response.
+ *
+ * Returns: an error message.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_message(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_details:
+ * @response: a #XhMcMediaCompressionFlutterApiOnImageCompletedResponse.
+ *
+ * Get the error details for this response.
+ *
+ * Returns: (allow-none): an error details or %NULL.
+ */
+FlValue* xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_details(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* response);
+
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse, xh_mc_media_compression_flutter_api_on_video_completed_response, XH_MC, MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE, GObject)
+
+/**
+ * xh_mc_media_compression_flutter_api_on_video_completed_response_is_error:
+ * @response: a #XhMcMediaCompressionFlutterApiOnVideoCompletedResponse.
+ *
+ * Checks if a response to MediaCompressionFlutterApi.onVideoCompleted is an error.
+ *
+ * Returns: a %TRUE if this response is an error.
+ */
+gboolean xh_mc_media_compression_flutter_api_on_video_completed_response_is_error(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_code:
+ * @response: a #XhMcMediaCompressionFlutterApiOnVideoCompletedResponse.
+ *
+ * Get the error code for this response.
+ *
+ * Returns: an error code or %NULL if not an error.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_code(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_message:
+ * @response: a #XhMcMediaCompressionFlutterApiOnVideoCompletedResponse.
+ *
+ * Get the error message for this response.
+ *
+ * Returns: an error message.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_message(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_details:
+ * @response: a #XhMcMediaCompressionFlutterApiOnVideoCompletedResponse.
+ *
+ * Get the error details for this response.
+ *
+ * Returns: (allow-none): an error details or %NULL.
+ */
+FlValue* xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_details(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* response);
+
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionFlutterApiOnErrorResponse, xh_mc_media_compression_flutter_api_on_error_response, XH_MC, MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE, GObject)
+
+/**
+ * xh_mc_media_compression_flutter_api_on_error_response_is_error:
+ * @response: a #XhMcMediaCompressionFlutterApiOnErrorResponse.
+ *
+ * Checks if a response to MediaCompressionFlutterApi.onError is an error.
+ *
+ * Returns: a %TRUE if this response is an error.
+ */
+gboolean xh_mc_media_compression_flutter_api_on_error_response_is_error(XhMcMediaCompressionFlutterApiOnErrorResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_error_response_get_error_code:
+ * @response: a #XhMcMediaCompressionFlutterApiOnErrorResponse.
+ *
+ * Get the error code for this response.
+ *
+ * Returns: an error code or %NULL if not an error.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_error_response_get_error_code(XhMcMediaCompressionFlutterApiOnErrorResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_error_response_get_error_message:
+ * @response: a #XhMcMediaCompressionFlutterApiOnErrorResponse.
+ *
+ * Get the error message for this response.
+ *
+ * Returns: an error message.
+ */
+const gchar* xh_mc_media_compression_flutter_api_on_error_response_get_error_message(XhMcMediaCompressionFlutterApiOnErrorResponse* response);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_error_response_get_error_details:
+ * @response: a #XhMcMediaCompressionFlutterApiOnErrorResponse.
+ *
+ * Get the error details for this response.
+ *
+ * Returns: (allow-none): an error details or %NULL.
+ */
+FlValue* xh_mc_media_compression_flutter_api_on_error_response_get_error_details(XhMcMediaCompressionFlutterApiOnErrorResponse* response);
+
+/**
+ * XhMcMediaCompressionFlutterApi:
+ *
+ */
+
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionFlutterApi, xh_mc_media_compression_flutter_api, XH_MC, MEDIA_COMPRESSION_FLUTTER_API, GObject)
+
+/**
+ * xh_mc_media_compression_flutter_api_new:
+ * @messenger: an #FlBinaryMessenger.
+ * @suffix: (allow-none): a suffix to add to the API or %NULL for none.
+ *
+ * Creates a new object to access the MediaCompressionFlutterApi API.
+ *
+ * Returns: a new #XhMcMediaCompressionFlutterApi
+ */
+XhMcMediaCompressionFlutterApi* xh_mc_media_compression_flutter_api_new(FlBinaryMessenger* messenger, const gchar* suffix);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_progress:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @value: parameter for this method.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): (allow-none): a #GAsyncReadyCallback to call when the call is complete or %NULL to ignore the response.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ */
+void xh_mc_media_compression_flutter_api_on_progress(XhMcMediaCompressionFlutterApi* api, double value, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_progress_finish:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @result: a #GAsyncResult.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL to ignore.
+ *
+ * Completes a xh_mc_media_compression_flutter_api_on_progress() call.
+ *
+ * Returns: a #XhMcMediaCompressionFlutterApiOnProgressResponse or %NULL on error.
+ */
+XhMcMediaCompressionFlutterApiOnProgressResponse* xh_mc_media_compression_flutter_api_on_progress_finish(XhMcMediaCompressionFlutterApi* api, GAsyncResult* result, GError** error);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_image_completed:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @result: parameter for this method.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): (allow-none): a #GAsyncReadyCallback to call when the call is complete or %NULL to ignore the response.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ */
+void xh_mc_media_compression_flutter_api_on_image_completed(XhMcMediaCompressionFlutterApi* api, XhMcImageCompressResultMsg* result, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_image_completed_finish:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @result: a #GAsyncResult.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL to ignore.
+ *
+ * Completes a xh_mc_media_compression_flutter_api_on_image_completed() call.
+ *
+ * Returns: a #XhMcMediaCompressionFlutterApiOnImageCompletedResponse or %NULL on error.
+ */
+XhMcMediaCompressionFlutterApiOnImageCompletedResponse* xh_mc_media_compression_flutter_api_on_image_completed_finish(XhMcMediaCompressionFlutterApi* api, GAsyncResult* result, GError** error);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_video_completed:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @result: parameter for this method.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): (allow-none): a #GAsyncReadyCallback to call when the call is complete or %NULL to ignore the response.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ */
+void xh_mc_media_compression_flutter_api_on_video_completed(XhMcMediaCompressionFlutterApi* api, XhMcVideoCompressResultMsg* result, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_video_completed_finish:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @result: a #GAsyncResult.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL to ignore.
+ *
+ * Completes a xh_mc_media_compression_flutter_api_on_video_completed() call.
+ *
+ * Returns: a #XhMcMediaCompressionFlutterApiOnVideoCompletedResponse or %NULL on error.
+ */
+XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* xh_mc_media_compression_flutter_api_on_video_completed_finish(XhMcMediaCompressionFlutterApi* api, GAsyncResult* result, GError** error);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_error:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @code: parameter for this method.
+ * @message: parameter for this method.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): (allow-none): a #GAsyncReadyCallback to call when the call is complete or %NULL to ignore the response.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ */
+void xh_mc_media_compression_flutter_api_on_error(XhMcMediaCompressionFlutterApi* api, const gchar* code, const gchar* message, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data);
+
+/**
+ * xh_mc_media_compression_flutter_api_on_error_finish:
+ * @api: a #XhMcMediaCompressionFlutterApi.
+ * @result: a #GAsyncResult.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL to ignore.
+ *
+ * Completes a xh_mc_media_compression_flutter_api_on_error() call.
+ *
+ * Returns: a #XhMcMediaCompressionFlutterApiOnErrorResponse or %NULL on error.
+ */
+XhMcMediaCompressionFlutterApiOnErrorResponse* xh_mc_media_compression_flutter_api_on_error_finish(XhMcMediaCompressionFlutterApi* api, GAsyncResult* result, GError** error);
 
 G_END_DECLS
 

@@ -1145,6 +1145,392 @@ gchar* xh_mc_video_capabilities_msg_to_string(XhMcVideoCapabilitiesMsg* self) {
   return g_string_free(str, FALSE);
 }
 
+struct _XhMcImageCompressResultMsg {
+  GObject parent_instance;
+
+  uint8_t* bytes;
+  size_t bytes_length;
+  gchar* output_path;
+  int64_t size_bytes;
+  gchar* format;
+  int64_t width;
+  int64_t height;
+};
+
+G_DEFINE_TYPE(XhMcImageCompressResultMsg, xh_mc_image_compress_result_msg, G_TYPE_OBJECT)
+
+static void xh_mc_image_compress_result_msg_dispose(GObject* object) {
+  XhMcImageCompressResultMsg* self = XH_MC_IMAGE_COMPRESS_RESULT_MSG(object);
+  g_clear_pointer(&self->output_path, g_free);
+  g_clear_pointer(&self->format, g_free);
+  G_OBJECT_CLASS(xh_mc_image_compress_result_msg_parent_class)->dispose(object);
+}
+
+static void xh_mc_image_compress_result_msg_init(XhMcImageCompressResultMsg* self) {
+}
+
+static void xh_mc_image_compress_result_msg_class_init(XhMcImageCompressResultMsgClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_image_compress_result_msg_dispose;
+}
+
+XhMcImageCompressResultMsg* xh_mc_image_compress_result_msg_new(const uint8_t* bytes, size_t bytes_length, const gchar* output_path, int64_t size_bytes, const gchar* format, int64_t width, int64_t height) {
+  XhMcImageCompressResultMsg* self = XH_MC_IMAGE_COMPRESS_RESULT_MSG(g_object_new(xh_mc_image_compress_result_msg_get_type(), nullptr));
+  if (bytes != nullptr) {
+    self->bytes = static_cast<uint8_t*>(memcpy(malloc(bytes_length), bytes, bytes_length));
+    self->bytes_length = bytes_length;
+  }
+  else {
+    self->bytes = nullptr;
+    self->bytes_length = 0;
+  }
+  if (output_path != nullptr) {
+    self->output_path = g_strdup(output_path);
+  }
+  else {
+    self->output_path = nullptr;
+  }
+  self->size_bytes = size_bytes;
+  self->format = g_strdup(format);
+  self->width = width;
+  self->height = height;
+  return self;
+}
+
+const uint8_t* xh_mc_image_compress_result_msg_get_bytes(XhMcImageCompressResultMsg* self, size_t* length) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), nullptr);
+  *length = self->bytes_length;
+  return self->bytes;
+}
+
+const gchar* xh_mc_image_compress_result_msg_get_output_path(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), nullptr);
+  return self->output_path;
+}
+
+int64_t xh_mc_image_compress_result_msg_get_size_bytes(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), 0);
+  return self->size_bytes;
+}
+
+const gchar* xh_mc_image_compress_result_msg_get_format(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), nullptr);
+  return self->format;
+}
+
+int64_t xh_mc_image_compress_result_msg_get_width(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), 0);
+  return self->width;
+}
+
+int64_t xh_mc_image_compress_result_msg_get_height(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), 0);
+  return self->height;
+}
+
+static FlValue* xh_mc_image_compress_result_msg_to_list(XhMcImageCompressResultMsg* self) {
+  FlValue* values = fl_value_new_list();
+  fl_value_append_take(values, self->bytes != nullptr ? fl_value_new_uint8_list(self->bytes, self->bytes_length) : fl_value_new_null());
+  fl_value_append_take(values, self->output_path != nullptr ? fl_value_new_string(self->output_path) : fl_value_new_null());
+  fl_value_append_take(values, fl_value_new_int(self->size_bytes));
+  fl_value_append_take(values, fl_value_new_string(self->format));
+  fl_value_append_take(values, fl_value_new_int(self->width));
+  fl_value_append_take(values, fl_value_new_int(self->height));
+  return values;
+}
+
+static XhMcImageCompressResultMsg* xh_mc_image_compress_result_msg_new_from_list(FlValue* values) {
+  FlValue* value0 = fl_value_get_list_value(values, 0);
+  const uint8_t* bytes = nullptr;
+  size_t bytes_length = 0;
+  if (fl_value_get_type(value0) != FL_VALUE_TYPE_NULL) {
+    bytes = fl_value_get_uint8_list(value0);
+    bytes_length = fl_value_get_length(value0);
+  }
+  FlValue* value1 = fl_value_get_list_value(values, 1);
+  const gchar* output_path = nullptr;
+  if (fl_value_get_type(value1) != FL_VALUE_TYPE_NULL) {
+    output_path = fl_value_get_string(value1);
+  }
+  FlValue* value2 = fl_value_get_list_value(values, 2);
+  int64_t size_bytes = fl_value_get_int(value2);
+  FlValue* value3 = fl_value_get_list_value(values, 3);
+  const gchar* format = fl_value_get_string(value3);
+  FlValue* value4 = fl_value_get_list_value(values, 4);
+  int64_t width = fl_value_get_int(value4);
+  FlValue* value5 = fl_value_get_list_value(values, 5);
+  int64_t height = fl_value_get_int(value5);
+  return xh_mc_image_compress_result_msg_new(bytes, bytes_length, output_path, size_bytes, format, width, height);
+}
+
+gboolean xh_mc_image_compress_result_msg_equals(XhMcImageCompressResultMsg* a, XhMcImageCompressResultMsg* b) {
+  if (a == b) {
+    return TRUE;
+  }
+  if (a == nullptr || b == nullptr) {
+    return FALSE;
+  }
+  if (a->bytes != b->bytes) {
+    if (a->bytes == nullptr || b->bytes == nullptr) {
+      return FALSE;
+    }
+    if (a->bytes_length != b->bytes_length) {
+      return FALSE;
+    }
+    if (memcmp(a->bytes, b->bytes, a->bytes_length * sizeof(uint8_t)) != 0) {
+      return FALSE;
+    }
+  }
+  if (g_strcmp0(a->output_path, b->output_path) != 0) {
+    return FALSE;
+  }
+  if (a->size_bytes != b->size_bytes) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->format, b->format) != 0) {
+    return FALSE;
+  }
+  if (a->width != b->width) {
+    return FALSE;
+  }
+  if (a->height != b->height) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+guint xh_mc_image_compress_result_msg_hash(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), 0);
+  guint result = 0;
+  {
+    size_t len = self->bytes_length;
+    const uint8_t* data = self->bytes;
+    if (data != nullptr) {
+      for (size_t i = 0; i < len; i++) {
+        result = result * 31 + static_cast<guint>(data[i]);
+      }
+    }
+  }
+  result = result * 31 + (self->output_path != nullptr ? g_str_hash(self->output_path) : 0);
+  result = result * 31 + static_cast<guint>(self->size_bytes);
+  result = result * 31 + (self->format != nullptr ? g_str_hash(self->format) : 0);
+  result = result * 31 + static_cast<guint>(self->width);
+  result = result * 31 + static_cast<guint>(self->height);
+  return result;
+}
+
+gchar* xh_mc_image_compress_result_msg_to_string(XhMcImageCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_IMAGE_COMPRESS_RESULT_MSG(self), NULL);
+  GString* str = g_string_new("ImageCompressResultMsg(");
+  g_string_append(str, "bytes: ");
+  if (self->bytes != nullptr) {
+    g_string_append(str, "[");
+    size_t len = self->bytes_length;
+    const uint8_t* data = self->bytes;
+    for (size_t i = 0; i < len; i++) {
+      if (i > 0) {
+        g_string_append(str, ", ");
+      }
+      g_string_append_printf(str, "%d", static_cast<int>(data[i]));
+    }
+    g_string_append(str, "]");
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", output_path: ");
+  if (self->output_path != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->output_path);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", size_bytes: ");
+  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->size_bytes);
+  g_string_append(str, ", format: ");
+  if (self->format != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->format);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", width: ");
+  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->width);
+  g_string_append(str, ", height: ");
+  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->height);
+  g_string_append(str, ")");
+  return g_string_free(str, FALSE);
+}
+
+struct _XhMcVideoCompressResultMsg {
+  GObject parent_instance;
+
+  gchar* output_path;
+  int64_t size_bytes;
+  gchar* encoder_name;
+  gchar* codec;
+  int64_t width;
+  int64_t height;
+};
+
+G_DEFINE_TYPE(XhMcVideoCompressResultMsg, xh_mc_video_compress_result_msg, G_TYPE_OBJECT)
+
+static void xh_mc_video_compress_result_msg_dispose(GObject* object) {
+  XhMcVideoCompressResultMsg* self = XH_MC_VIDEO_COMPRESS_RESULT_MSG(object);
+  g_clear_pointer(&self->output_path, g_free);
+  g_clear_pointer(&self->encoder_name, g_free);
+  g_clear_pointer(&self->codec, g_free);
+  G_OBJECT_CLASS(xh_mc_video_compress_result_msg_parent_class)->dispose(object);
+}
+
+static void xh_mc_video_compress_result_msg_init(XhMcVideoCompressResultMsg* self) {
+}
+
+static void xh_mc_video_compress_result_msg_class_init(XhMcVideoCompressResultMsgClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_video_compress_result_msg_dispose;
+}
+
+XhMcVideoCompressResultMsg* xh_mc_video_compress_result_msg_new(const gchar* output_path, int64_t size_bytes, const gchar* encoder_name, const gchar* codec, int64_t width, int64_t height) {
+  XhMcVideoCompressResultMsg* self = XH_MC_VIDEO_COMPRESS_RESULT_MSG(g_object_new(xh_mc_video_compress_result_msg_get_type(), nullptr));
+  self->output_path = g_strdup(output_path);
+  self->size_bytes = size_bytes;
+  self->encoder_name = g_strdup(encoder_name);
+  self->codec = g_strdup(codec);
+  self->width = width;
+  self->height = height;
+  return self;
+}
+
+const gchar* xh_mc_video_compress_result_msg_get_output_path(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), nullptr);
+  return self->output_path;
+}
+
+int64_t xh_mc_video_compress_result_msg_get_size_bytes(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), 0);
+  return self->size_bytes;
+}
+
+const gchar* xh_mc_video_compress_result_msg_get_encoder_name(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), nullptr);
+  return self->encoder_name;
+}
+
+const gchar* xh_mc_video_compress_result_msg_get_codec(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), nullptr);
+  return self->codec;
+}
+
+int64_t xh_mc_video_compress_result_msg_get_width(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), 0);
+  return self->width;
+}
+
+int64_t xh_mc_video_compress_result_msg_get_height(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), 0);
+  return self->height;
+}
+
+static FlValue* xh_mc_video_compress_result_msg_to_list(XhMcVideoCompressResultMsg* self) {
+  FlValue* values = fl_value_new_list();
+  fl_value_append_take(values, fl_value_new_string(self->output_path));
+  fl_value_append_take(values, fl_value_new_int(self->size_bytes));
+  fl_value_append_take(values, fl_value_new_string(self->encoder_name));
+  fl_value_append_take(values, fl_value_new_string(self->codec));
+  fl_value_append_take(values, fl_value_new_int(self->width));
+  fl_value_append_take(values, fl_value_new_int(self->height));
+  return values;
+}
+
+static XhMcVideoCompressResultMsg* xh_mc_video_compress_result_msg_new_from_list(FlValue* values) {
+  FlValue* value0 = fl_value_get_list_value(values, 0);
+  const gchar* output_path = fl_value_get_string(value0);
+  FlValue* value1 = fl_value_get_list_value(values, 1);
+  int64_t size_bytes = fl_value_get_int(value1);
+  FlValue* value2 = fl_value_get_list_value(values, 2);
+  const gchar* encoder_name = fl_value_get_string(value2);
+  FlValue* value3 = fl_value_get_list_value(values, 3);
+  const gchar* codec = fl_value_get_string(value3);
+  FlValue* value4 = fl_value_get_list_value(values, 4);
+  int64_t width = fl_value_get_int(value4);
+  FlValue* value5 = fl_value_get_list_value(values, 5);
+  int64_t height = fl_value_get_int(value5);
+  return xh_mc_video_compress_result_msg_new(output_path, size_bytes, encoder_name, codec, width, height);
+}
+
+gboolean xh_mc_video_compress_result_msg_equals(XhMcVideoCompressResultMsg* a, XhMcVideoCompressResultMsg* b) {
+  if (a == b) {
+    return TRUE;
+  }
+  if (a == nullptr || b == nullptr) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->output_path, b->output_path) != 0) {
+    return FALSE;
+  }
+  if (a->size_bytes != b->size_bytes) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->encoder_name, b->encoder_name) != 0) {
+    return FALSE;
+  }
+  if (g_strcmp0(a->codec, b->codec) != 0) {
+    return FALSE;
+  }
+  if (a->width != b->width) {
+    return FALSE;
+  }
+  if (a->height != b->height) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+guint xh_mc_video_compress_result_msg_hash(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), 0);
+  guint result = 0;
+  result = result * 31 + (self->output_path != nullptr ? g_str_hash(self->output_path) : 0);
+  result = result * 31 + static_cast<guint>(self->size_bytes);
+  result = result * 31 + (self->encoder_name != nullptr ? g_str_hash(self->encoder_name) : 0);
+  result = result * 31 + (self->codec != nullptr ? g_str_hash(self->codec) : 0);
+  result = result * 31 + static_cast<guint>(self->width);
+  result = result * 31 + static_cast<guint>(self->height);
+  return result;
+}
+
+gchar* xh_mc_video_compress_result_msg_to_string(XhMcVideoCompressResultMsg* self) {
+  g_return_val_if_fail(XH_MC_IS_VIDEO_COMPRESS_RESULT_MSG(self), NULL);
+  GString* str = g_string_new("VideoCompressResultMsg(");
+  g_string_append(str, "output_path: ");
+  if (self->output_path != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->output_path);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", size_bytes: ");
+  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->size_bytes);
+  g_string_append(str, ", encoder_name: ");
+  if (self->encoder_name != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->encoder_name);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", codec: ");
+  if (self->codec != nullptr) {
+    g_string_append_printf(str, "\"%s\"", self->codec);
+  }
+  else {
+    g_string_append(str, "null");
+  }
+  g_string_append(str, ", width: ");
+  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->width);
+  g_string_append(str, ", height: ");
+  g_string_append_printf(str, "%" G_GINT64_FORMAT, self->height);
+  g_string_append(str, ")");
+  return g_string_free(str, FALSE);
+}
+
 struct _XhMcMessageCodec {
   FlStandardMessageCodec parent_instance;
 
@@ -1158,6 +1544,8 @@ const int xh_mc_image_options_msg_type_id = 131;
 const int xh_mc_video_options_msg_type_id = 132;
 const int xh_mc_image_capabilities_msg_type_id = 133;
 const int xh_mc_video_capabilities_msg_type_id = 134;
+const int xh_mc_image_compress_result_msg_type_id = 135;
+const int xh_mc_video_compress_result_msg_type_id = 136;
 
 static gboolean xh_mc_message_codec_write_xh_mc_source_msg(FlStandardMessageCodec* codec, GByteArray* buffer, XhMcSourceMsg* value, GError** error) {
   uint8_t type = xh_mc_source_msg_type_id;
@@ -1201,6 +1589,20 @@ static gboolean xh_mc_message_codec_write_xh_mc_video_capabilities_msg(FlStandar
   return fl_standard_message_codec_write_value(codec, buffer, values, error);
 }
 
+static gboolean xh_mc_message_codec_write_xh_mc_image_compress_result_msg(FlStandardMessageCodec* codec, GByteArray* buffer, XhMcImageCompressResultMsg* value, GError** error) {
+  uint8_t type = xh_mc_image_compress_result_msg_type_id;
+  g_byte_array_append(buffer, &type, sizeof(uint8_t));
+  g_autoptr(FlValue) values = xh_mc_image_compress_result_msg_to_list(value);
+  return fl_standard_message_codec_write_value(codec, buffer, values, error);
+}
+
+static gboolean xh_mc_message_codec_write_xh_mc_video_compress_result_msg(FlStandardMessageCodec* codec, GByteArray* buffer, XhMcVideoCompressResultMsg* value, GError** error) {
+  uint8_t type = xh_mc_video_compress_result_msg_type_id;
+  g_byte_array_append(buffer, &type, sizeof(uint8_t));
+  g_autoptr(FlValue) values = xh_mc_video_compress_result_msg_to_list(value);
+  return fl_standard_message_codec_write_value(codec, buffer, values, error);
+}
+
 static gboolean xh_mc_message_codec_write_value(FlStandardMessageCodec* codec, GByteArray* buffer, FlValue* value, GError** error) {
   if (fl_value_get_type(value) == FL_VALUE_TYPE_CUSTOM) {
     switch (fl_value_get_custom_type(value)) {
@@ -1216,6 +1618,10 @@ static gboolean xh_mc_message_codec_write_value(FlStandardMessageCodec* codec, G
         return xh_mc_message_codec_write_xh_mc_image_capabilities_msg(codec, buffer, XH_MC_IMAGE_CAPABILITIES_MSG(fl_value_get_custom_value_object(value)), error);
       case xh_mc_video_capabilities_msg_type_id:
         return xh_mc_message_codec_write_xh_mc_video_capabilities_msg(codec, buffer, XH_MC_VIDEO_CAPABILITIES_MSG(fl_value_get_custom_value_object(value)), error);
+      case xh_mc_image_compress_result_msg_type_id:
+        return xh_mc_message_codec_write_xh_mc_image_compress_result_msg(codec, buffer, XH_MC_IMAGE_COMPRESS_RESULT_MSG(fl_value_get_custom_value_object(value)), error);
+      case xh_mc_video_compress_result_msg_type_id:
+        return xh_mc_message_codec_write_xh_mc_video_compress_result_msg(codec, buffer, XH_MC_VIDEO_COMPRESS_RESULT_MSG(fl_value_get_custom_value_object(value)), error);
     }
   }
 
@@ -1312,6 +1718,36 @@ static FlValue* xh_mc_message_codec_read_xh_mc_video_capabilities_msg(FlStandard
   return fl_value_new_custom_object(xh_mc_video_capabilities_msg_type_id, G_OBJECT(value));
 }
 
+static FlValue* xh_mc_message_codec_read_xh_mc_image_compress_result_msg(FlStandardMessageCodec* codec, GBytes* buffer, size_t* offset, GError** error) {
+  g_autoptr(FlValue) values = fl_standard_message_codec_read_value(codec, buffer, offset, error);
+  if (values == nullptr) {
+    return nullptr;
+  }
+
+  g_autoptr(XhMcImageCompressResultMsg) value = xh_mc_image_compress_result_msg_new_from_list(values);
+  if (value == nullptr) {
+    g_set_error(error, FL_MESSAGE_CODEC_ERROR, FL_MESSAGE_CODEC_ERROR_FAILED, "Invalid data received for MessageData");
+    return nullptr;
+  }
+
+  return fl_value_new_custom_object(xh_mc_image_compress_result_msg_type_id, G_OBJECT(value));
+}
+
+static FlValue* xh_mc_message_codec_read_xh_mc_video_compress_result_msg(FlStandardMessageCodec* codec, GBytes* buffer, size_t* offset, GError** error) {
+  g_autoptr(FlValue) values = fl_standard_message_codec_read_value(codec, buffer, offset, error);
+  if (values == nullptr) {
+    return nullptr;
+  }
+
+  g_autoptr(XhMcVideoCompressResultMsg) value = xh_mc_video_compress_result_msg_new_from_list(values);
+  if (value == nullptr) {
+    g_set_error(error, FL_MESSAGE_CODEC_ERROR, FL_MESSAGE_CODEC_ERROR_FAILED, "Invalid data received for MessageData");
+    return nullptr;
+  }
+
+  return fl_value_new_custom_object(xh_mc_video_compress_result_msg_type_id, G_OBJECT(value));
+}
+
 static FlValue* xh_mc_message_codec_read_value_of_type(FlStandardMessageCodec* codec, GBytes* buffer, size_t* offset, int type, GError** error) {
   switch (type) {
     case xh_mc_source_msg_type_id:
@@ -1326,6 +1762,10 @@ static FlValue* xh_mc_message_codec_read_value_of_type(FlStandardMessageCodec* c
       return xh_mc_message_codec_read_xh_mc_image_capabilities_msg(codec, buffer, offset, error);
     case xh_mc_video_capabilities_msg_type_id:
       return xh_mc_message_codec_read_xh_mc_video_capabilities_msg(codec, buffer, offset, error);
+    case xh_mc_image_compress_result_msg_type_id:
+      return xh_mc_message_codec_read_xh_mc_image_compress_result_msg(codec, buffer, offset, error);
+    case xh_mc_video_compress_result_msg_type_id:
+      return xh_mc_message_codec_read_xh_mc_video_compress_result_msg(codec, buffer, offset, error);
     default:
       return FL_STANDARD_MESSAGE_CODEC_CLASS(xh_mc_message_codec_parent_class)->read_value_of_type(codec, buffer, offset, type, error);
   }
@@ -1411,6 +1851,8 @@ XhMcMediaCompressionHostApiCreateJobResponse* xh_mc_media_compression_host_api_c
   return self;
 }
 
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse, xh_mc_media_compression_host_api_query_image_capabilities_response, XH_MC, MEDIA_COMPRESSION_HOST_API_QUERY_IMAGE_CAPABILITIES_RESPONSE, GObject)
+
 struct _XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse {
   GObject parent_instance;
 
@@ -1432,14 +1874,14 @@ static void xh_mc_media_compression_host_api_query_image_capabilities_response_c
   G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_host_api_query_image_capabilities_response_dispose;
 }
 
-XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* xh_mc_media_compression_host_api_query_image_capabilities_response_new(XhMcImageCapabilitiesMsg* return_value) {
+static XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* xh_mc_media_compression_host_api_query_image_capabilities_response_new(XhMcImageCapabilitiesMsg* return_value) {
   XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* self = XH_MC_MEDIA_COMPRESSION_HOST_API_QUERY_IMAGE_CAPABILITIES_RESPONSE(g_object_new(xh_mc_media_compression_host_api_query_image_capabilities_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_custom_object(xh_mc_image_capabilities_msg_type_id, G_OBJECT(return_value)));
   return self;
 }
 
-XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* xh_mc_media_compression_host_api_query_image_capabilities_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+static XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* xh_mc_media_compression_host_api_query_image_capabilities_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
   XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse* self = XH_MC_MEDIA_COMPRESSION_HOST_API_QUERY_IMAGE_CAPABILITIES_RESPONSE(g_object_new(xh_mc_media_compression_host_api_query_image_capabilities_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_string(code));
@@ -1487,6 +1929,8 @@ static XhMcMediaCompressionHostApiStartImageCompressResponse* xh_mc_media_compre
   return self;
 }
 
+G_DECLARE_FINAL_TYPE(XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse, xh_mc_media_compression_host_api_query_video_capabilities_response, XH_MC, MEDIA_COMPRESSION_HOST_API_QUERY_VIDEO_CAPABILITIES_RESPONSE, GObject)
+
 struct _XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse {
   GObject parent_instance;
 
@@ -1508,14 +1952,14 @@ static void xh_mc_media_compression_host_api_query_video_capabilities_response_c
   G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_host_api_query_video_capabilities_response_dispose;
 }
 
-XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* xh_mc_media_compression_host_api_query_video_capabilities_response_new(XhMcVideoCapabilitiesMsg* return_value) {
+static XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* xh_mc_media_compression_host_api_query_video_capabilities_response_new(XhMcVideoCapabilitiesMsg* return_value) {
   XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* self = XH_MC_MEDIA_COMPRESSION_HOST_API_QUERY_VIDEO_CAPABILITIES_RESPONSE(g_object_new(xh_mc_media_compression_host_api_query_video_capabilities_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_custom_object(xh_mc_video_capabilities_msg_type_id, G_OBJECT(return_value)));
   return self;
 }
 
-XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* xh_mc_media_compression_host_api_query_video_capabilities_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+static XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* xh_mc_media_compression_host_api_query_video_capabilities_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
   XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse* self = XH_MC_MEDIA_COMPRESSION_HOST_API_QUERY_VIDEO_CAPABILITIES_RESPONSE(g_object_new(xh_mc_media_compression_host_api_query_video_capabilities_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_string(code));
@@ -1697,16 +2141,8 @@ static void xh_mc_media_compression_host_api_query_image_capabilities_cb(FlBasic
     return;
   }
 
-  g_autoptr(XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse) response = self->vtable->query_image_capabilities(self->user_data);
-  if (response == nullptr) {
-    g_warning("No response returned to %s.%s", "MediaCompressionHostApi", "queryImageCapabilities");
-    return;
-  }
-
-  g_autoptr(GError) error = NULL;
-  if (!fl_basic_message_channel_respond(channel, response_handle, response->value, &error)) {
-    g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "queryImageCapabilities", error->message);
-  }
+  g_autoptr(XhMcMediaCompressionHostApiResponseHandle) handle = xh_mc_media_compression_host_api_response_handle_new(channel, response_handle);
+  self->vtable->query_image_capabilities(handle, self->user_data);
 }
 
 static void xh_mc_media_compression_host_api_start_image_compress_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
@@ -1735,16 +2171,8 @@ static void xh_mc_media_compression_host_api_query_video_capabilities_cb(FlBasic
     return;
   }
 
-  g_autoptr(XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse) response = self->vtable->query_video_capabilities(self->user_data);
-  if (response == nullptr) {
-    g_warning("No response returned to %s.%s", "MediaCompressionHostApi", "queryVideoCapabilities");
-    return;
-  }
-
-  g_autoptr(GError) error = NULL;
-  if (!fl_basic_message_channel_respond(channel, response_handle, response->value, &error)) {
-    g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "queryVideoCapabilities", error->message);
-  }
+  g_autoptr(XhMcMediaCompressionHostApiResponseHandle) handle = xh_mc_media_compression_host_api_response_handle_new(channel, response_handle);
+  self->vtable->query_video_capabilities(handle, self->user_data);
 }
 
 static void xh_mc_media_compression_host_api_start_video_compress_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
@@ -1863,6 +2291,22 @@ void xh_mc_media_compression_host_api_clear_method_handlers(FlBinaryMessenger* m
   fl_basic_message_channel_set_message_handler(dispose_job_channel, nullptr, nullptr, nullptr);
 }
 
+void xh_mc_media_compression_host_api_respond_query_image_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, XhMcImageCapabilitiesMsg* return_value) {
+  g_autoptr(XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse) response = xh_mc_media_compression_host_api_query_image_capabilities_response_new(return_value);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "queryImageCapabilities", error->message);
+  }
+}
+
+void xh_mc_media_compression_host_api_respond_error_query_image_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse) response = xh_mc_media_compression_host_api_query_image_capabilities_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "queryImageCapabilities", error->message);
+  }
+}
+
 void xh_mc_media_compression_host_api_respond_start_image_compress(XhMcMediaCompressionHostApiResponseHandle* response_handle) {
   g_autoptr(XhMcMediaCompressionHostApiStartImageCompressResponse) response = xh_mc_media_compression_host_api_start_image_compress_response_new();
   g_autoptr(GError) error = nullptr;
@@ -1876,6 +2320,22 @@ void xh_mc_media_compression_host_api_respond_error_start_image_compress(XhMcMed
   g_autoptr(GError) error = nullptr;
   if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
     g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "startImageCompress", error->message);
+  }
+}
+
+void xh_mc_media_compression_host_api_respond_query_video_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, XhMcVideoCapabilitiesMsg* return_value) {
+  g_autoptr(XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse) response = xh_mc_media_compression_host_api_query_video_capabilities_response_new(return_value);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "queryVideoCapabilities", error->message);
+  }
+}
+
+void xh_mc_media_compression_host_api_respond_error_query_video_capabilities(XhMcMediaCompressionHostApiResponseHandle* response_handle, const gchar* code, const gchar* message, FlValue* details) {
+  g_autoptr(XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse) response = xh_mc_media_compression_host_api_query_video_capabilities_response_new_error(code, message, details);
+  g_autoptr(GError) error = nullptr;
+  if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "queryVideoCapabilities", error->message);
   }
 }
 
@@ -1893,4 +2353,351 @@ void xh_mc_media_compression_host_api_respond_error_start_video_compress(XhMcMed
   if (!fl_basic_message_channel_respond(response_handle->channel, response_handle->response_handle, response->value, &error)) {
     g_warning("Failed to send response to %s.%s: %s", "MediaCompressionHostApi", "startVideoCompress", error->message);
   }
+}
+
+struct _XhMcMediaCompressionFlutterApi {
+  GObject parent_instance;
+
+  FlBinaryMessenger* messenger;
+  gchar *suffix;
+};
+
+G_DEFINE_TYPE(XhMcMediaCompressionFlutterApi, xh_mc_media_compression_flutter_api, G_TYPE_OBJECT)
+
+static void xh_mc_media_compression_flutter_api_dispose(GObject* object) {
+  XhMcMediaCompressionFlutterApi* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API(object);
+  g_clear_object(&self->messenger);
+  g_clear_pointer(&self->suffix, g_free);
+  G_OBJECT_CLASS(xh_mc_media_compression_flutter_api_parent_class)->dispose(object);
+}
+
+static void xh_mc_media_compression_flutter_api_init(XhMcMediaCompressionFlutterApi* self) {
+}
+
+static void xh_mc_media_compression_flutter_api_class_init(XhMcMediaCompressionFlutterApiClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_flutter_api_dispose;
+}
+
+XhMcMediaCompressionFlutterApi* xh_mc_media_compression_flutter_api_new(FlBinaryMessenger* messenger, const gchar* suffix) {
+  XhMcMediaCompressionFlutterApi* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API(g_object_new(xh_mc_media_compression_flutter_api_get_type(), nullptr));
+  self->messenger = FL_BINARY_MESSENGER(g_object_ref(messenger));
+  self->suffix = suffix != nullptr ? g_strdup_printf(".%s", suffix) : g_strdup("");
+  return self;
+}
+
+struct _XhMcMediaCompressionFlutterApiOnProgressResponse {
+  GObject parent_instance;
+
+  FlValue* error;
+};
+
+G_DEFINE_TYPE(XhMcMediaCompressionFlutterApiOnProgressResponse, xh_mc_media_compression_flutter_api_on_progress_response, G_TYPE_OBJECT)
+
+static void xh_mc_media_compression_flutter_api_on_progress_response_dispose(GObject* object) {
+  XhMcMediaCompressionFlutterApiOnProgressResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE(object);
+  g_clear_pointer(&self->error, fl_value_unref);
+  G_OBJECT_CLASS(xh_mc_media_compression_flutter_api_on_progress_response_parent_class)->dispose(object);
+}
+
+static void xh_mc_media_compression_flutter_api_on_progress_response_init(XhMcMediaCompressionFlutterApiOnProgressResponse* self) {
+}
+
+static void xh_mc_media_compression_flutter_api_on_progress_response_class_init(XhMcMediaCompressionFlutterApiOnProgressResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_flutter_api_on_progress_response_dispose;
+}
+
+static XhMcMediaCompressionFlutterApiOnProgressResponse* xh_mc_media_compression_flutter_api_on_progress_response_new(FlValue* response) {
+  XhMcMediaCompressionFlutterApiOnProgressResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE(g_object_new(xh_mc_media_compression_flutter_api_on_progress_response_get_type(), nullptr));
+  if (fl_value_get_length(response) > 1) {
+    self->error = fl_value_ref(response);
+  }
+  return self;
+}
+
+gboolean xh_mc_media_compression_flutter_api_on_progress_response_is_error(XhMcMediaCompressionFlutterApiOnProgressResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE(self), FALSE);
+  return self->error != nullptr;
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_progress_response_get_error_code(XhMcMediaCompressionFlutterApiOnProgressResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_progress_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 0));
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_progress_response_get_error_message(XhMcMediaCompressionFlutterApiOnProgressResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_progress_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 1));
+}
+
+FlValue* xh_mc_media_compression_flutter_api_on_progress_response_get_error_details(XhMcMediaCompressionFlutterApiOnProgressResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_PROGRESS_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_progress_response_is_error(self));
+  return fl_value_get_list_value(self->error, 2);
+}
+
+static void xh_mc_media_compression_flutter_api_on_progress_cb(GObject* object, GAsyncResult* result, gpointer user_data) {
+  GTask* task = G_TASK(user_data);
+  g_task_return_pointer(task, result, g_object_unref);
+}
+
+void xh_mc_media_compression_flutter_api_on_progress(XhMcMediaCompressionFlutterApi* self, double value, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+  g_autoptr(FlValue) args = fl_value_new_list();
+  fl_value_append_take(args, fl_value_new_float(value));
+  g_autofree gchar* channel_name = g_strdup_printf("dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onProgress%s", self->suffix);
+  g_autoptr(XhMcMessageCodec) codec = xh_mc_message_codec_new();
+  FlBasicMessageChannel* channel = fl_basic_message_channel_new(self->messenger, channel_name, FL_MESSAGE_CODEC(codec));
+  GTask* task = g_task_new(self, cancellable, callback, user_data);
+  g_task_set_task_data(task, channel, g_object_unref);
+  fl_basic_message_channel_send(channel, args, cancellable, xh_mc_media_compression_flutter_api_on_progress_cb, task);
+}
+
+XhMcMediaCompressionFlutterApiOnProgressResponse* xh_mc_media_compression_flutter_api_on_progress_finish(XhMcMediaCompressionFlutterApi* self, GAsyncResult* result, GError** error) {
+  g_autoptr(GTask) task = G_TASK(result);
+  GAsyncResult* r = G_ASYNC_RESULT(g_task_propagate_pointer(task, nullptr));
+  FlBasicMessageChannel* channel = FL_BASIC_MESSAGE_CHANNEL(g_task_get_task_data(task));
+  g_autoptr(FlValue) response = fl_basic_message_channel_send_finish(channel, r, error);
+  if (response == nullptr) { 
+    return nullptr;
+  }
+  return xh_mc_media_compression_flutter_api_on_progress_response_new(response);
+}
+
+struct _XhMcMediaCompressionFlutterApiOnImageCompletedResponse {
+  GObject parent_instance;
+
+  FlValue* error;
+};
+
+G_DEFINE_TYPE(XhMcMediaCompressionFlutterApiOnImageCompletedResponse, xh_mc_media_compression_flutter_api_on_image_completed_response, G_TYPE_OBJECT)
+
+static void xh_mc_media_compression_flutter_api_on_image_completed_response_dispose(GObject* object) {
+  XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE(object);
+  g_clear_pointer(&self->error, fl_value_unref);
+  G_OBJECT_CLASS(xh_mc_media_compression_flutter_api_on_image_completed_response_parent_class)->dispose(object);
+}
+
+static void xh_mc_media_compression_flutter_api_on_image_completed_response_init(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self) {
+}
+
+static void xh_mc_media_compression_flutter_api_on_image_completed_response_class_init(XhMcMediaCompressionFlutterApiOnImageCompletedResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_flutter_api_on_image_completed_response_dispose;
+}
+
+static XhMcMediaCompressionFlutterApiOnImageCompletedResponse* xh_mc_media_compression_flutter_api_on_image_completed_response_new(FlValue* response) {
+  XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE(g_object_new(xh_mc_media_compression_flutter_api_on_image_completed_response_get_type(), nullptr));
+  if (fl_value_get_length(response) > 1) {
+    self->error = fl_value_ref(response);
+  }
+  return self;
+}
+
+gboolean xh_mc_media_compression_flutter_api_on_image_completed_response_is_error(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE(self), FALSE);
+  return self->error != nullptr;
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_code(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_image_completed_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 0));
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_message(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_image_completed_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 1));
+}
+
+FlValue* xh_mc_media_compression_flutter_api_on_image_completed_response_get_error_details(XhMcMediaCompressionFlutterApiOnImageCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_IMAGE_COMPLETED_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_image_completed_response_is_error(self));
+  return fl_value_get_list_value(self->error, 2);
+}
+
+static void xh_mc_media_compression_flutter_api_on_image_completed_cb(GObject* object, GAsyncResult* result, gpointer user_data) {
+  GTask* task = G_TASK(user_data);
+  g_task_return_pointer(task, result, g_object_unref);
+}
+
+void xh_mc_media_compression_flutter_api_on_image_completed(XhMcMediaCompressionFlutterApi* self, XhMcImageCompressResultMsg* result, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+  g_autoptr(FlValue) args = fl_value_new_list();
+  fl_value_append_take(args, fl_value_new_custom_object(xh_mc_image_compress_result_msg_type_id, G_OBJECT(result)));
+  g_autofree gchar* channel_name = g_strdup_printf("dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onImageCompleted%s", self->suffix);
+  g_autoptr(XhMcMessageCodec) codec = xh_mc_message_codec_new();
+  FlBasicMessageChannel* channel = fl_basic_message_channel_new(self->messenger, channel_name, FL_MESSAGE_CODEC(codec));
+  GTask* task = g_task_new(self, cancellable, callback, user_data);
+  g_task_set_task_data(task, channel, g_object_unref);
+  fl_basic_message_channel_send(channel, args, cancellable, xh_mc_media_compression_flutter_api_on_image_completed_cb, task);
+}
+
+XhMcMediaCompressionFlutterApiOnImageCompletedResponse* xh_mc_media_compression_flutter_api_on_image_completed_finish(XhMcMediaCompressionFlutterApi* self, GAsyncResult* result, GError** error) {
+  g_autoptr(GTask) task = G_TASK(result);
+  GAsyncResult* r = G_ASYNC_RESULT(g_task_propagate_pointer(task, nullptr));
+  FlBasicMessageChannel* channel = FL_BASIC_MESSAGE_CHANNEL(g_task_get_task_data(task));
+  g_autoptr(FlValue) response = fl_basic_message_channel_send_finish(channel, r, error);
+  if (response == nullptr) { 
+    return nullptr;
+  }
+  return xh_mc_media_compression_flutter_api_on_image_completed_response_new(response);
+}
+
+struct _XhMcMediaCompressionFlutterApiOnVideoCompletedResponse {
+  GObject parent_instance;
+
+  FlValue* error;
+};
+
+G_DEFINE_TYPE(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse, xh_mc_media_compression_flutter_api_on_video_completed_response, G_TYPE_OBJECT)
+
+static void xh_mc_media_compression_flutter_api_on_video_completed_response_dispose(GObject* object) {
+  XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE(object);
+  g_clear_pointer(&self->error, fl_value_unref);
+  G_OBJECT_CLASS(xh_mc_media_compression_flutter_api_on_video_completed_response_parent_class)->dispose(object);
+}
+
+static void xh_mc_media_compression_flutter_api_on_video_completed_response_init(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self) {
+}
+
+static void xh_mc_media_compression_flutter_api_on_video_completed_response_class_init(XhMcMediaCompressionFlutterApiOnVideoCompletedResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_flutter_api_on_video_completed_response_dispose;
+}
+
+static XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* xh_mc_media_compression_flutter_api_on_video_completed_response_new(FlValue* response) {
+  XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE(g_object_new(xh_mc_media_compression_flutter_api_on_video_completed_response_get_type(), nullptr));
+  if (fl_value_get_length(response) > 1) {
+    self->error = fl_value_ref(response);
+  }
+  return self;
+}
+
+gboolean xh_mc_media_compression_flutter_api_on_video_completed_response_is_error(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE(self), FALSE);
+  return self->error != nullptr;
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_code(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_video_completed_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 0));
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_message(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_video_completed_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 1));
+}
+
+FlValue* xh_mc_media_compression_flutter_api_on_video_completed_response_get_error_details(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_VIDEO_COMPLETED_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_video_completed_response_is_error(self));
+  return fl_value_get_list_value(self->error, 2);
+}
+
+static void xh_mc_media_compression_flutter_api_on_video_completed_cb(GObject* object, GAsyncResult* result, gpointer user_data) {
+  GTask* task = G_TASK(user_data);
+  g_task_return_pointer(task, result, g_object_unref);
+}
+
+void xh_mc_media_compression_flutter_api_on_video_completed(XhMcMediaCompressionFlutterApi* self, XhMcVideoCompressResultMsg* result, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+  g_autoptr(FlValue) args = fl_value_new_list();
+  fl_value_append_take(args, fl_value_new_custom_object(xh_mc_video_compress_result_msg_type_id, G_OBJECT(result)));
+  g_autofree gchar* channel_name = g_strdup_printf("dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onVideoCompleted%s", self->suffix);
+  g_autoptr(XhMcMessageCodec) codec = xh_mc_message_codec_new();
+  FlBasicMessageChannel* channel = fl_basic_message_channel_new(self->messenger, channel_name, FL_MESSAGE_CODEC(codec));
+  GTask* task = g_task_new(self, cancellable, callback, user_data);
+  g_task_set_task_data(task, channel, g_object_unref);
+  fl_basic_message_channel_send(channel, args, cancellable, xh_mc_media_compression_flutter_api_on_video_completed_cb, task);
+}
+
+XhMcMediaCompressionFlutterApiOnVideoCompletedResponse* xh_mc_media_compression_flutter_api_on_video_completed_finish(XhMcMediaCompressionFlutterApi* self, GAsyncResult* result, GError** error) {
+  g_autoptr(GTask) task = G_TASK(result);
+  GAsyncResult* r = G_ASYNC_RESULT(g_task_propagate_pointer(task, nullptr));
+  FlBasicMessageChannel* channel = FL_BASIC_MESSAGE_CHANNEL(g_task_get_task_data(task));
+  g_autoptr(FlValue) response = fl_basic_message_channel_send_finish(channel, r, error);
+  if (response == nullptr) { 
+    return nullptr;
+  }
+  return xh_mc_media_compression_flutter_api_on_video_completed_response_new(response);
+}
+
+struct _XhMcMediaCompressionFlutterApiOnErrorResponse {
+  GObject parent_instance;
+
+  FlValue* error;
+};
+
+G_DEFINE_TYPE(XhMcMediaCompressionFlutterApiOnErrorResponse, xh_mc_media_compression_flutter_api_on_error_response, G_TYPE_OBJECT)
+
+static void xh_mc_media_compression_flutter_api_on_error_response_dispose(GObject* object) {
+  XhMcMediaCompressionFlutterApiOnErrorResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE(object);
+  g_clear_pointer(&self->error, fl_value_unref);
+  G_OBJECT_CLASS(xh_mc_media_compression_flutter_api_on_error_response_parent_class)->dispose(object);
+}
+
+static void xh_mc_media_compression_flutter_api_on_error_response_init(XhMcMediaCompressionFlutterApiOnErrorResponse* self) {
+}
+
+static void xh_mc_media_compression_flutter_api_on_error_response_class_init(XhMcMediaCompressionFlutterApiOnErrorResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = xh_mc_media_compression_flutter_api_on_error_response_dispose;
+}
+
+static XhMcMediaCompressionFlutterApiOnErrorResponse* xh_mc_media_compression_flutter_api_on_error_response_new(FlValue* response) {
+  XhMcMediaCompressionFlutterApiOnErrorResponse* self = XH_MC_MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE(g_object_new(xh_mc_media_compression_flutter_api_on_error_response_get_type(), nullptr));
+  if (fl_value_get_length(response) > 1) {
+    self->error = fl_value_ref(response);
+  }
+  return self;
+}
+
+gboolean xh_mc_media_compression_flutter_api_on_error_response_is_error(XhMcMediaCompressionFlutterApiOnErrorResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE(self), FALSE);
+  return self->error != nullptr;
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_error_response_get_error_code(XhMcMediaCompressionFlutterApiOnErrorResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_error_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 0));
+}
+
+const gchar* xh_mc_media_compression_flutter_api_on_error_response_get_error_message(XhMcMediaCompressionFlutterApiOnErrorResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_error_response_is_error(self));
+  return fl_value_get_string(fl_value_get_list_value(self->error, 1));
+}
+
+FlValue* xh_mc_media_compression_flutter_api_on_error_response_get_error_details(XhMcMediaCompressionFlutterApiOnErrorResponse* self) {
+  g_return_val_if_fail(XH_MC_IS_MEDIA_COMPRESSION_FLUTTER_API_ON_ERROR_RESPONSE(self), nullptr);
+  g_assert(xh_mc_media_compression_flutter_api_on_error_response_is_error(self));
+  return fl_value_get_list_value(self->error, 2);
+}
+
+static void xh_mc_media_compression_flutter_api_on_error_cb(GObject* object, GAsyncResult* result, gpointer user_data) {
+  GTask* task = G_TASK(user_data);
+  g_task_return_pointer(task, result, g_object_unref);
+}
+
+void xh_mc_media_compression_flutter_api_on_error(XhMcMediaCompressionFlutterApi* self, const gchar* code, const gchar* message, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+  g_autoptr(FlValue) args = fl_value_new_list();
+  fl_value_append_take(args, fl_value_new_string(code));
+  fl_value_append_take(args, fl_value_new_string(message));
+  g_autofree gchar* channel_name = g_strdup_printf("dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onError%s", self->suffix);
+  g_autoptr(XhMcMessageCodec) codec = xh_mc_message_codec_new();
+  FlBasicMessageChannel* channel = fl_basic_message_channel_new(self->messenger, channel_name, FL_MESSAGE_CODEC(codec));
+  GTask* task = g_task_new(self, cancellable, callback, user_data);
+  g_task_set_task_data(task, channel, g_object_unref);
+  fl_basic_message_channel_send(channel, args, cancellable, xh_mc_media_compression_flutter_api_on_error_cb, task);
+}
+
+XhMcMediaCompressionFlutterApiOnErrorResponse* xh_mc_media_compression_flutter_api_on_error_finish(XhMcMediaCompressionFlutterApi* self, GAsyncResult* result, GError** error) {
+  g_autoptr(GTask) task = G_TASK(result);
+  GAsyncResult* r = G_ASYNC_RESULT(g_task_propagate_pointer(task, nullptr));
+  FlBasicMessageChannel* channel = FL_BASIC_MESSAGE_CHANNEL(g_task_get_task_data(task));
+  g_autoptr(FlValue) response = fl_basic_message_channel_send_finish(channel, r, error);
+  if (response == nullptr) { 
+    return nullptr;
+  }
+  return xh_mc_media_compression_flutter_api_on_error_response_new(response);
 }

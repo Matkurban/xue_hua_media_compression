@@ -282,7 +282,7 @@ void compress_video_gst(
     const std::string& input_path, const std::string& output_path,
     XhMcVideoOptionsMsg* options, std::atomic<bool>* cancelled,
     const std::function<void(double)>& on_progress,
-    const std::function<void(FlValue*)>& on_completed,
+    const std::function<void(XhMcVideoCompressResultMsg*)>& on_completed,
     const std::function<void(const char*, const char*)>& on_error) {
   if (g_str_has_prefix(input_path.c_str(), "content://")) {
     on_error("unsupported", "content:// is Android-only");
@@ -395,18 +395,12 @@ void compress_video_gst(
       int64_t size = 0;
       if (g_stat(output_path.c_str(), &st) == 0) size = st.st_size;
       on_progress(1.0);
-      FlValue* map = fl_value_new_map();
-      fl_value_set_string_take(map, "outputPath",
-                               fl_value_new_string(output_path.c_str()));
-      fl_value_set_string_take(map, "sizeBytes", fl_value_new_int(size));
       gchar* name = g_strdup_printf("GStreamer:%s", spec->factory);
-      fl_value_set_string_take(map, "encoderName", fl_value_new_string(name));
+      XhMcVideoCompressResultMsg* result = xh_mc_video_compress_result_msg_new(
+          output_path.c_str(), size, name, hevc ? "h265" : "h264", out_w,
+          out_h);
       g_free(name);
-      fl_value_set_string_take(map, "codec",
-                               fl_value_new_string(hevc ? "h265" : "h264"));
-      fl_value_set_string_take(map, "width", fl_value_new_int(out_w));
-      fl_value_set_string_take(map, "height", fl_value_new_int(out_h));
-      on_completed(map);
+      on_completed(result);
       return;
     }
     // Runtime failure (e.g. HW encoder present but unusable): try the next.

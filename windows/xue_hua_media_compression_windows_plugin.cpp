@@ -1,7 +1,9 @@
 #include "xue_hua_media_compression_windows_plugin.h"
 
 #include <windows.h>
+#include <objbase.h>
 
+#include <algorithm>
 #include <exception>
 #include <thread>
 
@@ -9,6 +11,74 @@
 #include "video_transcoder.h"
 
 namespace xue_hua_media_compression {
+
+namespace {
+
+void IgnoreSuccess() {}
+void IgnoreError(const FlutterError&) {}
+
+}  // namespace
+
+void XueHuaMediaCompressionWindowsPlugin::SendProgress(
+    const std::shared_ptr<Job>& job, double value) {
+  if (job->closed || job->terminal || !job->flutter_api) {
+    return;
+  }
+  const double clamped = std::max(0.0, std::min(1.0, value));
+  const uint64_t now = GetTickCount64();
+  const bool first_positive =
+      clamped > 0.0 && clamped < 1.0 && !job->sent_positive;
+  if (!first_positive && clamped < 1.0 &&
+      (now - job->last_progress_sent_ms) < 100) {
+    job->last_progress = clamped;
+    return;
+  }
+  if (first_positive) {
+    job->sent_positive = true;
+  }
+  job->last_progress_sent_ms = now;
+  job->last_progress.reset();
+  job->flutter_api->OnProgress(clamped, IgnoreSuccess, IgnoreError);
+}
+
+void XueHuaMediaCompressionWindowsPlugin::SendImageCompleted(
+    const std::shared_ptr<Job>& job, const ImageCompressResultMsg& result) {
+  if (job->closed || job->terminal || !job->flutter_api) {
+    return;
+  }
+  job->terminal = true;
+  if (job->last_progress.has_value()) {
+    const double pending = *job->last_progress;
+    job->last_progress.reset();
+    job->flutter_api->OnProgress(pending, IgnoreSuccess, IgnoreError);
+  }
+  job->flutter_api->OnImageCompleted(result, IgnoreSuccess, IgnoreError);
+}
+
+void XueHuaMediaCompressionWindowsPlugin::SendVideoCompleted(
+    const std::shared_ptr<Job>& job, const VideoCompressResultMsg& result) {
+  if (job->closed || job->terminal || !job->flutter_api) {
+    return;
+  }
+  job->terminal = true;
+  if (job->last_progress.has_value()) {
+    const double pending = *job->last_progress;
+    job->last_progress.reset();
+    job->flutter_api->OnProgress(pending, IgnoreSuccess, IgnoreError);
+  }
+  job->flutter_api->OnVideoCompleted(result, IgnoreSuccess, IgnoreError);
+}
+
+void XueHuaMediaCompressionWindowsPlugin::SendError(
+    const std::shared_ptr<Job>& job, const std::string& code,
+    const std::string& message) {
+  if (job->closed || job->terminal || !job->flutter_api) {
+    return;
+  }
+  job->terminal = true;
+  job->last_progress.reset();
+  job->flutter_api->OnError(code, message, IgnoreSuccess, IgnoreError);
+}
 
 void XueHuaMediaCompressionWindowsPlugin::DeleteJobOutput(
     const std::shared_ptr<Job>& job) {
@@ -46,7 +116,7 @@ XueHuaMediaCompressionWindowsPlugin::~XueHuaMediaCompressionWindowsPlugin() {
   MediaCompressionHostApi::SetUp(registrar_->messenger(), nullptr);
   for (auto& entry : jobs_) {
     entry.second->cancelled->store(true);
-    entry.second->events->Close();
+    entry.second->closed = true;
   }
   jobs_.clear();
 }
@@ -54,19 +124,41 @@ XueHuaMediaCompressionWindowsPlugin::~XueHuaMediaCompressionWindowsPlugin() {
 ErrorOr<int64_t> XueHuaMediaCompressionWindowsPlugin::CreateJob() {
   const int64_t id = next_id_++;
   auto job = std::make_shared<Job>();
-  job->events =
-      std::make_shared<EventStream>(registrar_->messenger(), id);
+  job->flutter_api = std::make_unique<MediaCompressionFlutterApi>(
+      registrar_->messenger(), "job_" + std::to_string(id));
   jobs_[id] = job;
   return id;
 }
 
-ErrorOr<ImageCapabilitiesMsg>
-XueHuaMediaCompressionWindowsPlugin::QueryImageCapabilities() {
-  try {
-    return QueryImageCapabilitiesWic();
-  } catch (const FlutterError& error) {
-    return error;
-  }
+void XueHuaMediaCompressionWindowsPlugin::QueryImageCapabilities(
+    std::function<void(ErrorOr<ImageCapabilitiesMsg> reply)> result) {
+  std::thread([dispatcher = dispatcher_, result = std::move(result)]() mutable {
+    const HRESULT co = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const bool uninit = co == S_OK || co == S_FALSE;
+    try {
+      ImageCapabilitiesMsg caps = QueryImageCapabilitiesWic();
+      if (uninit) {
+        CoUninitialize();
+      }
+      dispatcher->Post([result = std::move(result),
+                        caps = std::move(caps)]() mutable { result(caps); });
+    } catch (const FlutterError& error) {
+      if (uninit) {
+        CoUninitialize();
+      }
+      dispatcher->Post([result = std::move(result), error]() mutable {
+        result(error);
+      });
+    } catch (const std::exception& error) {
+      const std::string message = error.what();
+      if (uninit) {
+        CoUninitialize();
+      }
+      dispatcher->Post([result = std::move(result), message]() mutable {
+        result(FlutterError("encode", message));
+      });
+    }
+  }).detach();
 }
 
 void XueHuaMediaCompressionWindowsPlugin::StartImageCompress(
@@ -100,56 +192,77 @@ void XueHuaMediaCompressionWindowsPlugin::StartImageCompress(
     if (job->cancelled->load()) {
       dispatcher->Post([job]() {
         DeleteJobOutput(job);
-        job->events->SendError("cancelled", "Cancelled");
+        SendError(job, "cancelled", "Cancelled");
       });
       finish();
       return;
     }
     try {
-      auto payload = CompressImageWic(source, destination, options);
+      dispatcher->Post([job]() {
+        if (!job->cancelled->load()) {
+          SendProgress(job, 0.25);
+        }
+      });
+      ImageCompressResultMsg payload =
+          CompressImageWic(source, destination, options);
       if (!job->output_path.empty()) {
         job->output_opened.store(true);
       }
-      dispatcher->Post([job, payload]() {
+      dispatcher->Post([job, payload = std::move(payload)]() {
         if (job->cancelled->load()) {
           DeleteJobOutput(job);
-          job->events->SendError("cancelled", "Cancelled");
+          SendError(job, "cancelled", "Cancelled");
           return;
         }
-        job->events->SendProgress(1.0);
-        job->events->SendCompleted(payload);
+        SendProgress(job, 1.0);
+        SendImageCompleted(job, payload);
       });
     } catch (const FlutterError& error) {
       dispatcher->Post([job, error]() {
         if (job->cancelled->load()) {
           DeleteJobOutput(job);
-          job->events->SendError("cancelled", "Cancelled");
+          SendError(job, "cancelled", "Cancelled");
           return;
         }
-        job->events->SendError(error.code(), error.message());
+        SendError(job, error.code(), error.message());
       });
     } catch (const std::exception& error) {
       const std::string message = error.what();
       dispatcher->Post([job, message]() {
         if (job->cancelled->load()) {
           DeleteJobOutput(job);
-          job->events->SendError("cancelled", "Cancelled");
+          SendError(job, "cancelled", "Cancelled");
           return;
         }
-        job->events->SendError("encode", message);
+        SendError(job, "encode", message);
       });
     }
     finish();
   }).detach();
 }
 
-ErrorOr<VideoCapabilitiesMsg>
-XueHuaMediaCompressionWindowsPlugin::QueryVideoCapabilities() {
-  try {
-    return QueryVideoCapabilitiesWin();
-  } catch (const std::exception& error) {
-    return FlutterError("encode", error.what());
-  }
+void XueHuaMediaCompressionWindowsPlugin::QueryVideoCapabilities(
+    std::function<void(ErrorOr<VideoCapabilitiesMsg> reply)> result) {
+  std::thread([dispatcher = dispatcher_, result = std::move(result)]() mutable {
+    const HRESULT co = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const bool uninit = co == S_OK || co == S_FALSE;
+    try {
+      VideoCapabilitiesMsg caps = QueryVideoCapabilitiesWin();
+      if (uninit) {
+        CoUninitialize();
+      }
+      dispatcher->Post([result = std::move(result),
+                        caps = std::move(caps)]() mutable { result(caps); });
+    } catch (const std::exception& error) {
+      const std::string message = error.what();
+      if (uninit) {
+        CoUninitialize();
+      }
+      dispatcher->Post([result = std::move(result), message]() mutable {
+        result(FlutterError("encode", message));
+      });
+    }
+  }).detach();
 }
 
 void XueHuaMediaCompressionWindowsPlugin::StartVideoCompress(
@@ -178,30 +291,30 @@ void XueHuaMediaCompressionWindowsPlugin::StartVideoCompress(
         [job, dispatcher](double value) {
           dispatcher->Post([job, value]() {
             if (!job->cancelled->load()) {
-              job->events->SendProgress(value);
+              SendProgress(job, value);
             }
           });
         },
-        [job, dispatcher](const flutter::EncodableMap& payload) {
+        [job, dispatcher](const VideoCompressResultMsg& payload) {
           dispatcher->Post([job, payload]() {
             if (job->cancelled->load()) {
               DeleteJobOutput(job);
-              job->events->SendError("cancelled", "Cancelled");
+              SendError(job, "cancelled", "Cancelled");
               return;
             }
-            job->events->SendProgress(1.0);
-            job->events->SendCompleted(payload);
+            SendProgress(job, 1.0);
+            SendVideoCompleted(job, payload);
           });
         },
         [job, dispatcher](const std::string& code, const std::string& message) {
           dispatcher->Post([job, code, message]() {
             if (job->cancelled->load() || code == "cancelled") {
               DeleteJobOutput(job);
-              job->events->SendError("cancelled", "Cancelled");
+              SendError(job, "cancelled", "Cancelled");
               return;
             }
             DeleteJobOutput(job);
-            job->events->SendError(code, message);
+            SendError(job, code, message);
           });
         });
     if (uninit) {
@@ -228,7 +341,7 @@ std::optional<FlutterError> XueHuaMediaCompressionWindowsPlugin::DisposeJob(
     return std::nullopt;
   }
   it->second->cancelled->store(true);
-  it->second->events->Close();
+  it->second->closed = true;
   jobs_.erase(it);
   return std::nullopt;
 }

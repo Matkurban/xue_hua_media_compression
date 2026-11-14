@@ -23,10 +23,10 @@ import kotlin.math.max
  */
 internal class VideoCompressor(
     private val context: Context,
-    private val events: JobEventStream,
+    private val relay: JobFlutterEventRelay,
     private val isCancelled: () -> Boolean,
 ) {
-    fun start(inputPath: String, outputPath: String, options: VideoOptionsMsg): Map<String, Any?> {
+    fun start(inputPath: String, outputPath: String, options: VideoOptionsMsg): VideoCompressResultMsg {
         val mime =
             when (options.codec) {
                 "h265" -> MediaFormat.MIMETYPE_VIDEO_HEVC
@@ -48,7 +48,7 @@ internal class VideoCompressor(
             throw FlutterError("io", "Cannot create ${parent.path}", null)
         }
         throwIfCancelled()
-        events.sendProgress(0.01)
+        relay.sendProgress(0.01)
         var success = false
         try {
             val result = transcode(resolvedInput, resolvedOutput, options, mime)
@@ -66,7 +66,7 @@ internal class VideoCompressor(
         outputPath: String,
         options: VideoOptionsMsg,
         mime: String,
-    ): Map<String, Any?> {
+    ): VideoCompressResultMsg {
         val extractor = openExtractor(inputPath)
         var decoder: MediaCodec? = null
         var encoder: OpenEncoder? = null
@@ -227,7 +227,7 @@ internal class VideoCompressor(
                                     } else {
                                         emitted.toDouble() / (emitted + 8).toDouble()
                                     }
-                                events.sendProgress(fraction.coerceIn(0.0, 0.99))
+                                relay.sendProgress(fraction.coerceIn(0.0, 0.99))
                             }
                             frameIndex += 1
                         }
@@ -302,13 +302,13 @@ internal class VideoCompressor(
                 } else {
                     "MediaCodec:$label"
                 }
-            return mapOf(
-                "outputPath" to outputPath,
-                "sizeBytes" to file.length(),
-                "encoderName" to encoderName,
-                "codec" to options.codec,
-                "width" to runningEncoder.width.toLong(),
-                "height" to runningEncoder.height.toLong(),
+            return VideoCompressResultMsg(
+                outputPath = outputPath,
+                sizeBytes = file.length(),
+                encoderName = encoderName,
+                codec = options.codec,
+                width = runningEncoder.width.toLong(),
+                height = runningEncoder.height.toLong(),
             )
         } catch (error: FlutterError) {
             throw error

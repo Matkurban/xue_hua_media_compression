@@ -4,13 +4,14 @@
 #include <glib/gstdio.h>
 #include <vips/vips.h>
 
+#include <algorithm>
 #include <atomic>
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
-#include <vector>
 
 #include "image_vips.h"
 #include "messages.g.h"
@@ -21,72 +22,23 @@
                               xue_hua_media_compression_linux_plugin_get_type(), \
                               XueHuaMediaCompressionLinuxPlugin))
 
-struct EventStream {
-  FlEventChannel* channel = nullptr;
-  bool listening = false;
-  FlValue* last_progress = nullptr;
-  std::vector<FlValue*> pending_terminal;
-  std::atomic<bool> alive{true};
-
-  ~EventStream() {
-    alive.store(false);
-    if (last_progress) fl_value_unref(last_progress);
-    for (FlValue* value : pending_terminal) fl_value_unref(value);
-    if (channel) {
-      fl_event_channel_set_stream_handlers(channel, nullptr, nullptr, nullptr,
-                                           nullptr);
-      g_object_unref(channel);
-      channel = nullptr;
-    }
-  }
-
-  void Send(FlValue* value, bool is_progress) {
-    if (!alive.load()) {
-      fl_value_unref(value);
-      return;
-    }
-    if (!listening) {
-      if (is_progress) {
-        if (last_progress) fl_value_unref(last_progress);
-        last_progress = value;
-      } else {
-        pending_terminal.push_back(value);
-      }
-      return;
-    }
-    fl_event_channel_send(channel, value, nullptr, nullptr);
-    fl_value_unref(value);
-  }
-};
-
-static FlMethodErrorResponse* event_listen_cb(FlEventChannel* channel,
-                                              FlValue*, gpointer user_data) {
-  auto* stream = static_cast<EventStream*>(user_data);
-  stream->listening = true;
-  if (stream->last_progress) {
-    fl_event_channel_send(channel, stream->last_progress, nullptr, nullptr);
-    fl_value_unref(stream->last_progress);
-    stream->last_progress = nullptr;
-  }
-  for (FlValue* value : stream->pending_terminal) {
-    fl_event_channel_send(channel, value, nullptr, nullptr);
-    fl_value_unref(value);
-  }
-  stream->pending_terminal.clear();
-  return nullptr;
-}
-
-static FlMethodErrorResponse* event_cancel_cb(FlEventChannel*, FlValue*,
-                                              gpointer user_data) {
-  static_cast<EventStream*>(user_data)->listening = false;
-  return nullptr;
-}
-
 struct Job {
   int64_t id = 0;
-  std::unique_ptr<EventStream> events;
+  XhMcMediaCompressionFlutterApi* flutter_api = nullptr;
   std::atomic<bool> cancelled{false};
   bool started = false;
+  bool closed = false;
+  bool terminal = false;
+  bool sent_positive = false;
+  int64_t last_progress_sent_us = 0;
+  std::optional<double> last_progress;
+
+  ~Job() {
+    if (flutter_api != nullptr) {
+      g_object_unref(flutter_api);
+      flutter_api = nullptr;
+    }
+  }
 };
 
 struct _XueHuaMediaCompressionLinuxPlugin {
@@ -117,17 +69,105 @@ static void PostToMain(const std::function<void()>& task) {
       heap);
 }
 
-static std::unique_ptr<EventStream> MakeEventStream(FlBinaryMessenger* messenger,
-                                                    int64_t id) {
-  auto stream = std::make_unique<EventStream>();
-  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
-  const std::string name =
-      "xue_hua_media_compression/job_events_" + std::to_string(id);
-  stream->channel =
-      fl_event_channel_new(messenger, name.c_str(), FL_METHOD_CODEC(codec));
-  fl_event_channel_set_stream_handlers(stream->channel, event_listen_cb,
-                                       event_cancel_cb, stream.get(), nullptr);
-  return stream;
+static void on_progress_done(GObject* source, GAsyncResult* res, gpointer) {
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(XhMcMediaCompressionFlutterApiOnProgressResponse) response =
+      xh_mc_media_compression_flutter_api_on_progress_finish(
+          XH_MC_MEDIA_COMPRESSION_FLUTTER_API(source), res, &error);
+  (void)response;
+}
+
+static void on_image_completed_done(GObject* source, GAsyncResult* res,
+                                    gpointer) {
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(XhMcMediaCompressionFlutterApiOnImageCompletedResponse) response =
+      xh_mc_media_compression_flutter_api_on_image_completed_finish(
+          XH_MC_MEDIA_COMPRESSION_FLUTTER_API(source), res, &error);
+  (void)response;
+}
+
+static void on_video_completed_done(GObject* source, GAsyncResult* res,
+                                    gpointer) {
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(XhMcMediaCompressionFlutterApiOnVideoCompletedResponse) response =
+      xh_mc_media_compression_flutter_api_on_video_completed_finish(
+          XH_MC_MEDIA_COMPRESSION_FLUTTER_API(source), res, &error);
+  (void)response;
+}
+
+static void on_error_done(GObject* source, GAsyncResult* res, gpointer) {
+  g_autoptr(GError) error = nullptr;
+  g_autoptr(XhMcMediaCompressionFlutterApiOnErrorResponse) response =
+      xh_mc_media_compression_flutter_api_on_error_finish(
+          XH_MC_MEDIA_COMPRESSION_FLUTTER_API(source), res, &error);
+  (void)response;
+}
+
+static void SendProgress(const std::shared_ptr<Job>& job, double value) {
+  if (job->closed || job->terminal || job->flutter_api == nullptr) {
+    return;
+  }
+  const double clamped = std::max(0.0, std::min(1.0, value));
+  const int64_t now_us = g_get_monotonic_time();
+  const bool first_positive =
+      clamped > 0.0 && clamped < 1.0 && !job->sent_positive;
+  if (!first_positive && clamped < 1.0 &&
+      (now_us - job->last_progress_sent_us) < 100000) {
+    job->last_progress = clamped;
+    return;
+  }
+  if (first_positive) {
+    job->sent_positive = true;
+  }
+  job->last_progress_sent_us = now_us;
+  job->last_progress.reset();
+  xh_mc_media_compression_flutter_api_on_progress(
+      job->flutter_api, clamped, nullptr, on_progress_done, nullptr);
+}
+
+static void SendImageCompleted(const std::shared_ptr<Job>& job,
+                               XhMcImageCompressResultMsg* result) {
+  if (job->closed || job->terminal || job->flutter_api == nullptr) {
+    return;
+  }
+  job->terminal = true;
+  if (job->last_progress.has_value()) {
+    const double pending = *job->last_progress;
+    job->last_progress.reset();
+    xh_mc_media_compression_flutter_api_on_progress(
+        job->flutter_api, pending, nullptr, on_progress_done, nullptr);
+  }
+  xh_mc_media_compression_flutter_api_on_image_completed(
+      job->flutter_api, result, nullptr, on_image_completed_done, nullptr);
+}
+
+static void SendVideoCompleted(const std::shared_ptr<Job>& job,
+                               XhMcVideoCompressResultMsg* result) {
+  if (job->closed || job->terminal || job->flutter_api == nullptr) {
+    return;
+  }
+  job->terminal = true;
+  if (job->last_progress.has_value()) {
+    const double pending = *job->last_progress;
+    job->last_progress.reset();
+    xh_mc_media_compression_flutter_api_on_progress(
+        job->flutter_api, pending, nullptr, on_progress_done, nullptr);
+  }
+  xh_mc_media_compression_flutter_api_on_video_completed(
+      job->flutter_api, result, nullptr, on_video_completed_done, nullptr);
+}
+
+static void SendError(const std::shared_ptr<Job>& job, const char* code,
+                      const char* message) {
+  if (job->closed || job->terminal || job->flutter_api == nullptr) {
+    return;
+  }
+  job->terminal = true;
+  job->last_progress.reset();
+  xh_mc_media_compression_flutter_api_on_error(
+      job->flutter_api, code != nullptr ? code : "encode",
+      message != nullptr ? message : "Native error", nullptr, on_error_done,
+      nullptr);
 }
 
 static XhMcMediaCompressionHostApiCreateJobResponse* handle_create_job(
@@ -136,15 +176,25 @@ static XhMcMediaCompressionHostApiCreateJobResponse* handle_create_job(
   const int64_t id = self->next_id++;
   auto job = std::make_shared<Job>();
   job->id = id;
-  job->events = MakeEventStream(self->messenger, id);
+  const std::string suffix = "job_" + std::to_string(id);
+  job->flutter_api =
+      xh_mc_media_compression_flutter_api_new(self->messenger, suffix.c_str());
   self->jobs->emplace(id, job);
   return xh_mc_media_compression_host_api_create_job_response_new(id);
 }
 
-static XhMcMediaCompressionHostApiQueryImageCapabilitiesResponse*
-handle_query_image(gpointer) {
-  return xh_mc_media_compression_host_api_query_image_capabilities_response_new(
-      query_image_capabilities_vips());
+static void handle_query_image(
+    XhMcMediaCompressionHostApiResponseHandle* response_handle, gpointer) {
+  g_object_ref(response_handle);
+  std::thread([response_handle]() {
+    XhMcImageCapabilitiesMsg* caps = query_image_capabilities_vips();
+    PostToMain([response_handle, caps]() {
+      xh_mc_media_compression_host_api_respond_query_image_capabilities(
+          response_handle, caps);
+      g_object_unref(caps);
+      g_object_unref(response_handle);
+    });
+  }).detach();
 }
 
 static void handle_start_image(
@@ -177,11 +227,16 @@ static void handle_start_image(
   std::thread([job, source, destination, options, output_path]() {
     char* code = nullptr;
     char* message = nullptr;
-    FlValue* result = nullptr;
+    XhMcImageCompressResultMsg* result = nullptr;
     if (job->cancelled.load()) {
       code = g_strdup("cancelled");
       message = g_strdup("Cancelled");
     } else {
+      PostToMain([job]() {
+        if (!job->cancelled.load()) {
+          SendProgress(job, 0.25);
+        }
+      });
       result =
           compress_image_vips(source, destination, options, &code, &message);
     }
@@ -189,36 +244,17 @@ static void handle_start_image(
     g_object_unref(destination);
     g_object_unref(options);
     PostToMain([job, result, code, message, output_path]() {
-      EventStream* events = job->events.get();
       if (job->cancelled.load()) {
         if (!output_path.empty()) g_remove(output_path.c_str());
-        FlValue* map = fl_value_new_map();
-        fl_value_set_string_take(map, "type", fl_value_new_string("error"));
-        fl_value_set_string_take(map, "code", fl_value_new_string("cancelled"));
-        fl_value_set_string_take(map, "message",
-                                 fl_value_new_string("Cancelled"));
-        events->Send(map, false);
-        if (result) fl_value_unref(result);
-      } else if (result) {
-        FlValue* progress = fl_value_new_map();
-        fl_value_set_string_take(progress, "type",
-                                 fl_value_new_string("progress"));
-        fl_value_set_string_take(progress, "value", fl_value_new_float(1.0));
-        events->Send(progress, true);
-        FlValue* map = fl_value_new_map();
-        fl_value_set_string_take(map, "type",
-                                 fl_value_new_string("completed"));
-        fl_value_set_string_take(map, "result", result);
-        events->Send(map, false);
+        SendError(job, "cancelled", "Cancelled");
+        if (result != nullptr) g_object_unref(result);
+      } else if (result != nullptr) {
+        SendProgress(job, 1.0);
+        SendImageCompleted(job, result);
+        g_object_unref(result);
       } else {
-        FlValue* map = fl_value_new_map();
-        fl_value_set_string_take(map, "type", fl_value_new_string("error"));
-        fl_value_set_string_take(map, "code",
-                                 fl_value_new_string(code ? code : "encode"));
-        fl_value_set_string_take(
-            map, "message",
-            fl_value_new_string(message ? message : "Image compress failed"));
-        events->Send(map, false);
+        SendError(job, code != nullptr ? code : "encode",
+                  message != nullptr ? message : "Image compress failed");
       }
       g_free(code);
       g_free(message);
@@ -226,10 +262,18 @@ static void handle_start_image(
   }).detach();
 }
 
-static XhMcMediaCompressionHostApiQueryVideoCapabilitiesResponse*
-handle_query_video(gpointer) {
-  return xh_mc_media_compression_host_api_query_video_capabilities_response_new(
-      query_video_capabilities_gst());
+static void handle_query_video(
+    XhMcMediaCompressionHostApiResponseHandle* response_handle, gpointer) {
+  g_object_ref(response_handle);
+  std::thread([response_handle]() {
+    XhMcVideoCapabilitiesMsg* caps = query_video_capabilities_gst();
+    PostToMain([response_handle, caps]() {
+      xh_mc_media_compression_host_api_respond_query_video_capabilities(
+          response_handle, caps);
+      g_object_unref(caps);
+      g_object_unref(response_handle);
+    });
+  }).detach();
 }
 
 static void handle_start_video(
@@ -259,37 +303,34 @@ static void handle_start_video(
         in, out, options, &job->cancelled,
         [job](double value) {
           PostToMain([job, value]() {
-            FlValue* map = fl_value_new_map();
-            fl_value_set_string_take(map, "type",
-                                     fl_value_new_string("progress"));
-            fl_value_set_string_take(map, "value", fl_value_new_float(value));
-            job->events->Send(map, true);
+            if (!job->cancelled.load()) {
+              SendProgress(job, value);
+            }
           });
         },
-        [job](FlValue* result) {
-          PostToMain([job, result]() {
-            FlValue* map = fl_value_new_map();
-            fl_value_set_string_take(map, "type",
-                                     fl_value_new_string("completed"));
-            fl_value_set_string_take(map, "result", result);
-            job->events->Send(map, false);
+        [job, out](XhMcVideoCompressResultMsg* result) {
+          PostToMain([job, result, out]() {
+            if (job->cancelled.load()) {
+              g_remove(out.c_str());
+              SendError(job, "cancelled", "Cancelled");
+            } else {
+              SendProgress(job, 1.0);
+              SendVideoCompleted(job, result);
+            }
+            if (result != nullptr) {
+              g_object_unref(result);
+            }
           });
         },
         [job](const char* code, const char* message) {
-          std::string c = code;
-          std::string m = message;
+          std::string c = code != nullptr ? code : "encode";
+          std::string m = message != nullptr ? message : "Video compress failed";
           PostToMain([job, c, m]() {
-            FlValue* map = fl_value_new_map();
-            fl_value_set_string_take(map, "type", fl_value_new_string("error"));
-            fl_value_set_string_take(map, "code", fl_value_new_string(c.c_str()));
-            fl_value_set_string_take(map, "message",
-                                     fl_value_new_string(m.c_str()));
-            job->events->Send(map, false);
+            SendError(job, c.c_str(), m.c_str());
           });
         });
     g_object_unref(options);
-    // Drop the worker's Job reference on the platform thread. EventStream owns
-    // a Flutter channel that must not be destroyed from this thread.
+    // Drop the worker's Job reference on the GLib main thread.
     PostToMain([job]() {});
   }).detach();
 }
@@ -312,7 +353,7 @@ static XhMcMediaCompressionHostApiDisposeJobResponse* handle_dispose(
   auto it = self->jobs->find(id);
   if (it != self->jobs->end()) {
     it->second->cancelled.store(true);
-    if (it->second->events) it->second->events->alive.store(false);
+    it->second->closed = true;
     self->jobs->erase(it);
   }
   return xh_mc_media_compression_host_api_dispose_job_response_new();
@@ -330,8 +371,14 @@ static const XhMcMediaCompressionHostApiVTable kVtable = {
 
 static void xue_hua_media_compression_linux_plugin_dispose(GObject* object) {
   auto* self = XUE_HUA_MEDIA_COMPRESSION_LINUX_PLUGIN(object);
-  delete self->jobs;
-  self->jobs = nullptr;
+  if (self->jobs != nullptr) {
+    for (auto& entry : *self->jobs) {
+      entry.second->cancelled.store(true);
+      entry.second->closed = true;
+    }
+    delete self->jobs;
+    self->jobs = nullptr;
+  }
   G_OBJECT_CLASS(xue_hua_media_compression_linux_plugin_parent_class)
       ->dispose(object);
 }

@@ -28,7 +28,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 | Flutter     | ≥ 3.44.0                                                                      |
 | Dart        | ≥ 3.12.0                                                                      |
 | Android     | minSdk 23，MediaCodec / MediaMuxer / Bitmap / ImageDecoder（不使用 FFmpeg） |
-| iOS / macOS | iOS 12 / macOS 10.15                                                          |
+| iOS / macOS | iOS 13 / macOS 10.15                                                          |
 | Windows     | Windows 10+，Media Foundation（不使用 FFmpeg）                                |
 | Linux       | `libvips-dev`、`libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev` 以及 GStreamer base/good/bad/ugly 插件 |
 
@@ -36,7 +36,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.3.2
+  xue_hua_media_compression: ^2.4.0
 ```
 
 ```dart
@@ -163,7 +163,7 @@ flutter drive \
 flutter build windows
 ```
 
-macOS 与 iOS（共用 Darwin 源码：ImageIO + AVFoundation / VideoToolbox，不用 FFmpeg）。在 Apple Silicon Mac，或 iOS 模拟器 / 真机上，用示例工程的 Flutter SDK 运行：
+macOS 与 iOS（`ios/` 与 `macos/` 各自独立实现：ImageIO + AVFoundation / VideoToolbox，不用 FFmpeg）。在 Apple Silicon Mac，或 iOS 模拟器 / 真机上，用示例工程的 Flutter SDK 运行：
 
 ```bash
 cd example
@@ -187,7 +187,7 @@ flutter drive \
 确认 macOS 插件二进制没有 FFmpeg：
 
 ```bash
-BIN=$(find example/build/macos/Build/Products -type f \( -name '*.debug.dylib' -o -name 'xue_hua_media_compression_darwin' -o -name 'xue_hua_media_compression' \) ! -path '*/App.framework/*' ! -path '*/flutter_assets/*' | head -n 1)
+BIN=$(find example/build/macos/Build/Products -type f \( -name '*.debug.dylib' -o -name 'xue_hua_media_compression' \) ! -path '*/App.framework/*' ! -path '*/flutter_assets/*' | head -n 1)
 strings "$BIN" | grep -E 'libavcodec|libavformat|libavutil|ffmpeg|gst-libav' && exit 1 || true
 ```
 

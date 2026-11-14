@@ -193,9 +193,9 @@ ImageCapabilitiesMsg QueryImageCapabilitiesWic() {
   return ImageCapabilitiesMsg(inputs, outputs);
 }
 
-flutter::EncodableMap CompressImageWic(const SourceMsg& source,
-                                       const DestinationMsg& destination,
-                                       const ImageOptionsMsg& options) {
+ImageCompressResultMsg CompressImageWic(const SourceMsg& source,
+                                        const DestinationMsg& destination,
+                                        const ImageOptionsMsg& options) {
   if (options.format() == "gif" || options.format() == "avif") {
     throw FlutterError("unsupported",
                        "Windows cannot encode " + options.format());
@@ -312,17 +312,10 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
     }
     fclose(file);
     DeleteFileW(temp_file);
-    return flutter::EncodableMap{
-        {flutter::EncodableValue("bytes"), flutter::EncodableValue(memory)},
-        {flutter::EncodableValue("sizeBytes"),
-         flutter::EncodableValue(static_cast<int64_t>(memory.size()))},
-        {flutter::EncodableValue("format"),
-         flutter::EncodableValue(options.format())},
-        {flutter::EncodableValue("width"),
-         flutter::EncodableValue(static_cast<int64_t>(width))},
-        {flutter::EncodableValue("height"),
-         flutter::EncodableValue(static_cast<int64_t>(height))},
-    };
+    const int64_t mem_size = static_cast<int64_t>(memory.size());
+    return ImageCompressResultMsg(&memory, nullptr, mem_size, options.format(),
+                                  static_cast<int64_t>(width),
+                                  static_cast<int64_t>(height));
   }
   if (destination.path() == nullptr) {
     throw FlutterError("io", "Missing destination path");
@@ -358,15 +351,9 @@ flutter::EncodableMap CompressImageWic(const SourceMsg& source,
     li.HighPart = static_cast<LONG>(attrs.nFileSizeHigh);
     size = li.QuadPart;
   }
-  return flutter::EncodableMap{
-      {flutter::EncodableValue("outputPath"), flutter::EncodableValue(output_path)},
-      {flutter::EncodableValue("sizeBytes"), flutter::EncodableValue(size)},
-      {flutter::EncodableValue("format"), flutter::EncodableValue(options.format())},
-      {flutter::EncodableValue("width"),
-       flutter::EncodableValue(static_cast<int64_t>(width))},
-      {flutter::EncodableValue("height"),
-       flutter::EncodableValue(static_cast<int64_t>(height))},
-  };
+  return ImageCompressResultMsg(nullptr, &output_path, size, options.format(),
+                                static_cast<int64_t>(width),
+                                static_cast<int64_t>(height));
 }
 
 }  // namespace xue_hua_media_compression

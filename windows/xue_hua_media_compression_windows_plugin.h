@@ -4,11 +4,13 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include <atomic>
+#include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
-#include "event_stream.h"
 #include "main_thread_dispatcher.h"
 #include "messages.g.h"
 
@@ -29,12 +31,14 @@ class XueHuaMediaCompressionWindowsPlugin : public flutter::Plugin,
       const XueHuaMediaCompressionWindowsPlugin&) = delete;
 
   ErrorOr<int64_t> CreateJob() override;
-  ErrorOr<ImageCapabilitiesMsg> QueryImageCapabilities() override;
+  void QueryImageCapabilities(
+      std::function<void(ErrorOr<ImageCapabilitiesMsg> reply)> result) override;
   void StartImageCompress(
       int64_t id, const SourceMsg& source, const DestinationMsg& destination,
       const ImageOptionsMsg& options,
       std::function<void(std::optional<FlutterError> reply)> result) override;
-  ErrorOr<VideoCapabilitiesMsg> QueryVideoCapabilities() override;
+  void QueryVideoCapabilities(
+      std::function<void(ErrorOr<VideoCapabilitiesMsg> reply)> result) override;
   void StartVideoCompress(
       int64_t id, const std::string& input_path, const std::string& output_path,
       const VideoOptionsMsg& options,
@@ -44,14 +48,26 @@ class XueHuaMediaCompressionWindowsPlugin : public flutter::Plugin,
 
  private:
   struct Job {
-    std::shared_ptr<EventStream> events;
+    std::unique_ptr<MediaCompressionFlutterApi> flutter_api;
     std::shared_ptr<std::atomic<bool>> cancelled =
         std::make_shared<std::atomic<bool>>(false);
     std::atomic<bool> output_opened{false};
     std::string output_path;
     bool started = false;
+    bool closed = false;
+    bool terminal = false;
+    bool sent_positive = false;
+    uint64_t last_progress_sent_ms = 0;
+    std::optional<double> last_progress;
   };
 
+  static void SendProgress(const std::shared_ptr<Job>& job, double value);
+  static void SendImageCompleted(const std::shared_ptr<Job>& job,
+                                 const ImageCompressResultMsg& result);
+  static void SendVideoCompleted(const std::shared_ptr<Job>& job,
+                                 const VideoCompressResultMsg& result);
+  static void SendError(const std::shared_ptr<Job>& job,
+                        const std::string& code, const std::string& message);
   static void DeleteJobOutput(const std::shared_ptr<Job>& job);
   static void ReleaseOnPlatform(
       const std::shared_ptr<MainThreadDispatcher>& dispatcher,

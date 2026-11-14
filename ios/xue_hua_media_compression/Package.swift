@@ -6,8 +6,7 @@ import PackageDescription
 let package = Package(
   name: "xue_hua_media_compression",
   platforms: [
-    .iOS("13.0"),
-    .macOS("10.15"),
+    .iOS("13.0")
   ],
   products: [
     .library(
@@ -19,13 +18,19 @@ let package = Package(
   ],
   targets: [
     .target(
+      name: "xue_hua_media_compression_objc_gen",
+      dependencies: [],
+      publicHeadersPath: "."
+    ),
+    .target(
       name: "xue_hua_media_compression",
       dependencies: [
-        .product(name: "FlutterFramework", package: "FlutterFramework")
+        "xue_hua_media_compression_objc_gen",
+        .product(name: "FlutterFramework", package: "FlutterFramework"),
       ],
       resources: [
         .process("PrivacyInfo.xcprivacy")
       ]
-    )
+    ),
   ]
 )

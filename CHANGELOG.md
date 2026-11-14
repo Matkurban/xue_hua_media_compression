@@ -1,3 +1,29 @@
+## [2.4.0] - 2026-11-15
+
+### Changed / 变更
+
+- **Pigeon Native Interop (FFI / JNI) under platform-thread mode**: Upgraded Pigeon to `^30.0.2` (`pigeons/messages.dart`) and added `objective_c: ^9.6.4`, `jni: ^1.1.1`, and `ffi: ^2.2.0` (`pubspec.yaml`):
+  **平台线程模式下的 Pigeon Native Interop（FFI / JNI）**：升级 Pigeon 至 `^30.0.2`（`pigeons/messages.dart`），并在 `pubspec.yaml` 中接入 `objective_c: ^9.6.4`、`jni: ^1.1.1` 与 `ffi: ^2.2.0`：
+  - **Android (`useJni: true`)**: Migrated `MediaCompressionHostApi` and `MediaCompressionFlutterApi` to Pigeon JNI bindings (`Messages.g.kt`, `XueHuaMediaCompressionPlugin.kt`, `JobFlutterEventRelay.kt`).
+    **Android（`useJni: true`）**：将 `MediaCompressionHostApi` 与 `MediaCompressionFlutterApi` 迁移到 Pigeon JNI 绑定（`Messages.g.kt`、`XueHuaMediaCompressionPlugin.kt`、`JobFlutterEventRelay.kt`）。
+  - **iOS / macOS (`useFfi: true`)**: Migrated `MediaCompressionHostApi` and `MediaCompressionFlutterApi` to Pigeon Objective-C / Swift FFI bindings (`Messages.g.swift`, `xue_hua_media_compression_objc_gen/xue_hua_media_compression.h`, `Messages.g.m`, `XueHuaMediaCompressionPlugin.swift`, `JobFlutterEventRelay.swift`).
+    **iOS / macOS（`useFfi: true`）**：将 `MediaCompressionHostApi` 与 `MediaCompressionFlutterApi` 迁移到 Pigeon Objective-C / Swift FFI 绑定（`Messages.g.swift`、`xue_hua_media_compression_objc_gen/xue_hua_media_compression.h`、`Messages.g.m`、`XueHuaMediaCompressionPlugin.swift`、`JobFlutterEventRelay.swift`）。
+  - **Windows / Linux**: Regenerated C++ / GObject Pigeon bindings (`windows/messages.g.h/.cpp`, `linux/messages.g.h/.cc`) with Pigeon `30.0.2` on Platform Channels, supporting `@async` capability queries and `MediaCompressionFlutterApi` callbacks.
+    **Windows / Linux**：使用 Pigeon `30.0.2` 重新生成 C++ / GObject 平台通道绑定（`windows/messages.g.h/.cpp`、`linux/messages.g.h/.cc`），接入 `@async` 能力查询与 `MediaCompressionFlutterApi` 回调。
+- **Replaced per-job `EventChannel` with `@FlutterApi`**: `MediaCompressionFlutterApi` (`onProgress`, `onImageCompleted`, `onVideoCompleted`, `onError`) pushes progress, completion, and errors back to Dart and removes per-job `EventChannel` helpers (`JobEventStream.kt`, `JobEventStream.swift`, `windows/event_stream.h`).
+  **用 `@FlutterApi` 替换按任务创建的 `EventChannel`**：通过 `MediaCompressionFlutterApi`（`onProgress`、`onImageCompleted`、`onVideoCompleted`、`onError`）向 Dart 推送进度、完成与错误事件，移除按任务创建的 `EventChannel` 实现（`JobEventStream.kt`、`JobEventStream.swift`、`windows/event_stream.h`）。
+- **Async capability queries (`@async`)**: Marked `queryImageCapabilities` and `queryVideoCapabilities` as `@async` in `pigeons/messages.dart` so native capability probing runs off the platform thread.
+  **异步能力查询（`@async`）**：在 `pigeons/messages.dart` 中将 `queryImageCapabilities` 和 `queryVideoCapabilities` 标记为 `@async`，使原生编码器能力探测在后台线程执行，不阻塞平台线程。
+- **Split iOS and macOS implementations**: Removed the shared `darwin/` directory and created independent `ios/` (`import Flutter`, `detachFromEngine(for:)`, iOS `13.0+`) and `macos/` (`import FlutterMacOS`, `deinit`, macOS `10.15+`) SwiftPM / CocoaPods plugin packages.
+  **拆分 iOS 与 macOS 实现**：移除共用的 `darwin/` 目录，改为完全独立的 `ios/`（`import Flutter`、`detachFromEngine(for:)`、最低 iOS `13.0`）与 `macos/`（`import FlutterMacOS`、`deinit`、最低 macOS `10.15`）SwiftPM / CocoaPods 插件包。
+
+### Fixed / 修复
+
+- **Windows COM header inclusion**: Added `#include <objbase.h>` in `windows/xue_hua_media_compression_windows_plugin.cpp` so `CoInitializeEx`, `CoUninitialize`, and `COINIT_*` compile cleanly under `WIN32_LEAN_AND_MEAN`.
+  **修复 Windows COM 头文件缺失**：在 `windows/xue_hua_media_compression_windows_plugin.cpp` 中补充 `#include <objbase.h>`，避免开启 `WIN32_LEAN_AND_MEAN` 时缺少 `CoInitializeEx`、`CoUninitialize` 与 `COINIT_*` 定义。
+- **Documentation**: Updated `README.md` and `README.zh-CN.md` minimum version (`^2.4.0`), iOS minimum deployment target (`iOS 13 / macOS 10.15`), and separate `ios/` / `macos/` commands.
+  **文档更新**：同步更新 `README.md` 与 `README.zh-CN.md` 中的依赖版本（`^2.4.0`）、系统要求（`iOS 13 / macOS 10.15`）以及独立 `ios/` / `macos/` 测试命令说明。
+
 ## 2.3.4
 
 * update pigeon to `29.2.0`

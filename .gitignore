@@ -1,6 +1,7 @@
 # Miscellaneous
 *.class
 *.log
+*.o
 *.pyc
 *.swp
 .DS_Store
@@ -32,3 +33,4 @@ migrate_working_dir/
 /build/
 /coverage/
 CONTEXT.md
+pigeon/

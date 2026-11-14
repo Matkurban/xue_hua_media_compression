@@ -123,10 +123,10 @@ XhMcImageCapabilitiesMsg* query_image_capabilities_vips() {
   return xh_mc_image_capabilities_msg_new(inputs, outputs);
 }
 
-FlValue* compress_image_vips(XhMcSourceMsg* source,
-                             XhMcDestinationMsg* destination,
-                             XhMcImageOptionsMsg* options, char** code,
-                             char** message) {
+XhMcImageCompressResultMsg* compress_image_vips(XhMcSourceMsg* source,
+                                                XhMcDestinationMsg* destination,
+                                                XhMcImageOptionsMsg* options,
+                                                char** code, char** message) {
   const char* format = xh_mc_image_options_msg_get_format(options);
   if (g_strcmp0(format, "gif") == 0 || g_strcmp0(format, "avif") == 0 ||
       g_strcmp0(format, "heic") == 0) {
@@ -169,24 +169,18 @@ FlValue* compress_image_vips(XhMcSourceMsg* source,
     vips_error_clear();
     return nullptr;
   }
-  FlValue* map = fl_value_new_map();
-  fl_value_set_string_take(map, "format", fl_value_new_string(format));
-  fl_value_set_string_take(map, "width", fl_value_new_int(width));
-  fl_value_set_string_take(map, "height", fl_value_new_int(height));
   if (kind == 0) {
-    FlValue* bytes = fl_value_new_uint8_list(static_cast<uint8_t*>(buffer), length);
-    fl_value_set_string_take(map, "bytes", bytes);
-    fl_value_set_string_take(map, "sizeBytes",
-                             fl_value_new_int(static_cast<int64_t>(length)));
+    XhMcImageCompressResultMsg* result = xh_mc_image_compress_result_msg_new(
+        static_cast<const uint8_t*>(buffer), length, nullptr,
+        static_cast<int64_t>(length), format, width, height);
     g_free(buffer);
-  } else {
-    GStatBuf st = {};
-    int64_t size = 0;
-    if (g_stat(path.c_str(), &st) == 0) {
-      size = st.st_size;
-    }
-    fl_value_set_string_take(map, "outputPath", fl_value_new_string(path.c_str()));
-    fl_value_set_string_take(map, "sizeBytes", fl_value_new_int(size));
+    return result;
   }
-  return map;
+  GStatBuf st = {};
+  int64_t size = 0;
+  if (g_stat(path.c_str(), &st) == 0) {
+    size = st.st_size;
+  }
+  return xh_mc_image_compress_result_msg_new(
+      nullptr, 0, path.c_str(), size, format, width, height);
 }

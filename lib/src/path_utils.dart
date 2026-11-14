@@ -22,7 +22,5 @@ String normalizeInputPath(String path) {
   return trimmed;
 }
 
-/// EventChannel 名称前缀，完整名为 `$jobEventChannelPrefix$id`。
-///
-/// EventChannel name prefix; the full name is `$jobEventChannelPrefix$id`.
-const String jobEventChannelPrefix = 'xue_hua_media_compression/job_events_';
+/// Per-job `@FlutterApi` suffix (`messageChannelSuffix` / registrar name).
+String jobFlutterApiSuffix(int id) => 'job_$id';

@@ -47,8 +47,9 @@ internal object ImageCompressor {
         source: SourceMsg,
         destination: DestinationMsg,
         options: ImageOptionsMsg,
+        onProgress: (Double) -> Unit = {},
         isCancelled: () -> Boolean = { false },
-    ): Map<String, Any?> {
+    ): ImageCompressResultMsg {
         if (isCancelled()) {
             throw FlutterError("cancelled", "Cancelled", null)
         }
@@ -67,6 +68,7 @@ internal object ImageCompressor {
             bitmap.recycle()
             throw FlutterError("cancelled", "Cancelled", null)
         }
+        onProgress(0.5)
         try {
             val quality = options.quality.toInt().coerceIn(1, 100)
             val keepMetadata = options.keepMetadata && metadataWritable(format)
@@ -82,12 +84,13 @@ internal object ImageCompressor {
                     if (keepMetadata) {
                         bytes = withMetadata(context, source, bytes, format)
                     }
-                    mapOf(
-                        "bytes" to bytes,
-                        "sizeBytes" to bytes.size.toLong(),
-                        "format" to format,
-                        "width" to bitmap.width.toLong(),
-                        "height" to bitmap.height.toLong(),
+                    ImageCompressResultMsg(
+                        bytes = bytes,
+                        outputPath = null,
+                        sizeBytes = bytes.size.toLong(),
+                        format = format,
+                        width = bitmap.width.toLong(),
+                        height = bitmap.height.toLong(),
                     )
                 }
 
@@ -108,12 +111,13 @@ internal object ImageCompressor {
                         }
                     }
                     val size = File(path).length()
-                    mapOf(
-                        "outputPath" to path,
-                        "sizeBytes" to size,
-                        "format" to format,
-                        "width" to bitmap.width.toLong(),
-                        "height" to bitmap.height.toLong(),
+                    ImageCompressResultMsg(
+                        bytes = null,
+                        outputPath = path,
+                        sizeBytes = size,
+                        format = format,
+                        width = bitmap.width.toLong(),
+                        height = bitmap.height.toLong(),
                     )
                 }
 

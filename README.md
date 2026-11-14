@@ -35,7 +35,7 @@ supported platform.
 | Flutter     | ≥ 3.44.0                                                                      |
 | Dart        | ≥ 3.12.0                                                                      |
 | Android     | minSdk 23, MediaCodec / MediaMuxer / Bitmap / ImageDecoder (no FFmpeg)       |
-| iOS / macOS | iOS 12 / macOS 10.15                                                          |
+| iOS / macOS | iOS 13 / macOS 10.15                                                          |
 | Windows     | Windows 10+, Media Foundation (no FFmpeg)                                     |
 | Linux       | `libvips-dev`, `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`, GStreamer base/good/bad/ugly plugins |
 
@@ -43,7 +43,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.3.2
+  xue_hua_media_compression: ^2.4.0
 ```
 
 ```dart
@@ -186,7 +186,7 @@ flutter drive \
 flutter build windows
 ```
 
-macOS and iOS (shared Darwin source: ImageIO + AVFoundation / VideoToolbox, no FFmpeg). Run on an Apple Silicon Mac or an iOS Simulator / device with the example's Flutter SDK:
+macOS and iOS (separate `ios/` and `macos/` implementations: ImageIO + AVFoundation / VideoToolbox, no FFmpeg). Run on an Apple Silicon Mac or an iOS Simulator / device with the example's Flutter SDK:
 
 ```bash
 cd example
@@ -210,7 +210,7 @@ flutter drive \
 Confirm the macOS plugin binary does not mention FFmpeg:
 
 ```bash
-BIN=$(find example/build/macos/Build/Products -type f \( -name '*.debug.dylib' -o -name 'xue_hua_media_compression_darwin' -o -name 'xue_hua_media_compression' \) ! -path '*/App.framework/*' ! -path '*/flutter_assets/*' | head -n 1)
+BIN=$(find example/build/macos/Build/Products -type f \( -name '*.debug.dylib' -o -name 'xue_hua_media_compression' \) ! -path '*/App.framework/*' ! -path '*/flutter_assets/*' | head -n 1)
 strings "$BIN" | grep -E 'libavcodec|libavformat|libavutil|ffmpeg|gst-libav' && exit 1 || true
 ```
 

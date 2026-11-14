@@ -13,7 +13,6 @@ set(PLUGIN_TARGET "xhmc_win")
 set(CMAKE_OBJECT_PATH_MAX 200)
 
 list(APPEND PLUGIN_SOURCES
-  "event_stream.h"
   "image_wic.cpp"
   "image_wic.h"
   "main_thread_dispatcher.h"

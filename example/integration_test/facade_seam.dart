@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
@@ -187,4 +188,55 @@ void registerFacadeSeamTests() {
     );
     await session.dispose();
   });
+
+  test(
+    'native interop works from a background Isolate without ServicesBinding',
+    () async {
+      if (!(Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
+        return;
+      }
+      final data = await rootBundle.load(
+        'integration_test/fixtures/sample.jpg',
+      );
+      final input = data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      );
+      final (
+        int width,
+        int height,
+        int outBytes,
+        int codecsCount,
+      ) = await Isolate.run(() async {
+        final imageCaps = await XueHuaMediaCompression.image
+            .queryCapabilities();
+        assert(imageCaps.outputFormats.isNotEmpty);
+        final videoCaps = await XueHuaMediaCompression.video
+            .queryCapabilities();
+        final session = XueHuaMediaCompression.image.compress(
+          source: MediaSource.bytes(input),
+          destination: MediaDestination.bytes(),
+          options: const ImageCompressOptions(
+            format: ImageFormat.jpeg,
+            quality: 75,
+          ),
+        );
+        final progress = <double>[];
+        final sub = session.progress.listen(progress.add);
+        final result = await session.result;
+        await sub.cancel();
+        await session.dispose();
+        return (
+          result.width,
+          result.height,
+          result.bytes?.length ?? 0,
+          videoCaps.codecs.length,
+        );
+      });
+      expect(width, greaterThan(0));
+      expect(height, greaterThan(0));
+      expect(outBytes, greaterThan(0));
+      expect(codecsCount, greaterThan(0));
+    },
+  );
 }

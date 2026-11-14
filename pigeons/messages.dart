@@ -2,15 +2,24 @@ import 'package:pigeon/pigeon.dart';
 
 @ConfigurePigeon(
   PigeonOptions(
+    appDirectory: 'example/',
+    configDirectory: '.',
     dartOut: 'lib/src/messages.g.dart',
     dartOptions: DartOptions(),
     kotlinOut:
         'android/src/main/kotlin/com/xuehua/xue_hua_media_compression/Messages.g.kt',
     kotlinOptions: KotlinOptions(
       package: 'com.xuehua.xue_hua_media_compression',
+      useJni: true,
     ),
-    swiftOut:
-        'darwin/xue_hua_media_compression/Sources/xue_hua_media_compression/Messages.g.swift',
+    swiftOut: <String>[
+      'ios/xue_hua_media_compression/Sources/xue_hua_media_compression/Messages.g.swift',
+      'macos/xue_hua_media_compression/Sources/xue_hua_media_compression/Messages.g.swift',
+    ],
+    swiftOptions: SwiftOptions(
+      useFfi: true,
+      ffiModuleName: 'xue_hua_media_compression',
+    ),
     cppHeaderOut: 'windows/messages.g.h',
     cppSourceOut: 'windows/messages.g.cpp',
     cppOptions: CppOptions(namespace: 'xue_hua_media_compression'),
@@ -96,10 +105,47 @@ class VideoCapabilitiesMsg {
   bool acceptsContentUri;
 }
 
+class ImageCompressResultMsg {
+  ImageCompressResultMsg({
+    this.bytes,
+    this.outputPath,
+    required this.sizeBytes,
+    required this.format,
+    required this.width,
+    required this.height,
+  });
+
+  Uint8List? bytes;
+  String? outputPath;
+  int sizeBytes;
+  String format;
+  int width;
+  int height;
+}
+
+class VideoCompressResultMsg {
+  VideoCompressResultMsg({
+    required this.outputPath,
+    required this.sizeBytes,
+    required this.encoderName,
+    required this.codec,
+    required this.width,
+    required this.height,
+  });
+
+  String outputPath;
+  int sizeBytes;
+  String encoderName;
+  String codec;
+  int width;
+  int height;
+}
+
 @HostApi()
 abstract class MediaCompressionHostApi {
   int createJob();
 
+  @async
   ImageCapabilitiesMsg queryImageCapabilities();
 
   @async
@@ -110,6 +156,7 @@ abstract class MediaCompressionHostApi {
     ImageOptionsMsg options,
   );
 
+  @async
   VideoCapabilitiesMsg queryVideoCapabilities();
 
   @async
@@ -123,4 +170,19 @@ abstract class MediaCompressionHostApi {
   void cancelJob(int id);
 
   void disposeJob(int id);
+}
+
+@FlutterApi()
+abstract class MediaCompressionFlutterApi {
+  @async
+  void onProgress(double value);
+
+  @async
+  void onImageCompleted(ImageCompressResultMsg result);
+
+  @async
+  void onVideoCompleted(VideoCompressResultMsg result);
+
+  @async
+  void onError(String code, String message);
 }

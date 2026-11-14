@@ -7,8 +7,13 @@
 import 'dart:async';
 import 'dart:typed_data' show Float64List, Int32List, Int64List;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
-import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
+import 'package:meta/meta.dart'
+    show immutable, internal, protected, visibleForTesting;
+import './messages.g.dart'
+    if (dart.library.ffi) './messages.native_interop.g.dart'
+    as pigeon_native;
 
 Object? _extractReplyValueOrThrow(
   List<Object?>? replyList,
@@ -33,6 +38,20 @@ Object? _extractReplyValueOrThrow(
     );
   }
   return replyList.firstOrNull;
+}
+
+List<Object?> wrapResponse({
+  Object? result,
+  PlatformException? error,
+  bool empty = false,
+}) {
+  if (empty) {
+    return <Object?>[];
+  }
+  if (error == null) {
+    return <Object?>[result];
+  }
+  return <Object?>[error.code, error.message, error.details];
 }
 
 bool _deepEquals(Object? a, Object? b) {
@@ -434,6 +453,144 @@ class VideoCapabilitiesMsg {
   }
 }
 
+class ImageCompressResultMsg {
+  ImageCompressResultMsg({
+    this.bytes,
+    this.outputPath,
+    required this.sizeBytes,
+    required this.format,
+    required this.width,
+    required this.height,
+  });
+
+  Uint8List? bytes;
+
+  String? outputPath;
+
+  int sizeBytes;
+
+  String format;
+
+  int width;
+
+  int height;
+
+  List<Object?> _toList() {
+    return <Object?>[bytes, outputPath, sizeBytes, format, width, height];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static ImageCompressResultMsg decode(Object result) {
+    result as List<Object?>;
+    return ImageCompressResultMsg(
+      bytes: result[0] as Uint8List?,
+      outputPath: result[1] as String?,
+      sizeBytes: result[2]! as int,
+      format: result[3]! as String,
+      width: result[4]! as int,
+      height: result[5]! as int,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! ImageCompressResultMsg || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(bytes, other.bytes) &&
+        _deepEquals(outputPath, other.outputPath) &&
+        _deepEquals(sizeBytes, other.sizeBytes) &&
+        _deepEquals(format, other.format) &&
+        _deepEquals(width, other.width) &&
+        _deepEquals(height, other.height);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+
+  @override
+  String toString() {
+    return 'ImageCompressResultMsg(bytes: $bytes, outputPath: $outputPath, sizeBytes: $sizeBytes, format: $format, width: $width, height: $height)';
+  }
+}
+
+class VideoCompressResultMsg {
+  VideoCompressResultMsg({
+    required this.outputPath,
+    required this.sizeBytes,
+    required this.encoderName,
+    required this.codec,
+    required this.width,
+    required this.height,
+  });
+
+  String outputPath;
+
+  int sizeBytes;
+
+  String encoderName;
+
+  String codec;
+
+  int width;
+
+  int height;
+
+  List<Object?> _toList() {
+    return <Object?>[outputPath, sizeBytes, encoderName, codec, width, height];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static VideoCompressResultMsg decode(Object result) {
+    result as List<Object?>;
+    return VideoCompressResultMsg(
+      outputPath: result[0]! as String,
+      sizeBytes: result[1]! as int,
+      encoderName: result[2]! as String,
+      codec: result[3]! as String,
+      width: result[4]! as int,
+      height: result[5]! as int,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! VideoCompressResultMsg || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(outputPath, other.outputPath) &&
+        _deepEquals(sizeBytes, other.sizeBytes) &&
+        _deepEquals(encoderName, other.encoderName) &&
+        _deepEquals(codec, other.codec) &&
+        _deepEquals(width, other.width) &&
+        _deepEquals(height, other.height);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+
+  @override
+  String toString() {
+    return 'VideoCompressResultMsg(outputPath: $outputPath, sizeBytes: $sizeBytes, encoderName: $encoderName, codec: $codec, width: $width, height: $height)';
+  }
+}
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -459,6 +616,12 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is VideoCapabilitiesMsg) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
+    } else if (value is ImageCompressResultMsg) {
+      buffer.putUint8(135);
+      writeValue(buffer, value.encode());
+    } else if (value is VideoCompressResultMsg) {
+      buffer.putUint8(136);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -479,10 +642,62 @@ class _PigeonCodec extends StandardMessageCodec {
         return ImageCapabilitiesMsg.decode(readValue(buffer)!);
       case 134:
         return VideoCapabilitiesMsg.decode(readValue(buffer)!);
+      case 135:
+        return ImageCompressResultMsg.decode(readValue(buffer)!);
+      case 136:
+        return VideoCompressResultMsg.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
   }
+}
+
+@internal
+const StandardMessageCodec pigeon_MessagesmessageCodec = _PigeonCodec();
+const String defaultInstanceName =
+    'PigeonDefaultClassName32uh4ui3lh445uh4h3l2l455g4y34u';
+
+@internal
+MediaCompressionHostApiForNativeInterop?
+pigeon_getInstance_MediaCompressionHostApi({
+  String channelName = defaultInstanceName,
+}) {
+  throw UnsupportedError(
+    'Native Interop is not supported on this platform. Use MediaCompressionHostApi instead.',
+  );
+}
+
+abstract class MediaCompressionHostApiForNativeInterop {
+  /// Returns instance of MediaCompressionHostApiForNativeInterop with specified [channelName] if one has been registered.
+  static MediaCompressionHostApiForNativeInterop? getInstance({
+    String channelName = defaultInstanceName,
+  }) => pigeon_native.pigeon_getInstance_MediaCompressionHostApi(
+    channelName: channelName,
+  );
+
+  int createJob();
+
+  Future<ImageCapabilitiesMsg> queryImageCapabilities();
+
+  Future<void> startImageCompress(
+    int id,
+    SourceMsg source,
+    DestinationMsg destination,
+    ImageOptionsMsg options,
+  );
+
+  Future<VideoCapabilitiesMsg> queryVideoCapabilities();
+
+  Future<void> startVideoCompress(
+    int id,
+    String inputPath,
+    String outputPath,
+    VideoOptionsMsg options,
+  );
+
+  void cancelJob(int id);
+
+  void disposeJob(int id);
 }
 
 class MediaCompressionHostApi {
@@ -492,17 +707,56 @@ class MediaCompressionHostApi {
   MediaCompressionHostApi({
     BinaryMessenger? binaryMessenger,
     String messageChannelSuffix = '',
+    MediaCompressionHostApiForNativeInterop? nativeInteropApi,
   }) : pigeonVar_binaryMessenger = binaryMessenger,
        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
            ? '.$messageChannelSuffix'
-           : '';
+           : '',
+       _nativeInteropApi = nativeInteropApi;
+
+  /// Creates an instance of [MediaCompressionHostApi] that requests an instance of
+  /// [MediaCompressionHostApiForNativeInterop] from the host platform with a matching instance name
+  /// to [messageChannelSuffix] or the default instance.
+  ///
+  /// Throws [ArgumentError] if no matching instance can be found.
+  factory MediaCompressionHostApi.createWithNativeInteropApi({
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    if (kIsWeb) {
+      throw UnsupportedError(
+        'Native Interop is not supported on this platform. Use the default constructor of MediaCompressionHostApi instead.',
+      );
+    }
+    final MediaCompressionHostApiForNativeInterop? nativeInteropApi =
+        MediaCompressionHostApiForNativeInterop.getInstance(
+          channelName: messageChannelSuffix.isEmpty
+              ? defaultInstanceName
+              : messageChannelSuffix,
+        );
+    if (nativeInteropApi == null) {
+      throw ArgumentError(
+        'No MediaCompressionHostApi instance with ${messageChannelSuffix.isEmpty ? 'no ' : ''}instance name ${messageChannelSuffix.isNotEmpty ? '"$messageChannelSuffix" ' : ''}found.',
+      );
+    }
+    return MediaCompressionHostApi(
+      binaryMessenger: binaryMessenger,
+      messageChannelSuffix: messageChannelSuffix,
+      nativeInteropApi: nativeInteropApi,
+    );
+  }
 
   final BinaryMessenger? pigeonVar_binaryMessenger;
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
 
+  final MediaCompressionHostApiForNativeInterop? _nativeInteropApi;
+
   Future<int> createJob() async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.createJob();
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.createJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -521,6 +775,9 @@ class MediaCompressionHostApi {
   }
 
   Future<ImageCapabilitiesMsg> queryImageCapabilities() async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.queryImageCapabilities();
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.queryImageCapabilities$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -544,6 +801,14 @@ class MediaCompressionHostApi {
     DestinationMsg destination,
     ImageOptionsMsg options,
   ) async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.startImageCompress(
+        id,
+        source,
+        destination,
+        options,
+      );
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.startImageCompress$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -563,6 +828,9 @@ class MediaCompressionHostApi {
   }
 
   Future<VideoCapabilitiesMsg> queryVideoCapabilities() async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.queryVideoCapabilities();
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.queryVideoCapabilities$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -586,6 +854,14 @@ class MediaCompressionHostApi {
     String outputPath,
     VideoOptionsMsg options,
   ) async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.startVideoCompress(
+        id,
+        inputPath,
+        outputPath,
+        options,
+      );
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.startVideoCompress$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -605,6 +881,9 @@ class MediaCompressionHostApi {
   }
 
   Future<void> cancelJob(int id) async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.cancelJob(id);
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.cancelJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -624,6 +903,9 @@ class MediaCompressionHostApi {
   }
 
   Future<void> disposeJob(int id) async {
+    if (_nativeInteropApi != null) {
+      return _nativeInteropApi.disposeJob(id);
+    }
     final pigeonVar_channelName =
         'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.disposeJob$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -639,6 +921,208 @@ class MediaCompressionHostApi {
       pigeonVar_replyList,
       pigeonVar_channelName,
       isNullValid: true,
+    );
+  }
+}
+
+@internal
+MediaCompressionFlutterApi pigeon_register_MediaCompressionFlutterApi(
+  MediaCompressionFlutterApi api, {
+  String name = defaultInstanceName,
+}) {
+  throw UnsupportedError(
+    'Native Interop is not supported on this platform. Use MediaCompressionFlutterApi.setUp instead.',
+  );
+}
+
+@internal
+void pigeon_unregister_MediaCompressionFlutterApi(
+  MediaCompressionFlutterApi api, {
+  String name = defaultInstanceName,
+}) {
+  throw UnsupportedError(
+    'Native Interop is not supported on this platform. Use MediaCompressionFlutterApi.setUp instead.',
+  );
+}
+
+@internal
+void pigeon_set_up_MediaCompressionFlutterApi(
+  MediaCompressionFlutterApi? api, {
+  String name = defaultInstanceName,
+}) {
+  throw UnsupportedError(
+    'Native Interop is not supported on this platform. Use MediaCompressionFlutterApi.setUp instead.',
+  );
+}
+
+/// Registers [MediaCompressionFlutterApi] implementations for Native Interop callers.
+final class MediaCompressionFlutterApiRegistrar {
+  /// Registers [api] under [name] (or the default instance when [name] is
+  /// omitted) and returns [api].
+  ///
+  /// The registration is tied to this isolate's engine, so native code looking
+  /// up the instance for that engine receives [api]. Unlike [MediaCompressionFlutterApi.setUp],
+  /// this does not replace earlier registrations from this isolate.
+  MediaCompressionFlutterApi register(
+    MediaCompressionFlutterApi api, {
+    String name = defaultInstanceName,
+  }) =>
+      pigeon_native.pigeon_register_MediaCompressionFlutterApi(api, name: name);
+
+  /// Removes [api], registered from this isolate under [name] (or the default
+  /// instance when [name] is omitted), leaving other registrations in place.
+  ///
+  /// Instances are matched by identity. Does nothing if [api] is not registered.
+  void unregister(
+    MediaCompressionFlutterApi api, {
+    String name = defaultInstanceName,
+  }) => pigeon_native.pigeon_unregister_MediaCompressionFlutterApi(
+    api,
+    name: name,
+  );
+}
+
+abstract class MediaCompressionFlutterApi {
+  static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
+
+  Future<void> onProgress(double value);
+
+  Future<void> onImageCompleted(ImageCompressResultMsg result);
+
+  Future<void> onVideoCompleted(VideoCompressResultMsg result);
+
+  Future<void> onError(String code, String message);
+
+  static void setUp(
+    MediaCompressionFlutterApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    if (!kIsWeb) {
+      pigeon_native.pigeon_set_up_MediaCompressionFlutterApi(
+        api,
+        name: messageChannelSuffix.isEmpty
+            ? defaultInstanceName
+            : messageChannelSuffix,
+      );
+    }
+    messageChannelSuffix = messageChannelSuffix.isNotEmpty
+        ? '.$messageChannelSuffix'
+        : '';
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onProgress$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final double arg_value = args[0]! as double;
+          try {
+            await api.onProgress(arg_value);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onImageCompleted$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final ImageCompressResultMsg arg_result =
+              args[0]! as ImageCompressResultMsg;
+          try {
+            await api.onImageCompleted(arg_result);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onVideoCompleted$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final VideoCompressResultMsg arg_result =
+              args[0]! as VideoCompressResultMsg;
+          try {
+            await api.onVideoCompleted(arg_result);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionFlutterApi.onError$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final String arg_code = args[0]! as String;
+          final String arg_message = args[1]! as String;
+          try {
+            await api.onError(arg_code, arg_message);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+  }
+
+  /// Registers [api] for Native Interop callers under [name], or the default
+  /// instance when [name] is omitted or empty, and returns [api].
+  static MediaCompressionFlutterApi implement(
+    MediaCompressionFlutterApi api, {
+    String name = defaultInstanceName,
+  }) {
+    return MediaCompressionFlutterApiRegistrar().register(
+      api,
+      name: name.isEmpty ? defaultInstanceName : name,
     );
   }
 }

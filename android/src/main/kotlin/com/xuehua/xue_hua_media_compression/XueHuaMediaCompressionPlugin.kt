@@ -1,46 +1,61 @@
 package com.xuehua.xue_hua_media_compression
 
+import android.content.Context
 import io.flutter.embedding.engine.plugins.FlutterPlugin
-import io.flutter.plugin.common.BinaryMessenger
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withContext
 
 /**
- * Android implementation: ImageDecoder/Bitmap/HeifWriter and MediaCodec/MediaMuxer.
+ * Android implementation: ImageDecoder/Bitmap/HeifWriter and MediaCodec/MediaMuxer
+ * exposed through Pigeon Native Interop (JNI).
  *
- * Jobs stay alive until the worker finishes so dispose during an encode does
- * not tear the event channel down from under the codec.
+ * Jobs keep their relay alive until worker completion and Dart disposal agree
+ * so cancelling or disposing mid-flight never tears down callbacks too early.
  */
 class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
-    private lateinit var context: android.content.Context
-    private lateinit var messenger: BinaryMessenger
+    private lateinit var context: Context
+    private var pluginBinding: FlutterPlugin.FlutterPluginBinding? = null
+    private val hostRegistrar = MediaCompressionHostApiRegistrar()
+    private val flutterApiRegistrar = MediaCompressionFlutterApiRegistrar()
     private val executor = Executors.newCachedThreadPool()
+    private val relayScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val jobs = mutableMapOf<Long, Job>()
-    private var nextId = 1L
+    private val jobs = ConcurrentHashMap<Long, Job>()
+    private val nextId = AtomicLong(1L)
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        messenger = binding.binaryMessenger
-        MediaCompressionHostApi.setUp(messenger, this)
+        pluginBinding = binding
+        hostRegistrar.register(this, binding)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        MediaCompressionHostApi.setUp(binding.binaryMessenger, null)
+        hostRegistrar.unregister(this, binding)
+        pluginBinding = null
         jobs.values.forEach { it.requestDispose() }
         jobs.clear()
+        relayScope.cancel()
         executor.shutdownNow()
     }
 
     override fun createJob(): Long {
-        val id = nextId++
-        jobs[id] = Job(JobEventStream(messenger, id))
+        val id = nextId.getAndIncrement()
+        jobs[id] = Job()
         return id
     }
 
-    override fun queryImageCapabilities(): ImageCapabilitiesMsg {
-        return ImageCompressor.queryCapabilities()
-    }
+    override suspend fun queryImageCapabilities(): ImageCapabilitiesMsg =
+        withContext(Dispatchers.IO) {
+            ImageCompressor.queryCapabilities()
+        }
 
     override suspend fun startImageCompress(
         id: Long,
@@ -49,57 +64,66 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
         options: ImageOptionsMsg,
     ) {
         val job = jobs[id] ?: throw FlutterError("instanceNotFound", "No job $id", null)
-        if (job.started) {
+        val binding = pluginBinding ?: throw FlutterError("invalidState", "Plugin not attached", null)
+        val flutterApi = flutterApiRegistrar.getInstance(binding, "job_$id")
+        val relay = JobFlutterEventRelay(flutterApi, relayScope)
+        if (!job.begin(relay)) {
             throw FlutterError("invalidState", "Job $id already started", null)
         }
-        job.started = true
         val outputPath = if (destination.kind == 1L) destination.path else null
-        executor.execute {
-            try {
-                if (job.cancelled) {
-                    deleteIfPresent(outputPath)
-                    job.events.sendError("cancelled", "Cancelled", null)
-                    return@execute
-                }
-                job.events.sendProgress(0.05)
-                val result =
-                    ImageCompressor.compress(context, source, destination, options) {
-                        job.cancelled
+        try {
+            executor.execute {
+                try {
+                    if (job.cancelled) {
+                        deleteIfPresent(outputPath)
+                        relay.sendError("cancelled", "Cancelled")
+                        return@execute
                     }
-                if (job.cancelled) {
+                    relay.sendProgress(0.05)
+                    val result =
+                        ImageCompressor.compress(
+                            context = context,
+                            source = source,
+                            destination = destination,
+                            options = options,
+                            onProgress = { value -> relay.sendProgress(value) },
+                        ) {
+                            job.cancelled
+                        }
+                    if (job.cancelled) {
+                        deleteIfPresent(outputPath)
+                        relay.sendError("cancelled", "Cancelled")
+                        return@execute
+                    }
+                    relay.sendProgress(1.0)
+                    relay.sendImageCompleted(result)
+                } catch (error: FlutterError) {
+                    if (error.code == "cancelled" || job.cancelled) {
+                        deleteIfPresent(outputPath)
+                        relay.sendError("cancelled", "Cancelled")
+                    } else {
+                        relay.sendError(error.code, error.message ?: error.code)
+                    }
+                } catch (error: Exception) {
                     deleteIfPresent(outputPath)
-                    job.events.sendError("cancelled", "Cancelled", null)
-                    return@execute
-                }
-                job.events.sendProgress(1.0)
-                job.events.sendCompleted(result)
-            } catch (error: FlutterError) {
-                if (error.code == "cancelled" || job.cancelled) {
-                    deleteIfPresent(outputPath)
-                    job.events.sendError("cancelled", "Cancelled", null)
-                } else {
-                    job.events.sendError(
-                        error.code,
-                        error.message ?: error.code,
-                        error.details?.toString(),
+                    relay.sendError(
+                        if (job.cancelled) "cancelled" else "encode",
+                        error.message ?: "Image compress failed",
                     )
+                } finally {
+                    job.onWorkerFinished()
                 }
-            } catch (error: Exception) {
-                deleteIfPresent(outputPath)
-                job.events.sendError(
-                    "encode",
-                    error.message ?: "Image compress failed",
-                    error.toString(),
-                )
-            } finally {
-                job.onWorkerFinished()
             }
+        } catch (_: RejectedExecutionException) {
+            job.onWorkerFinished()
+            throw FlutterError("cancelled", "Plugin detached", null)
         }
     }
 
-    override fun queryVideoCapabilities(): VideoCapabilitiesMsg {
-        return VideoCompressor.queryCapabilities()
-    }
+    override suspend fun queryVideoCapabilities(): VideoCapabilitiesMsg =
+        withContext(Dispatchers.IO) {
+            VideoCompressor.queryCapabilities()
+        }
 
     override suspend fun startVideoCompress(
         id: Long,
@@ -108,47 +132,52 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
         options: VideoOptionsMsg,
     ) {
         val job = jobs[id] ?: throw FlutterError("instanceNotFound", "No job $id", null)
-        if (job.started) {
+        val binding = pluginBinding ?: throw FlutterError("invalidState", "Plugin not attached", null)
+        val flutterApi = flutterApiRegistrar.getInstance(binding, "job_$id")
+        val relay = JobFlutterEventRelay(flutterApi, relayScope)
+        if (!job.begin(relay)) {
             throw FlutterError("invalidState", "Job $id already started", null)
         }
-        job.started = true
-        executor.execute {
-            try {
-                if (job.cancelled) {
-                    deleteIfPresent(outputPath)
-                    job.events.sendError("cancelled", "Cancelled", null)
-                    return@execute
-                }
-                val compressor =
-                    VideoCompressor(context, job.events) {
-                        job.cancelled
+        try {
+            executor.execute {
+                try {
+                    if (job.cancelled) {
+                        deleteIfPresent(outputPath)
+                        relay.sendError("cancelled", "Cancelled")
+                        return@execute
                     }
-                val result = compressor.start(inputPath, outputPath, options)
-                if (job.cancelled) {
+                    val compressor =
+                        VideoCompressor(context, relay) {
+                            job.cancelled
+                        }
+                    val result = compressor.start(inputPath, outputPath, options)
+                    if (job.cancelled) {
+                        deleteIfPresent(outputPath)
+                        relay.sendError("cancelled", "Cancelled")
+                        return@execute
+                    }
+                    relay.sendProgress(1.0)
+                    relay.sendVideoCompleted(result)
+                } catch (error: FlutterError) {
                     deleteIfPresent(outputPath)
-                    job.events.sendError("cancelled", "Cancelled", null)
-                    return@execute
+                    val code = if (job.cancelled) "cancelled" else error.code
+                    relay.sendError(
+                        code,
+                        if (code == "cancelled") "Cancelled" else error.message ?: error.code,
+                    )
+                } catch (error: Exception) {
+                    deleteIfPresent(outputPath)
+                    relay.sendError(
+                        if (job.cancelled) "cancelled" else "encode",
+                        error.message ?: "Video compress failed",
+                    )
+                } finally {
+                    job.onWorkerFinished()
                 }
-                job.events.sendProgress(1.0)
-                job.events.sendCompleted(result)
-            } catch (error: FlutterError) {
-                deleteIfPresent(outputPath)
-                val code = if (job.cancelled) "cancelled" else error.code
-                job.events.sendError(
-                    code,
-                    if (code == "cancelled") "Cancelled" else error.message ?: error.code,
-                    error.details?.toString(),
-                )
-            } catch (error: Exception) {
-                deleteIfPresent(outputPath)
-                job.events.sendError(
-                    if (job.cancelled) "cancelled" else "encode",
-                    error.message ?: "Video compress failed",
-                    error.toString(),
-                )
-            } finally {
-                job.onWorkerFinished()
             }
+        } catch (_: RejectedExecutionException) {
+            job.onWorkerFinished()
+            throw FlutterError("cancelled", "Plugin detached", null)
         }
     }
 
@@ -169,37 +198,44 @@ class XueHuaMediaCompressionPlugin : FlutterPlugin, MediaCompressionHostApi {
         }
     }
 
-    private class Job(val events: JobEventStream) {
-        var started = false
-
+    private class Job {
         @Volatile
         var cancelled = false
 
         private val gate = Any()
+        private var started = false
         private var workerFinished = false
         private var disposeRequested = false
+        private var relay: JobFlutterEventRelay? = null
+
+        fun begin(eventRelay: JobFlutterEventRelay): Boolean {
+            synchronized(gate) {
+                if (started || disposeRequested) {
+                    return false
+                }
+                started = true
+                relay = eventRelay
+                return true
+            }
+        }
 
         fun onWorkerFinished() {
-            val disposeNow =
+            val relayToDispose =
                 synchronized(gate) {
                     workerFinished = true
-                    disposeRequested
+                    if (disposeRequested) relay else null
                 }
-            if (disposeNow) {
-                events.dispose()
-            }
+            relayToDispose?.dispose()
         }
 
         fun requestDispose() {
             cancelled = true
-            val disposeNow =
+            val relayToDispose =
                 synchronized(gate) {
                     disposeRequested = true
-                    workerFinished
+                    if (!started || workerFinished) relay else null
                 }
-            if (disposeNow) {
-                events.dispose()
-            }
+            relayToDispose?.dispose()
         }
     }
 }

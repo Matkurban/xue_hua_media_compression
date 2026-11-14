@@ -78,11 +78,24 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late _FakeHostApi api;
+  late Map<String, MediaCompressionFlutterApi> flutterApis;
   late MethodChannelMediaCompression platform;
 
   setUp(() {
     api = _FakeHostApi();
-    platform = MethodChannelMediaCompression(api: api);
+    flutterApis = <String, MediaCompressionFlutterApi>{};
+    platform = MethodChannelMediaCompression(
+      api: api,
+      registerFlutterApi: (MediaCompressionFlutterApi handler, String suffix) {
+        flutterApis[suffix] = handler;
+      },
+      unregisterFlutterApi:
+          (MediaCompressionFlutterApi handler, String suffix) {
+            if (identical(flutterApis[suffix], handler)) {
+              flutterApis.remove(suffix);
+            }
+          },
+    );
   });
 
   test('queryImageCapabilities maps wire names', () async {
@@ -98,30 +111,7 @@ void main() {
     expect(caps.acceptsContentUri, isTrue);
   });
 
-  test('compressImage starts a job and completes from EventChannel', () async {
-    platform.eventChannelFor = (int id) {
-      return EventChannel('test/job_events_$id');
-    };
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockStreamHandler(
-          EventChannel('test/job_events_7'),
-          MockStreamHandler.inline(
-            onListen: (Object? arguments, MockStreamHandlerEventSink sink) {
-              sink.success(<String, Object?>{'type': 'progress', 'value': 0.5});
-              sink.success(<String, Object?>{
-                'type': 'completed',
-                'result': <String, Object?>{
-                  'bytes': Uint8List.fromList(const [1, 2, 3]),
-                  'sizeBytes': 3,
-                  'format': 'jpeg',
-                  'width': 10,
-                  'height': 8,
-                },
-              });
-            },
-          ),
-        );
-
+  test('compressImage starts a job and completes from FlutterApi', () async {
     final session = platform.compressImage(
       source: MediaSource.bytes(Uint8List.fromList(const [9, 9, 9])),
       destination: MediaDestination.bytes(),
@@ -129,6 +119,21 @@ void main() {
     );
     final progresses = <double>[];
     final sub = session.progress.listen(progresses.add);
+
+    await Future<void>.delayed(Duration.zero);
+    final handler = flutterApis['job_7'];
+    expect(handler, isNotNull);
+    await handler!.onProgress(0.5);
+    await handler.onImageCompleted(
+      ImageCompressResultMsg(
+        bytes: Uint8List.fromList(const [1, 2, 3]),
+        sizeBytes: 3,
+        format: 'jpeg',
+        width: 10,
+        height: 8,
+      ),
+    );
+
     final result = await session.result;
     expect(result.sizeBytes, 3);
     expect(result.width, 10);
@@ -137,42 +142,62 @@ void main() {
     await sub.cancel();
     await session.dispose();
     expect(api.disposeCount, 1);
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockStreamHandler(const EventChannel('test/job_events_7'), null);
+    expect(flutterApis.containsKey('job_7'), isFalse);
+  });
+
+  test('compressVideo completes from FlutterApi', () async {
+    final session = platform.compressVideo(
+      inputPath: '/tmp/in.mp4',
+      outputPath: '/tmp/out.mp4',
+      options: const VideoCompressOptions(codec: VideoCodec.h265),
+    );
+    await Future<void>.delayed(Duration.zero);
+    final handler = flutterApis['job_7'];
+    expect(handler, isNotNull);
+    await handler!.onProgress(0.6);
+    await handler.onVideoCompleted(
+      VideoCompressResultMsg(
+        outputPath: '/tmp/out.mp4',
+        sizeBytes: 1024,
+        encoderName: 'FakeEncoder',
+        codec: 'h265',
+        width: 1280,
+        height: 720,
+      ),
+    );
+
+    final result = await session.result;
+    expect(result.outputPath, '/tmp/out.mp4');
+    expect(result.sizeBytes, 1024);
+    expect(result.encoderName, 'FakeEncoder');
+    expect(result.codec, VideoCodec.h265);
+    expect(result.width, 1280);
+    expect(result.height, 720);
+    await session.dispose();
+    expect(api.disposeCount, 1);
+    expect(flutterApis.containsKey('job_7'), isFalse);
   });
 
   test('late progress listener receives the latest value', () async {
-    platform.eventChannelFor = (int id) {
-      return EventChannel('test/job_events_$id');
-    };
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockStreamHandler(
-          EventChannel('test/job_events_7'),
-          MockStreamHandler.inline(
-            onListen: (Object? arguments, MockStreamHandlerEventSink sink) {
-              sink.success(<String, Object?>{
-                'type': 'progress',
-                'value': 0.25,
-              });
-              sink.success(<String, Object?>{'type': 'progress', 'value': 0.5});
-              sink.success(<String, Object?>{
-                'type': 'completed',
-                'result': <String, Object?>{
-                  'bytes': Uint8List.fromList(const [1]),
-                  'sizeBytes': 1,
-                  'format': 'jpeg',
-                  'width': 2,
-                  'height': 2,
-                },
-              });
-            },
-          ),
-        );
     final session = platform.compressImage(
       source: MediaSource.bytes(Uint8List.fromList(const [4])),
       destination: MediaDestination.bytes(),
       options: const ImageCompressOptions(),
     );
+    await Future<void>.delayed(Duration.zero);
+    final handler = flutterApis['job_7']!;
+    await handler.onProgress(0.25);
+    await handler.onProgress(0.5);
+    await handler.onImageCompleted(
+      ImageCompressResultMsg(
+        bytes: Uint8List.fromList(const [1]),
+        sizeBytes: 1,
+        format: 'jpeg',
+        width: 2,
+        height: 2,
+      ),
+    );
+
     await session.result;
     final progresses = <double>[];
     final sub = session.progress.listen(progresses.add);
@@ -181,8 +206,7 @@ void main() {
     await sub.cancel();
     await session.dispose();
     expect(api.disposeCount, 1);
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockStreamHandler(const EventChannel('test/job_events_7'), null);
+    expect(flutterApis.containsKey('job_7'), isFalse);
   });
 
   test('pigeon start error becomes MediaCompressionException', () async {
@@ -190,14 +214,6 @@ void main() {
       code: MediaCompressionException.unsupported,
       message: 'no webp',
     );
-    platform.eventChannelFor = (int id) => EventChannel('test/job_events_$id');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockStreamHandler(
-          const EventChannel('test/job_events_7'),
-          MockStreamHandler.inline(
-            onListen: (Object? arguments, MockStreamHandlerEventSink sink) {},
-          ),
-        );
     final session = platform.compressImage(
       source: MediaSource.bytes(Uint8List.fromList(const [1])),
       destination: MediaDestination.bytes(),
@@ -213,5 +229,40 @@ void main() {
         ),
       ),
     );
+    expect(flutterApis.containsKey('job_7'), isFalse);
   });
+
+  test(
+    'flutterApi onError fails session with MediaCompressionException',
+    () async {
+      final session = platform.compressImage(
+        source: MediaSource.bytes(Uint8List.fromList(const [1])),
+        destination: MediaDestination.bytes(),
+        options: const ImageCompressOptions(),
+      );
+      final expectation = expectLater(
+        session.result,
+        throwsA(
+          isA<MediaCompressionException>()
+              .having(
+                (MediaCompressionException e) => e.code,
+                'code',
+                MediaCompressionException.decode,
+              )
+              .having(
+                (MediaCompressionException e) => e.message,
+                'message',
+                'corrupt payload',
+              ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await flutterApis['job_7']!.onError(
+        MediaCompressionException.decode,
+        'corrupt payload',
+      );
+      await expectation;
+      await session.dispose();
+    },
+  );
 }

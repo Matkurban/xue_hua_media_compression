@@ -4,6 +4,7 @@ import 'image_format.dart';
 import 'media_compression_exception.dart';
 import 'media_destination.dart';
 import 'media_source.dart';
+import 'messages.g.dart';
 import 'options.dart';
 import 'results.dart';
 import 'video_codec.dart';
@@ -118,36 +119,33 @@ MediaCompressionException exceptionFromPlatform(Object error) {
   );
 }
 
-/// 从 EventChannel 完成 payload 解析图片结果。
+/// 从 Pigeon FlutterApi 图片完成消息解析图片结果。
 ///
-/// Parses an image result from an EventChannel completion payload.
-ImageCompressResult imageResultFromMap(Map<Object?, Object?> map) {
-  final formatName = map['format'] as String? ?? 'jpeg';
-  final format = ImageFormatWire.tryParse(formatName) ?? ImageFormat.jpeg;
-  final bytes = map['bytes'];
+/// Parses an image result from a Pigeon FlutterApi completion message.
+ImageCompressResult imageResultFromMsg(ImageCompressResultMsg msg) {
+  final format = ImageFormatWire.tryParse(msg.format) ?? ImageFormat.jpeg;
   return ImageCompressResult(
-    bytes: bytes is Uint8List ? bytes : null,
-    outputPath: map['outputPath'] as String?,
-    sizeBytes: (map['sizeBytes'] as num?)?.toInt() ?? 0,
+    bytes: msg.bytes,
+    outputPath: msg.outputPath,
+    sizeBytes: msg.sizeBytes,
     format: format,
-    width: (map['width'] as num?)?.toInt() ?? 0,
-    height: (map['height'] as num?)?.toInt() ?? 0,
+    width: msg.width,
+    height: msg.height,
   );
 }
 
-/// 从 EventChannel 完成 payload 解析视频结果。
+/// 从 Pigeon FlutterApi 视频完成消息解析视频结果。
 ///
-/// Parses a video result from an EventChannel completion payload.
-VideoCompressResult videoResultFromMap(Map<Object?, Object?> map) {
-  final codecName = map['codec'] as String? ?? 'h264';
-  final codec = VideoCodecWire.tryParse(codecName) ?? VideoCodec.h264;
+/// Parses a video result from a Pigeon FlutterApi completion message.
+VideoCompressResult videoResultFromMsg(VideoCompressResultMsg msg) {
+  final codec = VideoCodecWire.tryParse(msg.codec) ?? VideoCodec.h264;
   return VideoCompressResult(
-    outputPath: map['outputPath'] as String? ?? '',
-    sizeBytes: (map['sizeBytes'] as num?)?.toInt() ?? 0,
-    encoderName: map['encoderName'] as String? ?? '',
+    outputPath: msg.outputPath,
+    sizeBytes: msg.sizeBytes,
+    encoderName: msg.encoderName,
     codec: codec,
-    width: (map['width'] as num?)?.toInt() ?? 0,
-    height: (map['height'] as num?)?.toInt() ?? 0,
+    width: msg.width,
+    height: msg.height,
   );
 }
 

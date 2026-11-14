@@ -6,11 +6,9 @@
 package com.xuehua.xue_hua_media_compression
 
 import android.util.Log
-import io.flutter.plugin.common.BasicMessageChannel
-import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.plugin.common.EventChannel
-import io.flutter.plugin.common.MessageCodec
-import io.flutter.plugin.common.StandardMethodCodec
+import androidx.annotation.Keep
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.StandardMessageCodec
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -21,6 +19,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 private object MessagesPigeonUtils {
+
+  fun createConnectionError(channelName: String): FlutterError {
+    return FlutterError("channel-error",  "Unable to establish connection on channel: '$channelName'.", "")  }
 
   fun wrapResult(result: Any?): List<Any?> {
     return listOf(result)
@@ -193,11 +194,83 @@ private object MessagesPigeonUtils {
  * @property message The error message.
  * @property details The error details. Must be a datatype supported by the api codec.
  */
+@Keep
 class FlutterError (
   val code: String,
   override val message: String? = null,
   val details: Any? = null
 ) : RuntimeException()
+private const val defaultInstanceName = "PigeonDefaultClassName32uh4ui3lh445uh4h3l2l455g4y34u"
+
+/** Computes keys that identify the Flutter engine a registration belongs to. */
+private object MessagesPigeonEngineKeys {
+  /** Sentinel meaning that no engine key is known. */
+  const val NO_KEY: Long = Long.MIN_VALUE
+
+  /** `FlutterPluginBinding.getEngineId`, which is missing on older Flutter versions. */
+  private val getEngineIdMethod: java.lang.reflect.Method? by lazy {
+    try {
+      FlutterPlugin.FlutterPluginBinding::class.java.getMethod("getEngineId")
+    } catch (e: Exception) {
+      null
+    }
+  }
+
+  /** Keys for engine messengers, used when an exact engine id is unavailable. */
+  private val messengerKeys = java.util.WeakHashMap<Any, Long>()
+
+  /**
+   * Keys already computed for each binding, so `register` and `unregister` with
+   * the same binding always agree even if [keyOf] for its engine later records
+   * an exact key for the messenger.
+   */
+  private val bindingKeys = java.util.WeakHashMap<FlutterPlugin.FlutterPluginBinding, Long>()
+
+  private var nextSyntheticKey: Long = -1L
+
+  /** Returns the key for the engine that [binding] belongs to. */
+  @Synchronized
+  fun keyOf(binding: FlutterPlugin.FlutterPluginBinding): Long {
+    return bindingKeys.getOrPut(binding) { computeKey(binding) }
+  }
+
+  private fun computeKey(binding: FlutterPlugin.FlutterPluginBinding): Long {
+    val method = getEngineIdMethod
+    if (method != null) {
+      try {
+        // Real engine ids are never 0, but an engine without one, or a test
+        // double, reports 0, which must not be shared between engines.
+        val engineId = method.invoke(binding) as Long
+        if (engineId != 0L) {
+          return engineId
+        }
+      } catch (e: Exception) {
+        // Fall back to a messenger-based key.
+      }
+    }
+    return keyOfMessenger(binding.binaryMessenger)
+  }
+
+  /** Returns the key for [engine]. */
+  @Synchronized
+  fun keyOf(engine: FlutterEngine): Long {
+    val key = engine.engineId
+    if (key == 0L) {
+      // Real engine ids are never 0, but an engine without one, or a test
+      // double, reports 0, which must not be shared between engines.
+      return keyOfMessenger(engine.dartExecutor)
+    }
+    // Record the exact key so later lookups through a binding for this engine
+    // agree with it even when the binding cannot report the engine id.
+    messengerKeys[engine.dartExecutor] = key
+    return key
+  }
+
+  @Synchronized
+  private fun keyOfMessenger(messenger: Any): Long {
+    return messengerKeys.getOrPut(messenger) { nextSyntheticKey-- }
+  }
+}
 
 /**
  * 输入位置：0 = 内存字节，1 = 路径 / URI。
@@ -206,6 +279,7 @@ class FlutterError (
  *
  * Generated class from Pigeon that represents data sent in messages.
  */
+@Keep
 data class SourceMsg (
   val kind: Long,
   val bytes: ByteArray? = null,
@@ -257,6 +331,7 @@ data class SourceMsg (
  *
  * Generated class from Pigeon that represents data sent in messages.
  */
+@Keep
 data class DestinationMsg (
   val kind: Long,
   val path: String? = null
@@ -298,6 +373,7 @@ data class DestinationMsg (
 }
 
 /** Generated class from Pigeon that represents data sent in messages. */
+@Keep
 data class ImageOptionsMsg (
   val format: String,
   val quality: Long,
@@ -347,6 +423,7 @@ data class ImageOptionsMsg (
 }
 
 /** Generated class from Pigeon that represents data sent in messages. */
+@Keep
 data class VideoOptionsMsg (
   val codec: String,
   val bitrate: Long,
@@ -404,6 +481,7 @@ data class VideoOptionsMsg (
 }
 
 /** Generated class from Pigeon that represents data sent in messages. */
+@Keep
 data class ImageCapabilitiesMsg (
   val inputFormats: List<String>,
   val outputFormats: List<String>
@@ -445,6 +523,7 @@ data class ImageCapabilitiesMsg (
 }
 
 /** Generated class from Pigeon that represents data sent in messages. */
+@Keep
 data class VideoCapabilitiesMsg (
   val encoderName: String? = null,
   val codecs: List<String>,
@@ -488,6 +567,122 @@ data class VideoCapabilitiesMsg (
     return "VideoCapabilitiesMsg(encoderName=$encoderName, codecs=$codecs, acceptsContentUri=$acceptsContentUri)"
   }
 }
+
+/** Generated class from Pigeon that represents data sent in messages. */
+@Keep
+data class ImageCompressResultMsg (
+  val bytes: ByteArray? = null,
+  val outputPath: String? = null,
+  val sizeBytes: Long,
+  val format: String,
+  val width: Long,
+  val height: Long
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): ImageCompressResultMsg {
+      val bytes = pigeonVar_list[0] as ByteArray?
+      val outputPath = pigeonVar_list[1] as String?
+      val sizeBytes = pigeonVar_list[2] as Long
+      val format = pigeonVar_list[3] as String
+      val width = pigeonVar_list[4] as Long
+      val height = pigeonVar_list[5] as Long
+      return ImageCompressResultMsg(bytes, outputPath, sizeBytes, format, width, height)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      bytes,
+      outputPath,
+      sizeBytes,
+      format,
+      width,
+      height,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as ImageCompressResultMsg
+    return MessagesPigeonUtils.deepEquals(this.bytes, other.bytes) && MessagesPigeonUtils.deepEquals(this.outputPath, other.outputPath) && MessagesPigeonUtils.deepEquals(this.sizeBytes, other.sizeBytes) && MessagesPigeonUtils.deepEquals(this.format, other.format) && MessagesPigeonUtils.deepEquals(this.width, other.width) && MessagesPigeonUtils.deepEquals(this.height, other.height)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.bytes)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.outputPath)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.sizeBytes)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.format)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.width)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.height)
+    return result
+  }
+  override fun toString(): String {
+    return "ImageCompressResultMsg(bytes=${bytes?.contentToString()}, outputPath=$outputPath, sizeBytes=$sizeBytes, format=$format, width=$width, height=$height)"
+  }
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+@Keep
+data class VideoCompressResultMsg (
+  val outputPath: String,
+  val sizeBytes: Long,
+  val encoderName: String,
+  val codec: String,
+  val width: Long,
+  val height: Long
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): VideoCompressResultMsg {
+      val outputPath = pigeonVar_list[0] as String
+      val sizeBytes = pigeonVar_list[1] as Long
+      val encoderName = pigeonVar_list[2] as String
+      val codec = pigeonVar_list[3] as String
+      val width = pigeonVar_list[4] as Long
+      val height = pigeonVar_list[5] as Long
+      return VideoCompressResultMsg(outputPath, sizeBytes, encoderName, codec, width, height)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      outputPath,
+      sizeBytes,
+      encoderName,
+      codec,
+      width,
+      height,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as VideoCompressResultMsg
+    return MessagesPigeonUtils.deepEquals(this.outputPath, other.outputPath) && MessagesPigeonUtils.deepEquals(this.sizeBytes, other.sizeBytes) && MessagesPigeonUtils.deepEquals(this.encoderName, other.encoderName) && MessagesPigeonUtils.deepEquals(this.codec, other.codec) && MessagesPigeonUtils.deepEquals(this.width, other.width) && MessagesPigeonUtils.deepEquals(this.height, other.height)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.outputPath)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.sizeBytes)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.encoderName)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.codec)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.width)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.height)
+    return result
+  }
+  override fun toString(): String {
+    return "VideoCompressResultMsg(outputPath=$outputPath, sizeBytes=$sizeBytes, encoderName=$encoderName, codec=$codec, width=$width, height=$height)"
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -521,6 +716,16 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
           VideoCapabilitiesMsg.fromList(it)
         }
       }
+      135.toByte() -> {
+        (readValue(buffer) as? List<Any?>)?.let {
+          ImageCompressResultMsg.fromList(it)
+        }
+      }
+      136.toByte() -> {
+        (readValue(buffer) as? List<Any?>)?.let {
+          VideoCompressResultMsg.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -550,158 +755,396 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(134)
         writeValue(stream, value.toList())
       }
+      is ImageCompressResultMsg -> {
+        stream.write(135)
+        writeValue(stream, value.toList())
+      }
+      is VideoCompressResultMsg -> {
+        stream.write(136)
+        writeValue(stream, value.toList())
+      }
       else -> super.writeValue(stream, value)
     }
   }
 }
 
+/**
+ * Encodes and decodes the buffers that native interop calls pass to and from
+ * Dart, in the same format as the message codec.
+ */
+private object MessagesPigeonInteropCodec : MessagesPigeonCodec() {
+  fun encode(value: Any?): ByteArray {
+    val stream = ByteArrayOutputStream()
+    writeValue(stream, value)
+    return stream.toByteArray()
+  }
 
-/** Generated interface from Pigeon that represents a handler of messages from Flutter. */
+  fun encodeOrNull(value: Any?): ByteArray? {
+    return if (value == null) null else encode(value)
+  }
+
+  fun decode(bytes: ByteArray): Any? {
+    return decodeMessage(ByteBuffer.wrap(bytes))
+  }
+
+  fun decodeArguments(bytes: ByteArray): List<Any?> {
+    return decode(bytes) as List<Any?>
+  }
+}
+
+
+
+val MediaCompressionHostApiInstances: MutableMap<String, MutableList<MediaCompressionHostApiRegistrar>> = mutableMapOf()
+@Keep
 interface MediaCompressionHostApi {
   fun createJob(): Long
-  fun queryImageCapabilities(): ImageCapabilitiesMsg
+  suspend fun queryImageCapabilities(): ImageCapabilitiesMsg
   suspend fun startImageCompress(id: Long, source: SourceMsg, destination: DestinationMsg, options: ImageOptionsMsg)
-  fun queryVideoCapabilities(): VideoCapabilitiesMsg
+  suspend fun queryVideoCapabilities(): VideoCapabilitiesMsg
   suspend fun startVideoCompress(id: Long, inputPath: String, outputPath: String, options: VideoOptionsMsg)
   fun cancelJob(id: Long)
   fun disposeJob(id: Long)
+}
+@Keep
+class MediaCompressionHostApiRegistrar private constructor(private val engineKey: Long) {
+  @Volatile private var api: MediaCompressionHostApi? = null
+
+  constructor() : this(MessagesPigeonEngineKeys.NO_KEY)
+
+  /**
+   * Registers [api] under [name] (or the default instance when [name] is
+   * omitted) for the engine of the plugin binding [binding].
+   *
+   * The registration is tied to that engine: unregistering it for this engine
+   * leaves other engines' registrations in place, and Dart code running on an
+   * engine uses the instance registered for that engine when it is known.
+   */
+  @Keep
+  fun register(api: MediaCompressionHostApi, binding: FlutterPlugin.FlutterPluginBinding, name: String = defaultInstanceName) {
+    registerWithKey(api, MessagesPigeonEngineKeys.keyOf(binding), name)
+  }
+
+  /**
+   * Registers [api] under [name] (or the default instance when [name] is
+   * omitted) for the engine of [engine].
+   *
+   * The registration is tied to that engine: unregistering it for this engine
+   * leaves other engines' registrations in place, and Dart code running on an
+   * engine uses the instance registered for that engine when it is known.
+   */
+  @Keep
+  fun register(api: MediaCompressionHostApi, engine: FlutterEngine, name: String = defaultInstanceName) {
+    registerWithKey(api, MessagesPigeonEngineKeys.keyOf(engine), name)
+  }
+
+  /**
+   * Removes [api] from the registrations under [name] (or the default instance
+   * when [name] is omitted) for the engine of the plugin binding [binding], leaving other
+   * registrations in place.
+   *
+   * Instances are matched by identity. If [api] is not registered for that
+   * engine but is registered for exactly one other engine, that registration is
+   * removed. Does nothing if [api] is not registered, or is only registered for
+   * several other engines.
+   */
+  @Keep
+  fun unregister(api: MediaCompressionHostApi, binding: FlutterPlugin.FlutterPluginBinding, name: String = defaultInstanceName) {
+    unregisterWithKey(api, MessagesPigeonEngineKeys.keyOf(binding), name)
+  }
+
+  /**
+   * Removes [api] from the registrations under [name] (or the default instance
+   * when [name] is omitted) for the engine of [engine], leaving other
+   * registrations in place.
+   *
+   * Instances are matched by identity. If [api] is not registered for that
+   * engine but is registered for exactly one other engine, that registration is
+   * removed. Does nothing if [api] is not registered, or is only registered for
+   * several other engines.
+   */
+  @Keep
+  fun unregister(api: MediaCompressionHostApi, engine: FlutterEngine, name: String = defaultInstanceName) {
+    unregisterWithKey(api, MessagesPigeonEngineKeys.keyOf(engine), name)
+  }
+
+  private fun registerWithKey(api: MediaCompressionHostApi, engineKey: Long, name: String) {
+    kotlin.synchronized(MediaCompressionHostApiInstances) {
+      val list = MediaCompressionHostApiInstances.getOrPut(name) { mutableListOf() }
+      val index = list.indexOfFirst { it.api === api && it.engineKey == engineKey }
+      if (index >= 0) {
+        list.add(list.removeAt(index))
+      } else {
+        val wrapper = MediaCompressionHostApiRegistrar(engineKey)
+        wrapper.api = api
+        list.add(wrapper)
+      }
+    }
+  }
+
+  private fun unregisterWithKey(api: MediaCompressionHostApi, engineKey: Long, name: String) {
+    kotlin.synchronized(MediaCompressionHostApiInstances) {
+      val list = MediaCompressionHostApiInstances[name] ?: return
+      val removeKey =
+        if (list.any { it.api === api && it.engineKey == engineKey }) {
+          engineKey
+        } else {
+          list.filter { it.api === api }.map { it.engineKey }.distinct().singleOrNull() ?: return
+        }
+      val iterator = list.iterator()
+      while (iterator.hasNext()) {
+        val entry = iterator.next()
+        if (entry.api === api && entry.engineKey == removeKey) {
+          entry.api = null
+          iterator.remove()
+        }
+      }
+      if (list.isEmpty()) {
+        MediaCompressionHostApiInstances.remove(name)
+      }
+    }
+  }
 
   companion object {
-    /** The codec used by MediaCompressionHostApi. */
-    val codec: MessageCodec<Any?> by lazy {
-      MessagesPigeonCodec()
-    }
-    /** Sets up an instance of `MediaCompressionHostApi` to handle messages through the `binaryMessenger`. */
-    @JvmOverloads
-    fun setUp(binaryMessenger: BinaryMessenger, api: MediaCompressionHostApi?, messageChannelSuffix: String = "") {
-      val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.createJob$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.createJob())
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.queryImageCapabilities$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.queryImageCapabilities())
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.startImageCompress$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val idArg = args[0] as Long
-            val sourceArg = args[1] as SourceMsg
-            val destinationArg = args[2] as DestinationMsg
-            val optionsArg = args[3] as ImageOptionsMsg
-            CoroutineScope(Dispatchers.Main).launch {
-              val wrapped: List<Any?> = try {
-                api.startImageCompress(idArg, sourceArg, destinationArg, optionsArg)
-                listOf(null)
-              } catch (exception: Throwable) {
-                MessagesPigeonUtils.wrapError(exception)
-              }
-              reply.reply(wrapped)
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.queryVideoCapabilities$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.queryVideoCapabilities())
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.startVideoCompress$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val idArg = args[0] as Long
-            val inputPathArg = args[1] as String
-            val outputPathArg = args[2] as String
-            val optionsArg = args[3] as VideoOptionsMsg
-            CoroutineScope(Dispatchers.Main).launch {
-              val wrapped: List<Any?> = try {
-                api.startVideoCompress(idArg, inputPathArg, outputPathArg, optionsArg)
-                listOf(null)
-              } catch (exception: Throwable) {
-                MessagesPigeonUtils.wrapError(exception)
-              }
-              reply.reply(wrapped)
-            }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.cancelJob$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val idArg = args[0] as Long
-            val wrapped: List<Any?> = try {
-              api.cancelJob(idArg)
-              listOf(null)
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.xue_hua_media_compression.MediaCompressionHostApi.disposeJob$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val idArg = args[0] as Long
-            val wrapped: List<Any?> = try {
-              api.disposeJob(idArg)
-              listOf(null)
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
+    /**
+     * Returns the instance registered under [name] for the engine identified by
+     * [engineId].
+     *
+     * Falls back to the most recent instance registered for [affinityKey], then to
+     * the most recent instance overall. Either key may be `Long.MIN_VALUE` when it
+     * is unknown.
+     *
+     * This is called by the generated Dart code and is not intended for direct use.
+     */
+    @JvmStatic
+    @Keep
+    fun pigeonResolveInstance(engineId: Long, affinityKey: Long, name: String = defaultInstanceName): MediaCompressionHostApiRegistrar? {
+      return kotlin.synchronized(MediaCompressionHostApiInstances) {
+        val list = MediaCompressionHostApiInstances[name] ?: return null
+        val exact = if (engineId != MessagesPigeonEngineKeys.NO_KEY) list.lastOrNull { it.engineKey == engineId } else null
+        val affine = if (affinityKey != MessagesPigeonEngineKeys.NO_KEY) list.lastOrNull { it.engineKey == affinityKey } else null
+        exact ?: affine ?: list.lastOrNull()
       }
     }
+
+    /**
+     * Returns the engine key that [instance] was registered with, or
+     * `Long.MIN_VALUE` if it is unknown.
+     *
+     * This is called by the generated Dart code and is not intended for direct use.
+     */
+    @JvmStatic
+    @Keep
+    fun pigeonEngineKeyOf(instance: MediaCompressionHostApiRegistrar): Long {
+      return instance.engineKey
+    }
+  }
+
+  fun createJob(): Long {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      return pigeonVar_api.createJob()
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+  suspend fun queryImageCapabilities(): ByteArray? {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      return MessagesPigeonInteropCodec.encodeOrNull(pigeonVar_api.queryImageCapabilities())
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+  suspend fun startImageCompress(id: Long, pigeonVar_args: ByteArray) {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      val pigeonVar_decodedArgs = MessagesPigeonInteropCodec.decodeArguments(pigeonVar_args)
+      val pigeonVar_arg_source = pigeonVar_decodedArgs[0] as SourceMsg
+      val pigeonVar_arg_destination = pigeonVar_decodedArgs[1] as DestinationMsg
+      val pigeonVar_arg_options = pigeonVar_decodedArgs[2] as ImageOptionsMsg
+      pigeonVar_api.startImageCompress(id, pigeonVar_arg_source, pigeonVar_arg_destination, pigeonVar_arg_options)
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+  suspend fun queryVideoCapabilities(): ByteArray? {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      return MessagesPigeonInteropCodec.encodeOrNull(pigeonVar_api.queryVideoCapabilities())
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+  suspend fun startVideoCompress(id: Long, inputPath: String, outputPath: String, pigeonVar_args: ByteArray) {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      val pigeonVar_decodedArgs = MessagesPigeonInteropCodec.decodeArguments(pigeonVar_args)
+      val pigeonVar_arg_options = pigeonVar_decodedArgs[0] as VideoOptionsMsg
+      pigeonVar_api.startVideoCompress(id, inputPath, outputPath, pigeonVar_arg_options)
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+  fun cancelJob(id: Long) {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      pigeonVar_api.cancelJob(id)
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+  fun disposeJob(id: Long) {
+    val pigeonVar_api = this.api ?: throw FlutterError("unregistered-instance", "MediaCompressionHostApi has not been registered.")
+    try {
+      pigeonVar_api.disposeJob(id)
+    } catch (e: FlutterError) {
+      throw FlutterError(e.code, e.message, MessagesPigeonInteropCodec.encodeOrNull(e.details)).apply {
+        stackTrace = e.stackTrace
+      }
+    }
+  }
+}
+/** Generated class from Pigeon that represents Flutter messages that can be called from Kotlin. */
+/** A registered [MediaCompressionFlutterApi] and the keys of the engine it belongs to. */
+class MediaCompressionFlutterApiRegistration(val api: MediaCompressionFlutterApi, val engineId: Long, val affinityKey: Long)
+
+/// Map that stores instances
+val registeredMediaCompressionFlutterApi: MutableMap<String, MutableList<MediaCompressionFlutterApiRegistration>> = mutableMapOf()
+
+/// Class that stores instances
+@Keep
+class MediaCompressionFlutterApiRegistrar() {
+  /**
+   * Registers [api] under [name] (or the default instance when [name] is omitted)
+   * for the engine identified by [engineId] and [affinityKey].
+   *
+   * Either key may be `Long.MIN_VALUE` when it is unknown. Registering an
+   * instance that is already registered under [name] updates its keys and keeps
+   * its position.
+   *
+   * This is called by the generated Dart code and is not intended for direct use.
+   */
+  @Keep
+  fun registerInstance(api: MediaCompressionFlutterApiBridge, engineId: Long, affinityKey: Long, name: String = defaultInstanceName) {
+    kotlin.synchronized(registeredMediaCompressionFlutterApi) {
+      val list = registeredMediaCompressionFlutterApi.getOrPut(name) { mutableListOf() }
+      val registration = MediaCompressionFlutterApiRegistration(MediaCompressionFlutterApiBridgeAdapter(api), engineId, affinityKey)
+      val index = list.indexOfFirst { (it.api as? MediaCompressionFlutterApiBridgeAdapter)?.bridge === api }
+      if (index >= 0) {
+        list[index] = registration
+      } else {
+        list.add(registration)
+      }
+    }
+  }
+
+  /**
+   * Removes [api] from the registrations under [name] (or the default instance
+   * when [name] is omitted), leaving other registrations in place.
+   *
+   * Instances are matched by identity. Does nothing if [api] is not registered.
+   *
+   * This is called by the generated Dart code and is not intended for direct use.
+   */
+  @Keep
+  fun unregisterInstance(api: MediaCompressionFlutterApiBridge, name: String = defaultInstanceName) {
+    kotlin.synchronized(registeredMediaCompressionFlutterApi) {
+      val list = registeredMediaCompressionFlutterApi[name] ?: return
+      list.removeAll { (it.api as? MediaCompressionFlutterApiBridgeAdapter)?.bridge === api }
+      if (list.isEmpty()) {
+        registeredMediaCompressionFlutterApi.remove(name)
+      }
+    }
+  }
+
+  /**
+   * Returns the instance registered under [name] (or the default instance when
+   * [name] is omitted) by the Dart code running on the engine of the plugin binding [binding].
+   *
+   * When no instance is known to belong to that engine, falls back to the most
+   * recent registration for [name]. Returns null if none is registered.
+   */
+  @Keep
+  fun getInstance(binding: FlutterPlugin.FlutterPluginBinding, name: String = defaultInstanceName): MediaCompressionFlutterApi? {
+    return getInstanceWithKey(MessagesPigeonEngineKeys.keyOf(binding), name)
+  }
+
+  /**
+   * Returns the instance registered under [name] (or the default instance when
+   * [name] is omitted) by the Dart code running on the engine of [engine].
+   *
+   * When no instance is known to belong to that engine, falls back to the most
+   * recent registration for [name]. Returns null if none is registered.
+   */
+  @Keep
+  fun getInstance(engine: FlutterEngine, name: String = defaultInstanceName): MediaCompressionFlutterApi? {
+    return getInstanceWithKey(MessagesPigeonEngineKeys.keyOf(engine), name)
+  }
+
+  private fun getInstanceWithKey(engineKey: Long, name: String): MediaCompressionFlutterApi? {
+    kotlin.synchronized(registeredMediaCompressionFlutterApi) {
+      val list = registeredMediaCompressionFlutterApi[name] ?: return null
+      if (engineKey != MessagesPigeonEngineKeys.NO_KEY) {
+        // Prefer the isolate running on the engine over isolates that only
+        // learned an affinity for it.
+        val match = list.lastOrNull { it.engineId == engineKey } ?: list.lastOrNull { it.affinityKey == engineKey }
+        if (match != null) {
+          return match.api
+        }
+      }
+      return list.lastOrNull()?.api
+    }
+  }
+}
+interface MediaCompressionFlutterApi {
+  suspend fun onProgress(value: Double)
+  suspend fun onImageCompleted(result: ImageCompressResultMsg)
+  suspend fun onVideoCompleted(result: VideoCompressResultMsg)
+  suspend fun onError(code: String, message: String)
+}
+
+/**
+ * The interface that Dart implements for [MediaCompressionFlutterApi].
+ *
+ * Values that the native interop transport passes directly are their own
+ * arguments and return values. All other arguments are encoded into one
+ * buffer, and other return values are returned in one.
+ */
+@Keep
+interface MediaCompressionFlutterApiBridge {
+  suspend fun onProgress(value: Double)
+  suspend fun onImageCompleted(pigeonVar_args: ByteArray)
+  suspend fun onVideoCompleted(pigeonVar_args: ByteArray)
+  suspend fun onError(code: String, message: String)
+}
+
+private class MediaCompressionFlutterApiBridgeAdapter(val bridge: MediaCompressionFlutterApiBridge) : MediaCompressionFlutterApi {
+  override suspend fun onProgress(value: Double)
+ {
+    this.bridge.onProgress(value)
+  }
+  override suspend fun onImageCompleted(result: ImageCompressResultMsg)
+ {
+    this.bridge.onImageCompleted(MessagesPigeonInteropCodec.encode(listOf<Any?>(result)))
+  }
+  override suspend fun onVideoCompleted(result: VideoCompressResultMsg)
+ {
+    this.bridge.onVideoCompleted(MessagesPigeonInteropCodec.encode(listOf<Any?>(result)))
+  }
+  override suspend fun onError(code: String, message: String)
+ {
+    this.bridge.onError(code, message)
   }
 }

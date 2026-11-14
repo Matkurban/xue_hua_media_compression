@@ -904,7 +904,7 @@ void CompressVideoWindows(
     const VideoOptionsMsg& options, const std::atomic<bool>& cancelled,
     std::atomic<bool>* output_opened,
     const std::function<void(double)>& on_progress,
-    const std::function<void(const flutter::EncodableMap&)>& on_completed,
+    const std::function<void(const VideoCompressResultMsg&)>& on_completed,
     const std::function<void(const std::string&, const std::string&)>& on_error) {
   auto fail = [&](const std::string& code, const std::string& message) {
     if (output_opened != nullptr && output_opened->exchange(false)) {
@@ -1193,17 +1193,9 @@ void CompressVideoWindows(
   const std::string encoder =
       std::string(used_hardware ? "MediaFoundationHW:" : "MediaFoundation:") +
       (hevc ? "H265" : "H264");
-  on_completed(flutter::EncodableMap{
-      {flutter::EncodableValue("outputPath"), flutter::EncodableValue(output_path)},
-      {flutter::EncodableValue("sizeBytes"), flutter::EncodableValue(size)},
-      {flutter::EncodableValue("encoderName"), flutter::EncodableValue(encoder)},
-      {flutter::EncodableValue("codec"),
-       flutter::EncodableValue(hevc ? "h265" : "h264")},
-      {flutter::EncodableValue("width"),
-       flutter::EncodableValue(static_cast<int64_t>(out_w))},
-      {flutter::EncodableValue("height"),
-       flutter::EncodableValue(static_cast<int64_t>(out_h))},
-  });
+  on_completed(VideoCompressResultMsg(
+      output_path, size, encoder, hevc ? "h265" : "h264",
+      static_cast<int64_t>(out_w), static_cast<int64_t>(out_h)));
 }
 
 }  // namespace xue_hua_media_compression
