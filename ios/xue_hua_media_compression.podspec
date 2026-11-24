@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'xue_hua_media_compression'
-  s.version          = '2.0.0'
+  s.version          = '2.4.1'
   s.summary          = 'iOS implementation of xue_hua_media_compression.'
   s.description      = <<-DESC
 ImageIO still-image compression and VideoToolbox hardware video encode for iOS.
@@ -13,7 +13,7 @@ ImageIO still-image compression and VideoToolbox hardware video encode for iOS.
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Matkurban' => '3496354336@qq.com' }
   s.source           = { :path => '.' }
-  s.source_files     = 'xue_hua_media_compression/Sources/**/*.{swift,m,h}'
+  s.source_files     = 'xue_hua_media_compression/Sources/xue_hua_media_compression/**/*.swift'
   s.resource_bundles = {
     'xue_hua_media_compression_privacy' => [
       'xue_hua_media_compression/Sources/xue_hua_media_compression/PrivacyInfo.xcprivacy'

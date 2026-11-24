@@ -36,7 +36,7 @@ GIF 输入只解码首帧。AVIF / GIF 在所有已支持平台上都不能编�
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.4.0
+  xue_hua_media_compression: ^2.4.1
 ```
 
 ```dart
@@ -134,7 +134,7 @@ dart run skills@ get --all
 ```bash
 flutter analyze
 flutter test
-dart run pigeon --input pigeons/messages.dart
+dart run tool/generate_pigeon.dart
 ```
 
 Linux 图片 / 视频压缩（GStreamer + libvips，不要安装 `gstreamer1.0-libav`）：

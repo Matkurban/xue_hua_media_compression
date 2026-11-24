@@ -1,3 +1,10 @@
+## [2.4.1] - 2026-11-24
+
+### Fixed / 修复
+
+- **iOS TestFlight / Xcode Archive & macOS Release FFI symbol stripping**: Xcode Archive (`DEPLOYMENT_POSTPROCESSING = YES` with default `STRIP_STYLE = all`) strips C trampoline exports from `xue_hua_media_compression_objc_gen/Messages.g.m` when statically linked into `Runner`, causing `dlsym(RTLD_DEFAULT, ...): symbol not found` at runtime. Moved `*_objc_gen/*.m` into a dedicated `DynamicLoadingBundled` Dart Native Code Asset (`hook/build.dart` with explicit `code_assets` and `hooks` dependencies), bound `lib/src/messages.g.ffi.dart` via `@ffi.DefaultAsset('package:xue_hua_media_compression/xue_hua_media_compression_objc_gen.dylib')` (maintained by `tool/generate_pigeon.dart`), and removed duplicate `.m` compilation from iOS/macOS `Package.swift` and `.podspec`. Works out of the box with zero host-app configuration changes.
+  **修复 iOS TestFlight / Xcode Archive 与 macOS Release 符号剥离导致的 FFI 崩溃**：Xcode Archive 在默认 `STRIP_STYLE = all` 下会剥离静态链接进 `Runner` 的 `xue_hua_media_compression_objc_gen/Messages.g.m` C trampoline 导出符号，导致运行时报 `dlsym(RTLD_DEFAULT, ...): symbol not found`。现已通过 `hook/build.dart`（并显式声明 `code_assets` / `hooks` 依赖）将其打包为独立的 `DynamicLoadingBundled` Native Code Asset，在 `lib/src/messages.g.ffi.dart` 中绑定 `@ffi.DefaultAsset('package:xue_hua_media_compression/xue_hua_media_compression_objc_gen.dylib')`（由 `tool/generate_pigeon.dart` 自动维护），并移除 iOS/macOS `Package.swift` 与 `.podspec` 中的重复编译。宿主应用无需做任何配置修改即可直接生效。
+
 ## [2.4.0] - 2026-11-15
 
 ### Changed / 变更

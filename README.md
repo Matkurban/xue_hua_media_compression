@@ -43,7 +43,7 @@ supported platform.
 
 ```yaml
 dependencies:
-  xue_hua_media_compression: ^2.4.0
+  xue_hua_media_compression: ^2.4.1
 ```
 
 ```dart
@@ -155,7 +155,7 @@ From the package root:
 ```bash
 flutter analyze
 flutter test
-dart run pigeon --input pigeons/messages.dart
+dart run tool/generate_pigeon.dart
 ```
 
 Linux image and video compression (GStreamer + libvips, no `gstreamer1.0-libav`):

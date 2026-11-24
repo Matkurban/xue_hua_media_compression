@@ -18,19 +18,13 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "xue_hua_media_compression_objc_gen",
-      dependencies: [],
-      publicHeadersPath: "."
-    ),
-    .target(
       name: "xue_hua_media_compression",
       dependencies: [
-        "xue_hua_media_compression_objc_gen",
-        .product(name: "FlutterFramework", package: "FlutterFramework"),
+        .product(name: "FlutterFramework", package: "FlutterFramework")
       ],
       resources: [
         .process("PrivacyInfo.xcprivacy")
       ]
-    ),
+    )
   ]
 )
